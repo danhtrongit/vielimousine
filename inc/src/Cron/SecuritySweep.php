@@ -14,6 +14,7 @@ final class SecuritySweep
         $table = $wpdb->prefix . 'vie_activity_log';
 
         $since = gmdate('Y-m-d H:i:s', time() - HOUR_IN_SECONDS);
+        $threshold = (int) apply_filters('vie_security_sweep_threshold', self::THRESHOLD);
 
         $rows = $wpdb->get_results(
             $wpdb->prepare(
@@ -26,7 +27,7 @@ final class SecuritySweep
                  HAVING c > %d",
                 'login_failed',
                 $since,
-                self::THRESHOLD
+                $threshold
             ),
             ARRAY_A
         );

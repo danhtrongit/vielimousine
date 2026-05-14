@@ -100,5 +100,11 @@ require __DIR__ . '/payment-e2e.php';
 echo "\n=== Phase 6 — Auth E2E ===\n\n";
 require __DIR__ . '/auth-e2e.php';
 
+echo "\n=== Phase 12 — Smoke E2E ===\n\n";
+require __DIR__ . '/smoke-e2e.php';
+
+echo "\n=== Phase 12 — Security E2E ===\n\n";
+require __DIR__ . '/security-e2e.php';
+
 echo "\n=== TOTAL: {$pass} passed, {$fail} failed ===\n";
 exit($fail === 0 ? 0 : 1);
