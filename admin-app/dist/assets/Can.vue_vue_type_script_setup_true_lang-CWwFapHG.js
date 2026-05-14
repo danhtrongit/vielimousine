@@ -1,1 +1,0 @@
-import{h as o,u as c,d as s,e as p,U as u}from"./index-CiAJSMUT.js";const f=o({__name:"Can",props:{cap:{},capAny:{}},setup(a){const e=a,t=c(),n=u(()=>e.cap?t.can(e.cap):e.capAny?t.canAny(e.capAny):!0);return(r,m)=>n.value?s(r.$slots,"default",{key:0}):p("",!0)}});export{f as _};

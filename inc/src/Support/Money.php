@@ -9,4 +9,10 @@ final class Money
     {
         return (int) (round($value / 1000) * 1000);
     }
+
+    public static function vnd(int|float|null $value): string
+    {
+        $n = (int) round((float) ($value ?? 0));
+        return number_format($n, 0, ',', '.') . ' ₫';
+    }
 }

@@ -8,6 +8,7 @@ final class HookRegistry
     public const ORDER_CREATED   = 'vie_order_created';
     public const ORDER_CANCELLED = 'vie_order_cancelled';
     public const ORDER_CONFIRMED = 'vie_order_confirmed';
+    public const ORDER_NO_SHOW   = 'vie_order_no_show';
     public const PAYMENT_LOGGED  = 'vie_payment_logged';
 
     public const USER_LOGGED_IN       = 'vie_user_logged_in';

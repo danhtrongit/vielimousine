@@ -36,6 +36,10 @@ const menuItems = computed(() => [
     show: auth.canAny(['vie_manage_payments', 'vie_view_all_orders']) },
   { label: 'Báo cáo', icon: 'pi pi-chart-bar', to: '/reports',
     show: auth.canAny(['vie_view_reports', 'vie_view_reports_own_hotel']) },
+  { label: 'Nhật ký', icon: 'pi pi-history', to: '/activity-log',
+    show: auth.can('vie_view_audit') },
+  { label: 'Cài đặt', icon: 'pi pi-cog', to: '/settings',
+    show: auth.can('vie_manage_settings') },
 ].filter((m) => m.show));
 
 const userMenuItems = computed(() => [

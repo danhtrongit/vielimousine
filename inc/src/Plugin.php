@@ -17,8 +17,9 @@ final class Plugin
         add_action('rest_api_init', [Service\Auth\CorsHandler::class, 'register']);
         add_action('init', [Frontend\AdminAppLoader::class, 'register']);
 
-        Email\OrderEmailListener::register();
+        Email\OrderEmailService::register();
         Frontend\ShortcodeRegistry::register();
         Frontend\PublicAssets::register();
+        Cron\CronRegistry::register();
     }
 }

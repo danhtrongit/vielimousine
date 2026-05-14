@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Vie\Http\Controllers;
 
 use Vie\Container;
+use Vie\Cron\SecuritySweep;
 use Vie\DTO\LoginRequest;
 use Vie\Service\Auth\AuthService;
 use Vie\Service\Auth\InvalidCredentialsException;
@@ -18,6 +19,13 @@ final class AuthController
 {
     public static function login(\WP_REST_Request $request): \WP_REST_Response
     {
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        if ($ip !== '' && SecuritySweep::isBlocked($ip)) {
+            return ResponseEnvelope::error([
+                ['code' => 'ip_blocked', 'field' => null, 'message' => 'Truy cập tạm thời bị khóa do quá nhiều lần đăng nhập sai.'],
+            ], 429);
+        }
+
         $data = $request->get_json_params() ?? [];
         if (!is_array($data)) {
             $data = [];

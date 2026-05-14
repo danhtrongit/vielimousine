@@ -20,6 +20,7 @@ use Vie\Http\Controllers\ProductCodeController;
 use Vie\Http\Controllers\PublicOrderController;
 use Vie\Http\Controllers\QuoteController;
 use Vie\Http\Controllers\RoomController;
+use Vie\Http\Controllers\SettingsController;
 use Vie\Http\Controllers\RoomPriceBulkController;
 use Vie\Http\Controllers\RoomPriceController;
 use Vie\Http\Controllers\SepayWebhookController;
@@ -138,6 +139,26 @@ final class RestRouter
             'methods'             => 'POST',
             'callback'            => [RoomPriceBulkController::class, 'bulk'],
             'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+        ]);
+
+        // Phase 11: settings
+        $manageSettings = AuthMiddleware::requireCap('vie_manage_settings');
+        register_rest_route(VIE_API_NAMESPACE, '/settings/general', [
+            ['methods' => 'GET', 'callback' => [SettingsController::class, 'getGeneral'],   'permission_callback' => $manageSettings],
+            ['methods' => 'PUT', 'callback' => [SettingsController::class, 'updateGeneral'],'permission_callback' => $manageSettings],
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/settings/email', [
+            ['methods' => 'GET', 'callback' => [SettingsController::class, 'getEmail'],   'permission_callback' => $manageSettings],
+            ['methods' => 'PUT', 'callback' => [SettingsController::class, 'updateEmail'],'permission_callback' => $manageSettings],
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/settings/email/test', [
+            'methods'             => 'POST',
+            'callback'            => [SettingsController::class, 'testEmail'],
+            'permission_callback' => $manageSettings,
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/settings/sepay', [
+            ['methods' => 'GET', 'callback' => [SettingsController::class, 'getSepay'],   'permission_callback' => $manageSettings],
+            ['methods' => 'PUT', 'callback' => [SettingsController::class, 'updateSepay'],'permission_callback' => $manageSettings],
         ]);
     }
 
