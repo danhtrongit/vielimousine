@@ -1,0 +1,1 @@
+import{W as a}from"./index-CiAJSMUT.js";const s={list:(t={})=>a.get("/orders",{params:t}).then(e=>e.data),get:t=>a.get(`/orders/${t}`).then(e=>e.data),create:(t,e)=>a.post("/orders",t,{headers:e?{"X-Idempotency-Key":e}:void 0}).then(r=>r.data),cancel:(t,e)=>a.post(`/orders/${t}/cancel`,{reason:e}).then(r=>r.data)};export{s as o};

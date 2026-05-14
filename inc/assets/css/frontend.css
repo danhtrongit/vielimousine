@@ -1,0 +1,227 @@
+/* Vielimousine — Public frontend (Phase 10) */
+
+.vie-public {
+  font-family: Tahoma, Arial, sans-serif;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 1100px;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+
+.vie-public *,
+.vie-public *::before,
+.vie-public *::after { box-sizing: border-box; }
+
+.vie-public h1, .vie-public h2, .vie-public h3 {
+  font-family: Tahoma, Arial, sans-serif;
+  color: #111827;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.vie-public h1 { font-size: 1.6rem; margin: 0 0 1rem; }
+.vie-public h2 { font-size: 1.25rem; margin: 1.25rem 0 .75rem; }
+.vie-public h3 { font-size: 1rem; margin: 1rem 0 .5rem; }
+
+.vie-public p { margin: 0 0 .75rem; }
+.vie-public a { color: #1d4ed8; text-decoration: none; }
+.vie-public a:hover { text-decoration: underline; }
+
+.vie-public__muted { color: #6b7280; font-size: 0.9rem; }
+.vie-public__loading { color: #6b7280; font-style: italic; }
+.vie-public__error-inline { color: #b91c1c; background: #fee2e2; padding: .65rem .85rem; border-radius: 6px; border: 1px solid #fca5a5; }
+
+/* ---------- Buttons ---------- */
+.vie-public__btn {
+  display: inline-block;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #1f2937;
+  padding: .55rem 1.1rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+  text-decoration: none;
+}
+.vie-public__btn:hover { background: #f3f4f6; }
+.vie-public__btn--primary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+}
+.vie-public__btn--primary:hover { background: #1e40af; border-color: #1e40af; color: #fff; }
+.vie-public__btn:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ---------- Form ---------- */
+.vie-public__form { display: flex; flex-direction: column; gap: 1rem; }
+.vie-public__fieldset {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 0;
+  background: #fff;
+}
+.vie-public__fieldset legend {
+  padding: 0 .5rem;
+  color: #111827;
+  font-weight: 600;
+}
+
+.vie-public__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.vie-public__row--3 { grid-template-columns: repeat(3, 1fr); }
+.vie-public__field { display: flex; flex-direction: column; gap: .35rem; }
+.vie-public__field label { font-size: .85rem; font-weight: 500; color: #374151; }
+.vie-public__field .required { color: #dc2626; }
+
+.vie-public__input,
+.vie-public__select,
+.vie-public__textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: .55rem .7rem;
+  font-size: .95rem;
+  font-family: inherit;
+  background: #fff;
+  width: 100%;
+  color: #111827;
+}
+.vie-public__textarea { min-height: 80px; resize: vertical; }
+.vie-public__input:focus,
+.vie-public__select:focus,
+.vie-public__textarea:focus {
+  outline: none;
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
+}
+
+.vie-public__inline-group {
+  display: flex;
+  gap: .5rem;
+}
+.vie-public__inline-group .vie-public__input { flex: 1; }
+
+.vie-public__coupon-status { margin-top: .35rem; font-size: .85rem; }
+.vie-public__coupon-status--ok { color: #047857; }
+.vie-public__coupon-status--err { color: #b91c1c; }
+
+/* ---------- Layout: checkout grid ---------- */
+.vie-public__checkout-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.vie-public__summary {
+  position: sticky;
+  top: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+.vie-public__summary h2 { margin-top: 0; }
+.vie-public__sum-row {
+  display: flex;
+  justify-content: space-between;
+  padding: .35rem 0;
+  border-bottom: 1px dashed #e5e7eb;
+  font-size: .92rem;
+}
+.vie-public__sum-row:last-child { border-bottom: none; }
+.vie-public__sum-row--discount { color: #047857; }
+.vie-public__total-line {
+  margin-top: .9rem;
+  padding-top: .75rem;
+  border-top: 2px solid #1f2937;
+  font-size: 1.1rem;
+  display: flex;
+  justify-content: space-between;
+}
+.vie-public__total-line strong { font-size: 1.2rem; color: #b91c1c; }
+
+.vie-public__notes {
+  margin: .75rem 0 0;
+  padding-left: 1.1rem;
+  font-size: .85rem;
+  color: #4b5563;
+}
+.vie-public__notes li { margin-bottom: .25rem; }
+
+/* ---------- Room cards ---------- */
+.vie-public__rooms-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.vie-public__room-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.vie-public__room-card h3 { margin: 0; }
+.vie-public__room-price { font-weight: 600; color: #b91c1c; margin: 0; }
+.vie-public__room-card .vie-public__btn { margin-top: auto; }
+
+/* ---------- Success page ---------- */
+.vie-public__success-card {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+.vie-public__success-card h2 { margin-top: 0; color: #166534; }
+.vie-public__order-items {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+.vie-public__order-items li {
+  background: #fff;
+  border: 1px solid #d1fae5;
+  border-radius: 6px;
+  padding: .75rem 1rem;
+  margin-bottom: .5rem;
+}
+
+/* ---------- Policy section ---------- */
+.vie-public-hotel { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; font-family: Tahoma, Arial, sans-serif; }
+.vie-public-hotel__booking, .vie-public-hotel__policy {
+  margin: 2rem 0;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+.vie-public-hotel__policy table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: .5rem;
+}
+.vie-public-hotel__policy th,
+.vie-public-hotel__policy td {
+  border: 1px solid #e5e7eb;
+  padding: .5rem .75rem;
+  text-align: left;
+  font-size: .9rem;
+}
+.vie-public-hotel__policy th { background: #f9fafb; font-weight: 600; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .vie-public__row,
+  .vie-public__row--3,
+  .vie-public__checkout-grid { grid-template-columns: 1fr; }
+  .vie-public__summary { position: static; }
+}
