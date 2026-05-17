@@ -7,7 +7,6 @@ use Vie\DTO\OrderRequest;
 use Vie\DTO\QuoteRequest;
 use Vie\Repository\ActivityLogRepository;
 use Vie\Repository\CustomerRepository;
-use Vie\Repository\HotelRepository;
 use Vie\Repository\OrderItemRepository;
 use Vie\Repository\OrderRepository;
 use Vie\Repository\PaymentLogRepository;
@@ -28,14 +27,12 @@ final class OrderService
         private readonly CustomerRepository $customerRepo,
         private readonly RoomRepository $roomRepo,
         private readonly RoomPriceRepository $roomPriceRepo,
-        private readonly HotelRepository $hotelRepo,
         private readonly PaymentLogRepository $paymentRepo,
         private readonly ActivityLogRepository $activityRepo,
         private readonly PriceCalculator $priceCalc,
         private readonly CouponService $couponService,
         private readonly OrderCodeGenerator $codeGen,
         private readonly OrderStateMachine $stateMachine,
-        private readonly CancellationCalculator $cancelCalc,
         private readonly PaymentLedger $paymentLedger,
     ) {
     }
@@ -221,10 +218,8 @@ final class OrderService
                     'order_id'              => $orderId,
                     'hotel_id'              => (int) $room['hotel_id'],
                     'room_id'               => $r->roomId,
-                    'product_code_id'       => null,
-                    'product_code'          => null,
                     'name'                  => (string) $room['name'],
-                    'booking_type'          => $r->bookingType === 'combo' ? 'night' : 'night',
+                    'booking_type'          => $r->bookingType,
                     'unit_label'            => 'đêm',
                     'quantity'              => $bd->numRooms,
                     'checkin'               => $r->checkin,
@@ -259,7 +254,10 @@ final class OrderService
                 );
             }
 
-            // 11. Activity log
+            // 11. Cập nhật booking_count customer (recompute từ vie_order)
+            $this->customerRepo->recomputeBookingCount((int) $customer['id']);
+
+            // 12. Activity log
             $this->activityRepo->create([
                 'actor_user_id' => get_current_user_id() ?: 0,
                 'entity_type'   => 'order',
@@ -289,7 +287,7 @@ final class OrderService
         return $this->buildDetail($orderId);
     }
 
-    public function cancel(int $orderId, string $reason, int $actorUserId = 0): array
+    public function cancel(int $orderId, string $reason, int $actorUserId = 0, int $refundAmount = 0): array
     {
         $order = $this->orderRepo->find($orderId);
         if ($order === null) {
@@ -299,16 +297,9 @@ final class OrderService
         $this->stateMachine->assertTransition((string) $order['status'], 'cancelled');
 
         $items     = $this->loadItems($orderId);
-        $hotelIds  = array_unique(array_map(static fn($i) => (int) $i['hotel_id'], $items));
-        $hotelsById = [];
-        foreach ($hotelIds as $hid) {
-            $h = $this->hotelRepo->find($hid);
-            if ($h !== null) {
-                $hotelsById[$hid] = $h;
-            }
-        }
 
-        $refund = $this->cancelCalc->compute($order, $items, $hotelsById);
+        $paidAmount   = (int) ($order['paid_amount'] ?? 0);
+        $refundAmount = max(0, min($refundAmount, $paidAmount));
 
         global $wpdb;
         $wpdb->query('START TRANSACTION');
@@ -336,12 +327,22 @@ final class OrderService
                 $wpdb->query($sql);
             }
 
-            // Update order status
-            $this->orderRepo->update($orderId, [
+            // Compare-and-swap: chỉ cancel khi status hiện tại == status đã đọc.
+            // Chống race với transition() và cron NoShowSweep.
+            if (!$this->orderRepo->updateIfStatus($orderId, (string) $order['status'], [
                 'status'        => 'cancelled',
                 'cancelled_at'  => current_time('mysql'),
                 'cancel_reason' => $reason,
-            ]);
+            ])) {
+                throw new IllegalTransitionException(
+                    "Đơn đã được chuyển sang trạng thái khác trong lúc bạn thao tác. Vui lòng tải lại."
+                );
+            }
+
+            // Recompute booking_count cho customer (đơn vừa cancel sẽ bị loại)
+            if (!empty($order['customer_id'])) {
+                $this->customerRepo->recomputeBookingCount((int) $order['customer_id']);
+            }
 
             // Update each item
             foreach ($items as $item) {
@@ -357,15 +358,15 @@ final class OrderService
 
             // Refund via PaymentLedger (single source of truth)
             $ledgerResult = null;
-            if ($refund->actualRefund > 0) {
+            if ($refundAmount > 0) {
                 $paymentReq = new PaymentRequest(
                     orderId:       $orderId,
                     type:          'refund',
-                    amount:        $refund->actualRefund,
+                    amount:        $refundAmount,
                     method:        'manual',
                     gateway:       null,
                     transactionId: null,
-                    note:          'Refund tự động khi hủy đơn: ' . $reason,
+                    note:          'Hoàn tiền thủ công khi hủy đơn: ' . $reason,
                     paidAt:        current_time('mysql'),
                     createdBy:     $actorUserId ?: null,
                     rawPayload:    null,
@@ -379,11 +380,12 @@ final class OrderService
                 'entity_type'   => 'order',
                 'entity_id'     => $orderId,
                 'action'        => 'cancel',
-                'before_json'   => ['status' => $order['status'], 'paid_amount' => (int) $order['paid_amount']],
+                'before_json'   => ['status' => $order['status'], 'paid_amount' => $paidAmount],
                 'after_json'    => [
                     'status'        => 'cancelled',
                     'cancel_reason' => $reason,
-                    'refund'        => $refund->toArray(),
+                    'refund_amount' => $refundAmount,
+                    'paid_amount'   => $paidAmount,
                 ],
             ]);
 
@@ -398,11 +400,84 @@ final class OrderService
             $this->paymentLedger->fireHooksAfterCommit($ledgerResult);
         }
 
-        do_action(HookRegistry::ORDER_CANCELLED, $orderId, $this->orderRepo->find($orderId), $refund);
+        $refundCtx = [
+            'paid_amount'    => $paidAmount,
+            'refund_amount'  => $refundAmount,
+            'remaining_held' => $paidAmount - $refundAmount,
+            'penalty_amount' => max(0, $paidAmount - $refundAmount),
+            'reason'         => $reason,
+        ];
+        $cancelledOrder = $this->orderRepo->find($orderId);
+        do_action(HookRegistry::ORDER_CANCELLED, $orderId, $cancelledOrder, $refundCtx);
 
         $detail = $this->buildDetail($orderId);
-        $detail['refund_preview'] = $refund->toArray();
+        $detail['refund'] = $refundCtx;
         return $detail;
+    }
+
+    /**
+     * Generic status transition for orders (non-cancel paths).
+     * Allowed: pending → confirmed | no_show
+     *          confirmed → completed
+     * Use cancel() for cancellation (it handles refund + stock restore separately).
+     */
+    public function transition(int $orderId, string $newStatus, int $actorUserId = 0): array
+    {
+        $order = $this->orderRepo->find($orderId);
+        if ($order === null) {
+            throw new OrderNotFoundException("Đơn hàng #{$orderId} không tồn tại");
+        }
+
+        $current = (string) $order['status'];
+        $this->stateMachine->assertTransition($current, $newStatus);
+
+        if ($newStatus === 'cancelled') {
+            throw new \LogicException('Use cancel() instead of transition() for cancellations');
+        }
+
+        global $wpdb;
+        $wpdb->query('START TRANSACTION');
+        try {
+            $patch = ['status' => $newStatus];
+            if ($newStatus === 'confirmed') {
+                $patch['confirmed_at'] = current_time('mysql');
+            } elseif ($newStatus === 'completed') {
+                $patch['completed_at'] = current_time('mysql');
+            }
+            // Compare-and-swap: chỉ update khi status hiện tại == $current.
+            // Chống race với cron NoShowSweep và 2 admin cùng bấm 2 button.
+            if (!$this->orderRepo->updateIfStatus($orderId, $current, $patch)) {
+                throw new IllegalTransitionException(
+                    "Đơn đã được chuyển sang trạng thái khác trong lúc bạn thao tác. Vui lòng tải lại."
+                );
+            }
+
+            $this->activityRepo->create([
+                'actor_user_id' => $actorUserId,
+                'entity_type'   => 'order',
+                'entity_id'     => $orderId,
+                'action'        => 'transition',
+                'before_json'   => ['status' => $current],
+                'after_json'    => ['status' => $newStatus],
+            ]);
+
+            $wpdb->query('COMMIT');
+        } catch (\Throwable $e) {
+            $wpdb->query('ROLLBACK');
+            throw $e;
+        }
+
+        $updated = $this->orderRepo->find($orderId);
+        $hookMap = [
+            'confirmed' => HookRegistry::ORDER_CONFIRMED,
+            'completed' => HookRegistry::ORDER_COMPLETED,
+            'no_show'   => HookRegistry::ORDER_NO_SHOW,
+        ];
+        if (isset($hookMap[$newStatus])) {
+            do_action($hookMap[$newStatus], $orderId, $updated);
+        }
+
+        return $this->buildDetail($orderId);
     }
 
     public function buildDetail(int $orderId): array
@@ -489,6 +564,16 @@ final class OrderService
         return array_values(array_unique($unavailable));
     }
 
+    /**
+     * Compare-and-swap stock decrement. Mỗi UPDATE chỉ thành công nếu
+     * `stock >= $needed AND is_active = 1` ngay tại thời điểm execute.
+     *
+     * Nếu rows_affected != 1 → có ai đó (race) đã rút stock dưới ngưỡng giữa
+     * checkAndLockStock (SELECT FOR UPDATE) và decrementStock (UPDATE).
+     * Throw StockUnavailableException để TX outer rollback toàn bộ order.
+     *
+     * @throws \Vie\Service\Order\StockUnavailableException
+     */
     private function decrementStock(array $targets): void
     {
         global $wpdb;
@@ -496,12 +581,31 @@ final class OrderService
 
         foreach ($targets as $roomId => $dateMap) {
             foreach ($dateMap as $date => $needed) {
-                $wpdb->query($wpdb->prepare(
-                    "UPDATE {$table} SET stock = stock - %d WHERE room_id = %d AND date = %s",
+                $needed = (int) $needed;
+                $rid    = (int) $roomId;
+                $d      = (string) $date;
+                $affected = $wpdb->query($wpdb->prepare(
+                    "UPDATE {$table}
+                        SET stock = stock - %d, updated_at = %s
+                      WHERE room_id = %d
+                        AND date = %s
+                        AND is_active = 1
+                        AND stock >= %d",
                     $needed,
-                    (int) $roomId,
-                    (string) $date
+                    current_time('mysql'),
+                    $rid,
+                    $d,
+                    $needed
                 ));
+                if ($affected === false) {
+                    throw new \RuntimeException('Stock decrement SQL failed: ' . $wpdb->last_error);
+                }
+                if ((int) $affected !== 1) {
+                    throw new \Vie\Service\Order\StockUnavailableException(
+                        [$d],
+                        sprintf('Phòng không đủ tồn kho cho ngày %s.', $d)
+                    );
+                }
             }
         }
     }

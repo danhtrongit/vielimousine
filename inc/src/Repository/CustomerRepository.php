@@ -96,4 +96,51 @@ final class CustomerRepository extends AbstractRepository
         $digits  = preg_replace('/\D+/', '', $phone) ?? '';
         return $hasPlus ? '+' . $digits : $digits;
     }
+
+    /**
+     * Đếm đơn của customer từ `vie_order` (loại trừ đơn đã hủy),
+     * cập nhật cột `booking_count` và trả về số mới.
+     */
+    public function recomputeBookingCount(int $customerId): int
+    {
+        if ($customerId <= 0) {
+            return 0;
+        }
+        global $wpdb;
+        $orderTbl = $wpdb->prefix . 'vie_order';
+        $count = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$orderTbl} WHERE customer_id = %d AND status <> 'cancelled'",
+                $customerId
+            )
+        );
+        $wpdb->update(
+            $this->table(),
+            ['booking_count' => $count],
+            ['id' => $customerId],
+            ['%d'],
+            ['%d']
+        );
+        return $count;
+    }
+
+    /**
+     * Backfill: recompute booking_count cho tất cả customer.
+     * Dùng cho one-shot migration sau khi fix bug counter.
+     */
+    public function recomputeAllBookingCounts(): int
+    {
+        global $wpdb;
+        $orderTbl = $wpdb->prefix . 'vie_order';
+        // Update bằng JOIN — 1 query duy nhất, scale tốt.
+        $sql = "UPDATE {$this->table()} c
+                LEFT JOIN (
+                    SELECT customer_id, COUNT(*) AS cnt
+                      FROM {$orderTbl}
+                     WHERE status <> 'cancelled'
+                     GROUP BY customer_id
+                ) AS o ON o.customer_id = c.id
+                   SET c.booking_count = COALESCE(o.cnt, 0)";
+        return (int) $wpdb->query($sql);
+    }
 }

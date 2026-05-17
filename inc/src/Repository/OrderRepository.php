@@ -203,4 +203,52 @@ final class OrderRepository extends AbstractRepository
         );
         return $row !== null ? $this->castRow($row) : null;
     }
+
+    /**
+     * Compare-and-swap update: chỉ apply $patch khi `status` hiện tại trong DB
+     * còn bằng $expectedStatus. Trả về true nếu update thành công, false nếu
+     * status đã đổi (race).
+     *
+     * Áp dụng cho mọi state transition (confirm/complete/cancel/no_show) thay
+     * thế pattern read-then-update truyền thống.
+     *
+     * $patch dùng fillable filter + cast giống AbstractRepository::update.
+     */
+    public function updateIfStatus(int $id, string $expectedStatus, array $patch): bool
+    {
+        global $wpdb;
+        $fillable = $this->fillable();
+        $safe = array_intersect_key($patch, array_flip($fillable));
+        if ($safe === []) {
+            return false;
+        }
+        $safe['updated_at'] = current_time('mysql');
+
+        // Build SET clause với placeholders đúng kiểu cho mỗi cột.
+        $setParts = [];
+        $params   = [];
+        foreach ($safe as $col => $val) {
+            if ($val === null) {
+                $setParts[] = "{$col} = NULL";
+                continue;
+            }
+            $ph = is_int($val) ? '%d' : (is_float($val) ? '%f' : '%s');
+            $setParts[] = "{$col} = {$ph}";
+            $params[]   = $val;
+        }
+        $params[] = $id;
+        $params[] = $expectedStatus;
+
+        $sql = sprintf(
+            "UPDATE %s SET %s WHERE id = %%d AND status = %%s",
+            $this->table(),
+            implode(', ', $setParts)
+        );
+        $prepared = $wpdb->prepare($sql, ...$params);
+        $affected = $wpdb->query($prepared);
+        if ($affected === false) {
+            throw new \RuntimeException('Order CAS update failed: ' . $wpdb->last_error);
+        }
+        return (int) $affected === 1;
+    }
 }

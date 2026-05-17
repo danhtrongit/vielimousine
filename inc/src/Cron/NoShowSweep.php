@@ -17,15 +17,20 @@ final class NoShowSweep
         global $wpdb;
         $table = $wpdb->prefix . 'vie_order';
 
+        // Dùng WP timezone thay vì DB CURDATE() để biên ngày khớp với cảm nhận
+        // của khách (site Asia/Ho_Chi_Minh, DB có thể chạy UTC).
+        $today = wp_date('Y-m-d');
+
         $ids = $wpdb->get_col(
             $wpdb->prepare(
                 "SELECT id FROM {$table}
                  WHERE status = %s
-                   AND checkin < CURDATE()
+                   AND checkin < %s
                    AND paid_amount = 0
                  ORDER BY id ASC
                  LIMIT %d",
                 'pending',
+                $today,
                 self::BATCH_LIMIT
             )
         );
@@ -39,21 +44,22 @@ final class NoShowSweep
 
         foreach ($ids as $idRaw) {
             $id = (int) $idRaw;
-            $before = $orderRepo->find($id);
-            if ($before === null || ($before['status'] ?? '') !== 'pending') {
+
+            // Compare-and-swap: UPDATE chỉ thành công khi status vẫn là 'pending'.
+            // Phòng race với admin transition vừa confirm/cancel ngay trước cron.
+            $affected = $wpdb->query($wpdb->prepare(
+                "UPDATE {$table}
+                    SET status = %s, updated_at = %s
+                  WHERE id = %d AND status = %s AND paid_amount = 0",
+                'no_show',
+                current_time('mysql'),
+                $id,
+                'pending'
+            ));
+            if ($affected !== 1) {
+                // Order đã thay đổi trong lúc cron xử lý — skip không log để tránh nhiễu.
                 continue;
             }
-
-            $wpdb->update(
-                $table,
-                [
-                    'status'     => 'no_show',
-                    'updated_at' => current_time('mysql'),
-                ],
-                ['id' => $id],
-                ['%s', '%s'],
-                ['%d']
-            );
 
             $after = $orderRepo->find($id);
 
@@ -63,7 +69,7 @@ final class NoShowSweep
                     'entity_type'   => 'order',
                     'entity_id'     => $id,
                     'action'        => 'no_show_sweep',
-                    'before_json'   => ['status' => $before['status'] ?? null],
+                    'before_json'   => ['status' => 'pending'],
                     'after_json'    => ['status' => 'no_show'],
                     'ip'            => null,
                     'user_agent'    => 'cron:vie_no_show_sweep',

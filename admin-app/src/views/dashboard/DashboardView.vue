@@ -6,7 +6,7 @@ import ProgressSpinner from 'primevue/progressspinner';
 import { ordersApi } from '@/api/orders.api';
 import { paymentsApi } from '@/api/payments.api';
 import { useUIStore } from '@/stores/ui.store';
-import { formatVND } from '@/composables/useFormat';
+import { formatVND, ymdLocal } from '@/composables/useFormat';
 import type { Order, Payment } from '@/types/order';
 
 const orders30d = ref<Order[]>([]);
@@ -14,15 +14,11 @@ const payments30d = ref<Payment[]>([]);
 const loading = ref(true);
 
 const ui = useUIStore();
-ui.setBreadcrumb([{ label: 'Dashboard' }]);
-
-function ymd(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
+ui.setBreadcrumb([{ label: 'Tổng quan' }]);
 
 const today = new Date();
-const todayStr = ymd(today);
-const thirtyDaysAgo = ymd(new Date(today.getTime() - 30 * 24 * 3600 * 1000));
+const todayStr = ymdLocal(today);
+const thirtyDaysAgo = ymdLocal(new Date(today.getTime() - 30 * 24 * 3600 * 1000));
 
 onMounted(async () => {
   try {
@@ -56,7 +52,7 @@ const paid30d = computed(() =>
 const chartData = computed(() => {
   const buckets: Record<string, number> = {};
   for (let i = 29; i >= 0; i--) {
-    const d = ymd(new Date(today.getTime() - i * 24 * 3600 * 1000));
+    const d = ymdLocal(new Date(today.getTime() - i * 24 * 3600 * 1000));
     buckets[d] = 0;
   }
   for (const o of orders30d.value) {

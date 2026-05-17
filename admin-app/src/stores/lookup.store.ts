@@ -2,13 +2,16 @@ import { defineStore } from 'pinia';
 import { hotelsApi } from '@/api/hotels.api';
 import { roomsApi } from '@/api/rooms.api';
 import { surchargesApi, type Surcharge } from '@/api/surcharges.api';
+import { usersApi, type VieUser } from '@/api/users.api';
 import type { Hotel, Room } from '@/types/hotel';
+import { decodeEntities } from '@/composables/useFormat';
 
 export const useLookupStore = defineStore('lookup', {
   state: () => ({
     hotels: [] as Hotel[],
     rooms: [] as Room[],
     surcharges: [] as Surcharge[],
+    users: [] as VieUser[],
     loaded: false,
     loading: false,
   }),
@@ -21,20 +24,29 @@ export const useLookupStore = defineStore('lookup', {
       s.rooms.find((r) => r.id === id),
     surchargesByRoom: (s) => (roomId: number): Surcharge[] =>
       s.surcharges.filter((sc) => sc.room_id === roomId && sc.is_active),
+    userById: (s) => (id: number): VieUser | undefined =>
+      s.users.find((u) => u.id === id),
+    displayUser: (s) => (id: number | null | undefined): string => {
+      if (!id) return '—';
+      const u = s.users.find((x) => x.id === id);
+      return u?.display_name || `User #${id}`;
+    },
   },
   actions: {
     async ensureLoaded() {
       if (this.loaded || this.loading) return;
       this.loading = true;
       try {
-        const [hotelsResp, roomsResp, surchargesResp] = await Promise.all([
+        const [hotelsResp, roomsResp, surchargesResp, usersResp] = await Promise.all([
           hotelsApi.list({ per_page: 100, is_active: 1 }),
           roomsApi.list({ per_page: 100, is_active: 1 }),
           surchargesApi.list({ per_page: 200, is_active: 1 }),
+          usersApi.list().catch(() => ({ data: [] as VieUser[] })),
         ]);
-        this.hotels = hotelsResp.data;
-        this.rooms = roomsResp.data;
-        this.surcharges = surchargesResp.data;
+        this.hotels = hotelsResp.data.map((h) => ({ ...h, name: decodeEntities(h.name) }));
+        this.rooms = roomsResp.data.map((r) => ({ ...r, name: decodeEntities(r.name) }));
+        this.surcharges = surchargesResp.data.map((s) => ({ ...s, label: decodeEntities(s.label) }));
+        this.users = (usersResp.data ?? []).map((u) => ({ ...u, display_name: decodeEntities(u.display_name) }));
         this.loaded = true;
       } finally {
         this.loading = false;

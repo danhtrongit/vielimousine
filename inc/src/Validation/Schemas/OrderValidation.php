@@ -45,6 +45,13 @@ final class OrderValidation
 
     public static function updateRules(int $id): array
     {
+        // PUT /orders/{id} chỉ cho phép sửa metadata.
+        // Money / status / payment / coupon / invoice phải đi qua endpoint riêng:
+        //   - status              → POST /orders/{id}/transition hoặc /cancel
+        //   - paid_amount / payment_status → PaymentLedger (qua webhook hoặc /payments)
+        //   - subtotal/total/discount → không sửa được (cancel + tạo lại)
+        //   - coupon              → không sửa được sau khi tạo
+        //   - invoice_number      → InvoiceService::getOrAssignNumber (LOCK TABLES)
         return [
             'customer_phone'          => 'nullable|phone',
             'customer_name'           => 'nullable|string|max:255',
@@ -55,21 +62,8 @@ final class OrderValidation
             'internal_note'           => 'nullable|string',
             'pickup'                  => 'nullable|array',
             'dropoff'                 => 'nullable|array',
-            'subtotal'                => 'nullable|float|min:0',
-            'discount'                => 'nullable|float|min:0',
-            'tax'                     => 'nullable|float|min:0',
-            'total'                   => 'nullable|float|min:0',
-            'cost_total'              => 'nullable|float|min:0',
-            'profit_total'            => 'nullable|float',
-            'coupon_id'               => 'nullable|int',
-            'coupon_code'             => 'nullable|string|max:50',
-            'payment_status'          => 'nullable|string|in:pending,partial,paid,refunded',
-            'paid_amount'             => 'nullable|float|min:0',
             'partner_payment_status'  => 'nullable|string|max:30',
-            'invoice_number'          => 'nullable|string|max:100',
             'voucher_code'            => 'nullable|string|max:100',
-            'status'                  => 'nullable|string|in:pending,confirmed,cancelled,completed',
-            'cancel_reason'           => 'nullable|string',
         ];
     }
 }

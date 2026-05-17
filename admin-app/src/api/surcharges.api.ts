@@ -8,6 +8,8 @@ export interface Surcharge {
   label: string;
   age_from: number;
   age_to: number;
+  child_index_min: number;
+  child_index_max: number | null;
   amount: number;
   is_free: boolean;
   sort_order: number;
@@ -31,7 +33,28 @@ export const surchargesApi = {
     api.post<Envelope<Surcharge>>('/surcharges', body).then((r) => r.data),
   update: (id: number, body: Partial<Surcharge>) =>
     api.put<Envelope<Surcharge>>(`/surcharges/${id}`, body).then((r) => r.data),
+  delete: (id: number) =>
+    api.delete<Envelope<{ ok: boolean }>>(`/surcharges/${id}`).then((r) => r.data),
 };
+
+export interface SurchargePriceBulkScope {
+  surcharge_ids: number[];
+  date_from: string;
+  date_to: string;
+  weekdays?: number[] | null;
+}
+
+export interface SurchargePriceBulkValues {
+  amount?: number;
+  is_active?: boolean;
+}
+
+export interface SurchargePriceBulkResult {
+  rows_affected: number;
+  dates_count: number;
+  surcharges_count: number;
+  cells_count: number;
+}
 
 export const surchargePricesApi = {
   list: (params: Record<string, unknown> = {}) =>
@@ -40,4 +63,6 @@ export const surchargePricesApi = {
     api.post<Envelope<SurchargePrice>>('/surcharge-prices', body).then((r) => r.data),
   update: (id: number, body: Partial<SurchargePrice>) =>
     api.put<Envelope<SurchargePrice>>(`/surcharge-prices/${id}`, body).then((r) => r.data),
+  bulk: (scope: SurchargePriceBulkScope, values: SurchargePriceBulkValues) =>
+    api.post<Envelope<SurchargePriceBulkResult>>('/surcharge-prices/bulk', { scope, values }).then((r) => r.data),
 };

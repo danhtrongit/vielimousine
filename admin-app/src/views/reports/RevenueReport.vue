@@ -5,9 +5,9 @@ import Chart from 'primevue/chart';
 import Button from 'primevue/button';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { formatVND } from '@/composables/useFormat';
-import type { Order, Payment } from '@/types/order';
+import type { Order } from '@/types/order';
 
-const props = defineProps<{ orders: Order[]; payments: Payment[] }>();
+const props = defineProps<{ orders: Order[] }>();
 const csv = useCsvExport();
 
 // Match Dashboard logic: filter out cancelled orders
@@ -16,11 +16,11 @@ const filtered = computed(() => props.orders.filter((o) => o.status !== 'cancell
 const summary = computed(() => {
   const f = filtered.value;
   const revenue = f.reduce((s, o) => s + (o.total ?? 0), 0);
-  const paid = props.payments
-    .filter((p) => p.type === 'payment' || p.type === 'deposit')
-    .reduce((s, p) => s + (p.amount ?? 0), 0);
+  // "Đã thu" cộng dồn paid_amount của orders đã lọc, để khớp với filter
+  // (sales/KS/source). Trước đây cộng tổng `payments` thô → không phản ánh filter.
+  const paid = f.reduce((s, o) => s + (o.paid_amount ?? 0), 0);
   const outstanding = f.reduce((s, o) => s + Math.max(0, (o.total ?? 0) - (o.paid_amount ?? 0)), 0);
-  const cost = f.reduce((s, o) => s + ((o as any).cost_total ?? 0), 0);
+  const cost = f.reduce((s, o) => s + (o.cost_total ?? 0), 0);
   const profit = revenue - cost;
   return {
     orders: f.length,

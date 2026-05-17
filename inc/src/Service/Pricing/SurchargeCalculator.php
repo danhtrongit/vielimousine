@@ -84,7 +84,15 @@ final class SurchargeCalculator
     private function findRule(ChildAssessment $c): ?array
     {
         foreach ($this->rules as $rule) {
-            if ($c->age >= (int) $rule['age_from'] && $c->age <= (int) $rule['age_to']) {
+            $ageOk = $c->age >= (int) $rule['age_from'] && $c->age <= (int) $rule['age_to'];
+            if (!$ageOk) {
+                continue;
+            }
+            $idxMin = (int) ($rule['child_index_min'] ?? 1);
+            $idxMaxRaw = $rule['child_index_max'] ?? null;
+            $idxOk = $c->childIndex >= $idxMin
+                  && ($idxMaxRaw === null || $c->childIndex <= (int) $idxMaxRaw);
+            if ($idxOk) {
                 return $rule;
             }
         }
@@ -109,7 +117,17 @@ final class SurchargeCalculator
             'sort'       => 'sort_order',
             'per_page'   => 100,
         ]);
-        $this->rules = $result['data'] ?? [];
+        $rules = $result['data'] ?? [];
+        // Sort by child_index_min DESC so more specific rules (idx=2,3...) match before generic (idx=1, unbounded).
+        usort($rules, static function ($a, $b) {
+            $aMin = (int) ($a['child_index_min'] ?? 1);
+            $bMin = (int) ($b['child_index_min'] ?? 1);
+            if ($aMin !== $bMin) {
+                return $bMin <=> $aMin;
+            }
+            return (int) ($a['sort_order'] ?? 0) <=> (int) ($b['sort_order'] ?? 0);
+        });
+        $this->rules = $rules;
     }
 
     private function loadOverrides(SurchargePriceRepository $repo): void
@@ -118,22 +136,8 @@ final class SurchargeCalculator
             return;
         }
         $ruleIds = array_map(static fn($r) => (int) $r['id'], $this->rules);
-        $dates   = $this->nights;
-        sort($dates);
-
-        $result = $repo->all([
-            'is_active' => 1,
-            'date_from' => $dates[0],
-            'date_to'   => $dates[count($dates) - 1],
-            'per_page'  => 100,
-        ]);
-        foreach ($result['data'] ?? [] as $row) {
-            if (!in_array((int) $row['surcharge_id'], $ruleIds, true)) {
-                continue;
-            }
-            if (!in_array($row['date'], $this->nights, true)) {
-                continue;
-            }
+        $rows    = $repo->findOverridesByDateRange($ruleIds, $this->nights);
+        foreach ($rows as $row) {
             $this->priceOverrides[$row['surcharge_id'] . '|' . $row['date']] = (int) $row['amount'];
         }
     }

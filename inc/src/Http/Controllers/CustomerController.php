@@ -25,12 +25,17 @@ final class CustomerController
 
     public static function show(\WP_REST_Request $request): \WP_REST_Response
     {
+        $id   = (int) $request->get_param('id');
         $repo = Container::get(CustomerRepository::class);
-        $row  = $repo->find((int) $request->get_param('id'));
+        $row  = $repo->find($id);
 
         if ($row === null) {
             return ResponseEnvelope::notFound('Customer');
         }
+
+        // Recompute booking_count để luôn chính xác (tránh counter drift)
+        $repo->recomputeBookingCount($id);
+        $row = $repo->find($id);
 
         return ResponseEnvelope::success($row);
     }

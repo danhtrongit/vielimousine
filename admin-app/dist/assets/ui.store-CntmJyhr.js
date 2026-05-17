@@ -1,1 +1,0 @@
-import{ac as s}from"./index-Ci0TGa1D.js";const r=s("ui",{state:()=>({sidebarCollapsed:!1,breadcrumb:[]}),actions:{toggleSidebar(){this.sidebarCollapsed=!this.sidebarCollapsed},setBreadcrumb(e){this.breadcrumb=e}}});export{r as u};

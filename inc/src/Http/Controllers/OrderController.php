@@ -18,6 +18,26 @@ use Vie\Validation\Schemas\OrderCreateValidation;
 
 final class OrderController
 {
+    /**
+     * Object-level IDOR guard for any write/read of a single order.
+     * Returns null when authorized; returns a 403/404 response when not.
+     */
+    private static function ensureCanAccess(int $orderId): ?\WP_REST_Response
+    {
+        $repo  = Container::get(OrderRepository::class);
+        $order = $repo->find($orderId);
+        if ($order === null) {
+            return ResponseEnvelope::notFound('Đơn hàng');
+        }
+        $userId = (int) get_current_user_id();
+        if (!$repo->canUserViewOrder($userId, $order)) {
+            return ResponseEnvelope::error([
+                ['code' => 'forbidden', 'field' => null, 'message' => 'Bạn không có quyền thao tác với đơn này'],
+            ], 403);
+        }
+        return null;
+    }
+
     public static function index(\WP_REST_Request $request): \WP_REST_Response
     {
         $repo   = Container::get(OrderRepository::class);
@@ -116,11 +136,9 @@ final class OrderController
 
     public static function update(\WP_REST_Request $request): \WP_REST_Response
     {
-        $id   = (int) $request->get_param('id');
-        $repo = Container::get(OrderRepository::class);
-
-        if ($repo->find($id) === null) {
-            return ResponseEnvelope::notFound('Đơn hàng');
+        $id = (int) $request->get_param('id');
+        if ($denied = self::ensureCanAccess($id)) {
+            return $denied;
         }
 
         $data = $request->get_json_params();
@@ -130,20 +148,32 @@ final class OrderController
             return ResponseEnvelope::error($v->errors(), 422);
         }
 
-        $row = $repo->update($id, $v->validated());
+        $repo = Container::get(OrderRepository::class);
+        $row  = $repo->update($id, $v->validated());
         return ResponseEnvelope::success($row);
     }
 
+    /**
+     * DELETE /orders/{id} không xóa cứng — chuyển sang soft-cancel để bảo toàn
+     * audit trail, restore stock, và release coupon usage qua OrderService::cancel.
+     */
     public static function destroy(\WP_REST_Request $request): \WP_REST_Response
     {
-        $id   = (int) $request->get_param('id');
-        $repo = Container::get(OrderRepository::class);
-
-        if ($repo->find($id) === null) {
-            return ResponseEnvelope::notFound('Đơn hàng');
+        $id = (int) $request->get_param('id');
+        if ($denied = self::ensureCanAccess($id)) {
+            return $denied;
         }
 
-        $repo->delete($id);
+        try {
+            $orderSvc = Container::get(OrderService::class);
+            $orderSvc->cancel($id, 'Hủy qua DELETE /orders/{id}', (int) get_current_user_id(), 0);
+        } catch (OrderNotFoundException $e) {
+            return ResponseEnvelope::notFound('Đơn hàng');
+        } catch (\Vie\Service\Order\IllegalTransitionException $e) {
+            return ResponseEnvelope::error([
+                ['code' => 'illegal_transition', 'field' => 'status', 'message' => $e->getMessage()],
+            ], 409);
+        }
 
         return new \WP_REST_Response(null, 204);
     }

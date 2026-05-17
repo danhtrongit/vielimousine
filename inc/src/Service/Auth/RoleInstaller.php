@@ -29,6 +29,7 @@ final class RoleInstaller
         'vie_print_order',
         'vie_manage_inventory_own_hotel',
         'vie_manage_settings',
+        'vie_manage_media',
     ];
 
     public static function install(): void
@@ -54,6 +55,7 @@ final class RoleInstaller
             'vie_use_price_check'   => true,
             'vie_print_order'       => true,
             'vie_manage_settings'   => true,
+            'vie_manage_media'      => true,
         ]);
 
         self::ensureRole(self::ROLE_SALES, 'Vie Sales', [

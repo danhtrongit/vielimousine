@@ -225,3 +225,89 @@
   .vie-public__checkout-grid { grid-template-columns: 1fr; }
   .vie-public__summary { position: static; }
 }
+
+/* ============================================================
+   Single Hotel — parent theme overrides
+   Parent rules: vielimousine/assets/css/single-hotel.css
+   Goal: keep parent's header / gallery / combo / utilities visual
+         but give the Vue booking section and sidebar widget a clean
+         canvas (no excessive padding, no green form wrapper).
+   ============================================================ */
+
+/* 1. Main column article: parent sets `padding: 20px 80px` which is
+      too much horizontal space and squeezes the Vue room cards.
+      Replace with a reasonable vertical-only rhythm. */
+body.single-hotel .vie-row .cell.vie-col-9 article {
+  padding:  0 !important;
+}
+
+/* 2. Vue booking section: sits in the article flow.
+      Section title reuses parent's `.single-tour-title-content` styling
+      (uppercase 22px) so it visually aligns with Combo / Utilities titles.
+      scroll-margin-top compensates parent's sticky #bottom-header so the
+      "ĐẶT NGAY" anchor (href="#form_booking") lands at section top, not under header. */
+body.single-hotel .vie-booking-section {
+  margin: 24px 0;
+  scroll-margin-top: 120px;
+}
+body.single-hotel .vie-booking-section .single-tour-title-content {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+/* 3. Vue room app root: parent has no rule for these classes, but the
+      article's old `padding: 20px 80px` was the only culprit. After (1)
+      these collapse to flex column with the gap defined in main.css.
+      Keep this as a defensive reset against any future parent change. */
+body.single-hotel .vh-app-embedded,
+body.single-hotel .vh-room {
+  padding: 0 !important;
+}
+
+/* 4. Booking-unavailable fallback (when hotel chưa cấu hình rooms). */
+body.single-hotel .vie-booking-unavailable {
+  margin: 24px 0;
+  padding: 16px 20px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 6px;
+  color: #874d00;
+}
+
+/* 5. Sidebar widget: parent stacks 2 boxes flush —
+      `.single_tour_sidebar-price-inner` (green header, rounded top)
+      `.single_tour_sidebar-form-inner` (form area, rounded bottom).
+      Make the Vue widget flow as the form-inner content seamlessly:
+      no double card, no green tint, top corners flush with the header. */
+body.single-hotel .vie-row .cell.vie-col-3 .single_tour_sidebar-form-inner:has(#vie-booking-widget) {
+  background: #fff;
+  padding: 0;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+  border: 1px solid var(--vie-border, #e5e7eb);
+  border-top: none;
+}
+body.single-hotel #vie-booking-widget {
+  display: block;
+  background: #fff;
+}
+body.single-hotel #vie-booking-widget .vh-widget-wrap {
+  margin: 0;
+}
+/* Neutralize widget's own border/shadow/rounding inside sidebar so it
+   acts like the content of parent's form-inner box, not a nested card. */
+body.single-hotel #vie-booking-widget .vh-widget {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 16px 14px;
+}
+
+/* 6. Mobile: parent stacks col-9 + col-3, sticky becomes useless.
+      Make sure the widget doesn't get cropped or stick awkwardly. */
+@media only screen and (max-width: 47.99875rem) {
+  body.single-hotel .vie-row .cell.vie-col-3 .single_tour_sidebar-wrapper {
+    position: static;
+  }
+}
+

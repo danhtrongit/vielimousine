@@ -4,9 +4,9 @@ import { useRouter } from 'vue-router';
 import Card from 'primevue/card';
 import Steps from 'primevue/steps';
 import Button from 'primevue/button';
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 import MultiSelect from 'primevue/multiselect';
-import Calendar from 'primevue/calendar';
+import DatePicker from 'primevue/datepicker';
 import InputNumber from 'primevue/inputnumber';
 import ToggleSwitch from 'primevue/toggleswitch';
 import Message from 'primevue/message';
@@ -14,7 +14,7 @@ import { useUIStore } from '@/stores/ui.store';
 import { useLookupStore } from '@/stores/lookup.store';
 import { useNotify } from '@/composables/useNotify';
 import { roomPricesApi } from '@/api/roomPrices.api';
-import { formatVND } from '@/composables/useFormat';
+import { formatVND, ymdLocal } from '@/composables/useFormat';
 
 const router = useRouter();
 const ui = useUIStore();
@@ -63,10 +63,10 @@ const WEEKDAYS = [
 ];
 
 const SOURCES = [
-  { label: 'Manual', value: 'manual' },
+  { label: 'Thủ công', value: 'manual' },
   { label: 'Theo ngày trong tuần', value: 'weekday_rule' },
-  { label: 'Override ngày lễ', value: 'holiday_override' },
-  { label: 'Import', value: 'import' },
+  { label: 'Áp đặt ngày lễ', value: 'holiday_override' },
+  { label: 'Nhập từ file', value: 'import' },
 ];
 
 const submitting = ref(false);
@@ -107,7 +107,7 @@ function nextStep() {
 function prevStep() { if (stepIndex.value > 0) stepIndex.value--; }
 
 function fmtDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return ymdLocal(d);
 }
 
 onMounted(async () => {
@@ -153,12 +153,14 @@ async function submit() {
           <div class="grid-2">
             <div class="field">
               <label>Khách sạn</label>
-              <Dropdown
+              <Select
                 v-model="scope.hotel_id"
                 :options="lookup.hotels"
                 option-label="name"
                 option-value="id"
                 placeholder="Chọn khách sạn"
+                filter
+                filter-placeholder="Tìm khách sạn…"
               />
             </div>
             <div class="field">
@@ -175,11 +177,11 @@ async function submit() {
             </div>
             <div class="field">
               <label>Từ ngày</label>
-              <Calendar v-model="scope.date_from" date-format="yy-mm-dd" show-icon />
+              <DatePicker v-model="scope.date_from" date-format="yy-mm-dd" show-icon />
             </div>
             <div class="field">
               <label>Đến ngày</label>
-              <Calendar v-model="scope.date_to" date-format="yy-mm-dd" show-icon />
+              <DatePicker v-model="scope.date_to" date-format="yy-mm-dd" show-icon />
             </div>
             <div class="field grid-span-2">
               <label>Lọc theo thứ (bỏ trống = mọi ngày)</label>
@@ -217,7 +219,7 @@ async function submit() {
             </div>
             <div class="field">
               <label>Nguồn</label>
-              <Dropdown
+              <Select
                 v-model="values.source"
                 :options="SOURCES"
                 option-label="label"

@@ -18,7 +18,6 @@ if (!function_exists('vie_email_render_items')) {
         foreach ($items as $item) {
             $hotel  = esc_html((string) ($item['hotel_name'] ?? ''));
             $room   = esc_html((string) ($item['room_name'] ?? ''));
-            $code   = esc_html((string) ($item['product_code'] ?? ''));
             $type   = esc_html((string) ($item['booking_type'] ?? ''));
             $checkin  = esc_html((string) ($item['checkin'] ?? ''));
             $checkout = esc_html((string) ($item['checkout'] ?? ''));
@@ -35,7 +34,7 @@ if (!function_exists('vie_email_render_items')) {
 
             $out .= '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #e5e7eb;border-radius:6px;margin:0 0 12px;border-collapse:separate;">';
             $out .= '<tr><td colspan="2" style="background:#f9fafb;padding:8px 12px;font-weight:600;border-bottom:1px solid #e5e7eb;">';
-            $out .= ($code !== '' ? "{$code} — " : '') . ($hotel !== '' ? $hotel : 'Khách sạn');
+            $out .= $hotel !== '' ? $hotel : 'Khách sạn';
             $out .= '</td></tr>';
             $out .= '<tr><td style="padding:6px 12px;color:#6b7280;width:42%;">Phòng / Loại</td><td style="padding:6px 12px;">' . ($room !== '' ? $room : '—') . ($type !== '' ? " ({$type})" : '') . '</td></tr>';
             $out .= '<tr><td style="padding:6px 12px;color:#6b7280;">Nhận → Trả</td><td style="padding:6px 12px;">' . $checkin . ' → ' . $checkout . ($nights ? " ({$nights} đêm)" : '') . ($qty > 1 ? " × {$qty} {$unit}" : '') . '</td></tr>';

@@ -15,7 +15,6 @@ final class Fixtures
         $items = [[
             'hotel_name'           => 'The Capella Vũng Tàu',
             'room_name'            => 'Phòng Deluxe Hướng Biển',
-            'product_code'         => 'CAP-DLX-OCN',
             'booking_type'         => 'combo',
             'quantity'             => 1,
             'unit_label'           => 'phòng',

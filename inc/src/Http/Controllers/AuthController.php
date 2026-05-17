@@ -11,6 +11,7 @@ use Vie\Service\Auth\InvalidCredentialsException;
 use Vie\Service\Auth\InvalidTokenException;
 use Vie\Service\Auth\TokenReuseException;
 use Vie\Service\Settings\AuthSettings;
+use Vie\Support\ClientIp;
 use Vie\Support\ResponseEnvelope;
 use Vie\Support\Validator;
 use Vie\Validation\Schemas\LoginValidation;
@@ -19,7 +20,7 @@ final class AuthController
 {
     public static function login(\WP_REST_Request $request): \WP_REST_Response
     {
-        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        $ip = ClientIp::clientIp();
         if ($ip !== '' && SecuritySweep::isBlocked($ip)) {
             return ResponseEnvelope::error([
                 ['code' => 'ip_blocked', 'field' => null, 'message' => 'Truy cập tạm thời bị khóa do quá nhiều lần đăng nhập sai.'],
@@ -39,7 +40,7 @@ final class AuthController
         try {
             $req = LoginRequest::fromArray(
                 $v->validated(),
-                $_SERVER['REMOTE_ADDR']     ?? null,
+                $ip !== '' ? $ip : null,
                 $_SERVER['HTTP_USER_AGENT'] ?? null,
             );
             $tokens = Container::get(AuthService::class)->login($req);
@@ -61,9 +62,10 @@ final class AuthController
         }
 
         try {
+            $ip     = ClientIp::clientIp();
             $tokens = Container::get(AuthService::class)->refresh(
                 $raw,
-                $_SERVER['REMOTE_ADDR']     ?? null,
+                $ip !== '' ? $ip : null,
                 $_SERVER['HTTP_USER_AGENT'] ?? null,
             );
             return self::respondWithTokens($tokens, 200);
@@ -127,9 +129,9 @@ final class AuthController
                     'expires'  => $expiresAt->getTimestamp(),
                     'path'     => $settings->refreshCookiePath(),
                     'domain'   => '',
-                    'secure'   => is_ssl(),
+                    'secure'   => ClientIp::isSecure(),
                     'httponly' => true,
-                    'samesite' => 'Lax',
+                    'samesite' => 'Strict',
                 ]
             );
         }

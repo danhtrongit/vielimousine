@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import TabView from 'primevue/tabview';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
+import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import Button from 'primevue/button';
-import PriceMatrixView from './PriceMatrixView.vue';
-import SurchargeMatrixView from './SurchargeMatrixView.vue';
-import TicketMatrixView from './TicketMatrixView.vue';
+import PricingConfigView from './PricingConfigView.vue';
+import UnifiedMatrixView from './UnifiedMatrixView.vue';
 import { useUIStore } from '@/stores/ui.store';
 
 const router = useRouter();
 const ui = useUIStore();
-const activeTab = ref('rooms');
+const activeTab = ref('config');
 
 onMounted(() => {
   ui.setBreadcrumb([{ label: 'Bảng giá' }]);
@@ -25,17 +27,20 @@ onMounted(() => {
       <Button label="Cập nhật hàng loạt" icon="pi pi-bolt" severity="warn" @click="router.push('/pricing/bulk')" />
     </div>
 
-    <TabView v-model:value="activeTab">
-      <TabPanel header="Giá phòng" value="rooms">
-        <PriceMatrixView v-if="activeTab === 'rooms'" />
-      </TabPanel>
-      <TabPanel header="Phụ thu" value="surcharges">
-        <SurchargeMatrixView v-if="activeTab === 'surcharges'" />
-      </TabPanel>
-      <TabPanel header="Vé xe" value="tickets">
-        <TicketMatrixView v-if="activeTab === 'tickets'" />
-      </TabPanel>
-    </TabView>
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="config">Cấu hình</Tab>
+        <Tab value="matrix">Theo ngày</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="config">
+          <PricingConfigView v-if="activeTab === 'config'" />
+        </TabPanel>
+        <TabPanel value="matrix">
+          <UnifiedMatrixView v-if="activeTab === 'matrix'" />
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
   </div>
 </template>
 

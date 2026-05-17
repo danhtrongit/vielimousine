@@ -18,9 +18,9 @@ const filterSchema: FilterDef[] = [
     { label: 'Hoạt động', value: '1' },
     { label: 'Vô hiệu', value: '0' },
   ]},
-  { key: 'sales_only', label: 'Sales only', type: 'enum', options: [
-    { label: 'Sales only', value: '1' },
-    { label: 'Mọi nguồn', value: '0' },
+  { key: 'sales_only', label: 'Kênh áp dụng', type: 'enum', options: [
+    { label: 'Chỉ kênh Sales', value: '1' },
+    { label: 'Mọi kênh', value: '0' },
   ]},
 ];
 

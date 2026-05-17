@@ -1,0 +1,1 @@
+import{ai as s}from"./index-CvzrLKog.js";const r=s("ui",{state:()=>({sidebarCollapsed:!1,breadcrumb:[]}),actions:{toggleSidebar(){this.sidebarCollapsed=!this.sidebarCollapsed},setBreadcrumb(e){this.breadcrumb=e}}});export{r as u};

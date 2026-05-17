@@ -6,6 +6,9 @@ namespace Vie\Http\Controllers;
 use Vie\Container;
 use Vie\Repository\HotelRepository;
 use Vie\Repository\RepositoryException;
+use Vie\Service\Hotel\HotelDeleteService;
+use Vie\Service\Hotel\HotelInUseException;
+use Vie\Service\Hotel\HotelSyncService;
 use Vie\Support\ResponseEnvelope;
 use Vie\Support\Validator;
 use Vie\Validation\Schemas\HotelValidation;
@@ -45,8 +48,20 @@ final class HotelController
             return ResponseEnvelope::error($v->errors(), 422);
         }
 
+        $clean = $v->validated();
+
+        // Auto-create WP post nếu SPA không truyền post_id
+        if (empty($clean['post_id'])) {
+            $sync = Container::get(HotelSyncService::class);
+            $clean['post_id'] = $sync->createPost(
+                (string) ($clean['name'] ?? ''),
+                isset($clean['slug']) ? (string) $clean['slug'] : null,
+                isset($clean['description']) ? (string) $clean['description'] : null,
+            );
+        }
+
         $repo  = Container::get(HotelRepository::class);
-        $hotel = $repo->create($v->validated());
+        $hotel = $repo->create($clean);
 
         return ResponseEnvelope::success($hotel, [], 201);
     }
@@ -70,6 +85,9 @@ final class HotelController
 
         $hotel = $repo->update($id, $v->validated());
 
+        // Push lên WP post (no-op nếu post_id rỗng hoặc đang trong vòng sync)
+        Container::get(HotelSyncService::class)->pushToPost($hotel);
+
         return ResponseEnvelope::success($hotel);
     }
 
@@ -83,7 +101,14 @@ final class HotelController
             return ResponseEnvelope::notFound('Hotel');
         }
 
-        $repo->delete($id);
+        try {
+            Container::get(HotelDeleteService::class)
+                ->delete($id, (int) get_current_user_id());
+        } catch (HotelInUseException $e) {
+            return ResponseEnvelope::error([
+                ['code' => 'hotel_in_use', 'field' => null, 'message' => $e->getMessage()],
+            ], 409);
+        }
 
         return new \WP_REST_Response(null, 204);
     }

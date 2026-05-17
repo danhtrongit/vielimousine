@@ -6,8 +6,8 @@ import Steps from 'primevue/steps';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
-import Dropdown from 'primevue/dropdown';
-import Calendar from 'primevue/calendar';
+import Select from 'primevue/select';
+import DatePicker from 'primevue/datepicker';
 import Textarea from 'primevue/textarea';
 import Chips from 'primevue/chips';
 import Message from 'primevue/message';
@@ -15,7 +15,7 @@ import ProgressSpinner from 'primevue/progressspinner';
 import { useUIStore } from '@/stores/ui.store';
 import { useLookupStore, ORDER_SOURCES } from '@/stores/lookup.store';
 import { useNotify } from '@/composables/useNotify';
-import { formatVND, formatDate } from '@/composables/useFormat';
+import { formatVND, formatDate, ymdLocal } from '@/composables/useFormat';
 import { quoteApi, couponsApi, type PriceBreakdown } from '@/api/quote.api';
 import { ordersApi } from '@/api/orders.api';
 import { customersApi } from '@/api/customers.api';
@@ -144,7 +144,7 @@ async function runQuote() {
 }
 
 function toDateStr(v: string | Date): string {
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (v instanceof Date) return ymdLocal(v);
   return v;
 }
 
@@ -276,7 +276,7 @@ onMounted(() => { lookup.ensureLoaded(); });
           <div class="grid-2">
             <div class="field">
               <label>Phòng</label>
-              <Dropdown
+              <Select
                 v-model="wizard.item.room_id"
                 :options="roomOptions"
                 option-label="label"
@@ -288,7 +288,7 @@ onMounted(() => { lookup.ensureLoaded(); });
             </div>
             <div class="field">
               <label>Loại đặt</label>
-              <Dropdown
+              <Select
                 v-model="wizard.item.booking_type"
                 :options="[{label:'Phòng', value:'room'},{label:'Combo (phòng + vé)', value:'combo'}]"
                 option-label="label"
@@ -298,17 +298,17 @@ onMounted(() => { lookup.ensureLoaded(); });
             </div>
             <div class="field">
               <label>Check-in</label>
-              <Calendar
+              <DatePicker
                 :model-value="wizard.item.checkin ? new Date(wizard.item.checkin) : null"
-                @update:model-value="(v: any) => { wizard.item.checkin = v instanceof Date ? v.toISOString().slice(0,10) : ''; runQuote(); }"
+                @update:model-value="(v: any) => { wizard.item.checkin = v instanceof Date ? ymdLocal(v) : ''; runQuote(); }"
                 date-format="yy-mm-dd" show-icon
               />
             </div>
             <div class="field">
               <label>Check-out</label>
-              <Calendar
+              <DatePicker
                 :model-value="wizard.item.checkout ? new Date(wizard.item.checkout) : null"
-                @update:model-value="(v: any) => { wizard.item.checkout = v instanceof Date ? v.toISOString().slice(0,10) : ''; runQuote(); }"
+                @update:model-value="(v: any) => { wizard.item.checkout = v instanceof Date ? ymdLocal(v) : ''; runQuote(); }"
                 date-format="yy-mm-dd" show-icon
               />
             </div>
@@ -384,7 +384,7 @@ onMounted(() => { lookup.ensureLoaded(); });
           <div class="grid-2">
             <div class="field">
               <label>Nguồn đơn</label>
-              <Dropdown
+              <Select
                 v-model="wizard.source"
                 :options="ORDER_SOURCES"
                 option-label="label"

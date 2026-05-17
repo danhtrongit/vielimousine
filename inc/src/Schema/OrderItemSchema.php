@@ -5,7 +5,7 @@ namespace Vie\Schema;
 
 final class OrderItemSchema
 {
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.1.0';
 
     public static function install(\wpdb $wpdb): void
     {
@@ -17,8 +17,6 @@ final class OrderItemSchema
             order_id BIGINT UNSIGNED NOT NULL,
             hotel_id BIGINT UNSIGNED NOT NULL,
             room_id BIGINT UNSIGNED NOT NULL,
-            product_code_id BIGINT UNSIGNED DEFAULT NULL,
-            product_code VARCHAR(50) DEFAULT NULL,
             name VARCHAR(255) NOT NULL,
             booking_type VARCHAR(10) NOT NULL,
             unit_label VARCHAR(50) NOT NULL,
@@ -51,7 +49,6 @@ final class OrderItemSchema
             KEY idx_order_id (order_id),
             KEY idx_hotel_id (hotel_id),
             KEY idx_room_id (room_id),
-            KEY idx_product_code (product_code),
             KEY idx_checkin (checkin)
         ) ENGINE=InnoDB {$charset};";
 

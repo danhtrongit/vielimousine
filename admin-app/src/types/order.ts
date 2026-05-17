@@ -16,11 +16,14 @@ export interface Order {
   subtotal: number;
   discount: number;
   total: number;
+  cost_total: number;
+  profit_total: number;
   paid_amount: number;
   currency: string;
   coupon_code: string | null;
   payment_status: 'pending' | 'partial' | 'paid' | 'refunded';
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+  invoice_number: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
   confirmed_at: string | null;
@@ -83,11 +86,9 @@ export interface OrderDetail extends Order {
   payments: Payment[];
   customer: Customer | null;
   redirect_url?: string | null;
-  refund_preview?: {
-    item_refunds: Array<{ item_id: number; line_total: number; penalty_percent: number; refundable: number; notes: string }>;
-    total_refundable: number;
+  refund?: {
     paid_amount: number;
-    actual_refund: number;
+    refund_amount: number;
     remaining_held: number;
   };
 }

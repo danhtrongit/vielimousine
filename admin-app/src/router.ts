@@ -10,6 +10,11 @@ const router = createRouter({
       meta: { layout: 'auth' },
     },
     {
+      path: '/503',
+      component: () => import('@/views/errors/ServiceUnavailableView.vue'),
+      meta: { layout: 'error' },
+    },
+    {
       path: '/',
       component: () => import('@/layouts/DefaultLayout.vue'),
       meta: { requiresAuth: true },
@@ -49,9 +54,9 @@ const router = createRouter({
         { path: 'pricing/bulk',
           component: () => import('@/views/pricing/BulkWizardView.vue'),
           meta: { cap: 'vie_manage_inventory' } },
-        { path: 'product-codes',
-          component: () => import('@/views/product-codes/ProductCodeListView.vue'),
-          meta: { cap: 'vie_manage_inventory' } },
+        { path: 'media',
+          component: () => import('@/views/media/MediaListView.vue'),
+          meta: { cap: 'vie_manage_media' } },
         { path: 'coupons',
           component: () => import('@/views/coupons/CouponListView.vue'),
           meta: { cap: 'vie_manage_coupons' } },
@@ -70,6 +75,8 @@ const router = createRouter({
         { path: 'settings',
           component: () => import('@/views/settings/SettingsView.vue'),
           meta: { cap: 'vie_manage_settings' } },
+        { path: ':pathMatch(.*)*',
+          component: () => import('@/views/errors/NotFoundView.vue') },
       ],
     },
   ],
@@ -95,6 +102,50 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
 
   if (to.path === '/login' && auth.isAuthenticated) {
     return { path: '/dashboard' };
+  }
+});
+
+// Stale-chunk handler: when a new build invalidates cached chunk hashes,
+// dynamic imports fail with "Failed to fetch dynamically imported module".
+// Force a full reload so the browser fetches the fresh index.html + new chunks.
+const CHUNK_LOAD_ERROR_RE = /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk \d+ failed/i;
+const RELOAD_KEY = '__vie_chunk_reload';
+
+function isChunkLoadError(err: unknown): boolean {
+  if (!err) return false;
+  const msg = (err as Error)?.message ?? String(err);
+  return CHUNK_LOAD_ERROR_RE.test(msg);
+}
+
+function reloadOnce(targetPath: string): void {
+  // Prevent infinite reload loop: only reload once per path within 10s.
+  const flag = sessionStorage.getItem(RELOAD_KEY);
+  const now = Date.now();
+  if (flag) {
+    const [path, ts] = flag.split('|');
+    if (path === targetPath && now - Number(ts) < 10_000) {
+      return; // already tried; let the error bubble so user sees it
+    }
+  }
+  sessionStorage.setItem(RELOAD_KEY, `${targetPath}|${now}`);
+  window.location.href = targetPath;
+}
+
+router.onError((err, to) => {
+  if (isChunkLoadError(err)) {
+    reloadOnce(to.fullPath);
+  }
+});
+
+// Also catch chunk errors raised outside router context (e.g. async data fetches).
+window.addEventListener('error', (e) => {
+  if (isChunkLoadError(e.error ?? e.message)) {
+    reloadOnce(window.location.pathname + window.location.search);
+  }
+});
+window.addEventListener('unhandledrejection', (e) => {
+  if (isChunkLoadError(e.reason)) {
+    reloadOnce(window.location.pathname + window.location.search);
   }
 });
 

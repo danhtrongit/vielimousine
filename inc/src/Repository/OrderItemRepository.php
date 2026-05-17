@@ -13,8 +13,7 @@ final class OrderItemRepository extends AbstractRepository
     protected function fillable(): array
     {
         return [
-            'order_id', 'hotel_id', 'room_id',
-            'product_code_id', 'product_code', 'name',
+            'order_id', 'hotel_id', 'room_id', 'name',
             'booking_type', 'unit_label', 'quantity',
             'checkin', 'checkout', 'nights', 'adults', 'children', 'child_ages',
             'room_subtotal', 'extra_adult_total', 'child_surcharge_total',
@@ -33,7 +32,6 @@ final class OrderItemRepository extends AbstractRepository
             'order_id'               => 'int',
             'hotel_id'               => 'int',
             'room_id'                => 'int',
-            'product_code_id'        => 'int',
             'quantity'               => 'int',
             'nights'                 => 'int',
             'adults'                 => 'int',
@@ -54,7 +52,7 @@ final class OrderItemRepository extends AbstractRepository
 
     protected function searchableColumns(): array
     {
-        return ['name', 'product_code'];
+        return ['name'];
     }
 
     protected function defaultSort(): array

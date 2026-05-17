@@ -14,7 +14,9 @@ final class SurchargeRepository extends AbstractRepository
     {
         return [
             'room_id', 'guest_type', 'label',
-            'age_from', 'age_to', 'amount',
+            'age_from', 'age_to',
+            'child_index_min', 'child_index_max',
+            'amount',
             'is_free', 'sort_order', 'is_active',
         ];
     }
@@ -22,14 +24,16 @@ final class SurchargeRepository extends AbstractRepository
     protected function casts(): array
     {
         return [
-            'id'         => 'int',
-            'room_id'    => 'int',
-            'age_from'   => 'int',
-            'age_to'     => 'int',
-            'amount'     => 'float',
-            'is_free'    => 'bool',
-            'sort_order' => 'int',
-            'is_active'  => 'bool',
+            'id'              => 'int',
+            'room_id'         => 'int',
+            'age_from'        => 'int',
+            'age_to'          => 'int',
+            'child_index_min' => 'int',
+            'child_index_max' => 'int',
+            'amount'          => 'float',
+            'is_free'         => 'bool',
+            'sort_order'      => 'int',
+            'is_active'       => 'bool',
         ];
     }
 

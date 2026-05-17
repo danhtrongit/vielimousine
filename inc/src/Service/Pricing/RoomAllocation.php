@@ -7,6 +7,7 @@ final class RoomAllocation
 {
     private int   $numRooms;
     private int   $extraAdultBeds;
+    private int   $spareAdultSlots;
     private bool  $requiresQuote = false;
     private array $messages      = [];
 
@@ -29,7 +30,8 @@ final class RoomAllocation
             $this->numRooms = max($byAdults, $byChildren, 1);
         }
 
-        $this->extraAdultBeds = max(0, $effAdults - $this->numRooms * $included);
+        $this->extraAdultBeds  = max(0, $effAdults - $this->numRooms * $included);
+        $this->spareAdultSlots = max(0, $this->numRooms * $included - $effAdults);
 
         $totalCapacityAdults   = $this->numRooms * $capacity;
         $totalCapacityChildren = $this->numRooms * $maxChildren;
@@ -57,6 +59,11 @@ final class RoomAllocation
     public function extraAdultBeds(): int
     {
         return $this->extraAdultBeds;
+    }
+
+    public function spareAdultSlots(): int
+    {
+        return $this->spareAdultSlots;
     }
 
     public function requiresQuote(): bool

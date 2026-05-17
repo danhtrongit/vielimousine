@@ -7,10 +7,12 @@ import Column from 'primevue/column';
 import Button from 'primevue/button';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { formatVND } from '@/composables/useFormat';
+import { useLookupStore } from '@/stores/lookup.store';
 import type { Order } from '@/types/order';
 
 const props = defineProps<{ orders: Order[] }>();
 const csv = useCsvExport();
+const lookup = useLookupStore();
 
 const aggregated = computed(() => {
   const map = new Map<number, { sales_user_id: number; orders: number; revenue: number; paid: number }>();
@@ -29,7 +31,7 @@ const aggregated = computed(() => {
 });
 
 const chartData = computed(() => ({
-  labels: aggregated.value.slice(0, 10).map((r) => `User #${r.sales_user_id}`),
+  labels: aggregated.value.slice(0, 10).map((r) => lookup.displayUser(r.sales_user_id)),
   datasets: [
     {
       label: 'Doanh thu',
@@ -48,18 +50,17 @@ const chartOptions = {
 function exportCsv() {
   csv.downloadCsv(
     `vie-by-sales-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Sales User ID', 'Số đơn', 'Doanh thu', 'Đã thu'],
-    aggregated.value.map((r) => [r.sales_user_id, r.orders, r.revenue, r.paid])
+    ['Nhân viên', 'Email', 'Số đơn', 'Doanh thu', 'Đã thu'],
+    aggregated.value.map((r) => {
+      const u = lookup.userById(r.sales_user_id);
+      return [u?.display_name ?? `User #${r.sales_user_id}`, u?.email ?? '', r.orders, r.revenue, r.paid];
+    })
   );
 }
 </script>
 
 <template>
   <div class="report">
-    <p class="muted">
-      <i class="pi pi-info-circle" />
-      Chỉ hiện đơn có sales_user_id. Tên hiển thị sẽ resolve qua lookup user (Phase 11).
-    </p>
     <div class="actions">
       <Button label="Xuất CSV" icon="pi pi-download" outlined @click="exportCsv" />
     </div>
@@ -75,8 +76,13 @@ function exportCsv() {
       <template #title>Chi tiết</template>
       <template #content>
         <DataTable :value="aggregated" :empty-message="'Chưa có đơn nào của sales user'">
-          <Column field="sales_user_id" header="Sales User">
-            <template #body="{ data }">User #{{ data.sales_user_id }}</template>
+          <Column header="Nhân viên">
+            <template #body="{ data }">
+              <div class="user-cell">
+                <strong>{{ lookup.displayUser(data.sales_user_id) }}</strong>
+                <small v-if="lookup.userById(data.sales_user_id)?.email">{{ lookup.userById(data.sales_user_id)?.email }}</small>
+              </div>
+            </template>
           </Column>
           <Column field="orders" header="Số đơn" sortable />
           <Column header="Doanh thu" sortable>
@@ -93,7 +99,8 @@ function exportCsv() {
 
 <style scoped>
 .report { display: flex; flex-direction: column; gap: 1rem; }
-.muted { color: var(--p-text-muted-color); font-size: 0.85rem; padding: 0.5rem 0.75rem; background: var(--p-surface-50); border-radius: 0.375rem; }
 .actions { display: flex; justify-content: flex-end; }
 .chart-wrap { height: 320px; }
+.user-cell { display: flex; flex-direction: column; }
+.user-cell small { color: var(--p-text-muted-color); font-size: 0.75rem; }
 </style>

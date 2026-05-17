@@ -6,6 +6,7 @@ namespace Vie\Http\Controllers;
 use Vie\Container;
 use Vie\Email\Fixtures;
 use Vie\Email\OrderEmailService;
+use Vie\Service\Hotel\HotelSyncService;
 use Vie\Service\Settings\EmailSettings;
 use Vie\Service\Settings\SepaySettings;
 use Vie\Support\ResponseEnvelope;
@@ -131,5 +132,28 @@ final class SettingsController
         $s->update($clean);
 
         return self::getSepay($request);
+    }
+
+    // ---------- Hotel sync (Phase 13) ----------
+
+    public static function runHotelSync(\WP_REST_Request $request): \WP_REST_Response
+    {
+        try {
+            $stats = Container::get(HotelSyncService::class)->backfillAll();
+        } catch (\Throwable $e) {
+            return ResponseEnvelope::error([
+                ['code' => 'sync_failed', 'field' => null, 'message' => $e->getMessage()],
+            ], 500);
+        }
+
+        return ResponseEnvelope::success([
+            'stats'   => $stats,
+            'message' => sprintf(
+                'Đã đồng bộ Hotel với WP Posts — tạo %d, cập nhật %d, bỏ qua %d.',
+                (int) $stats['created'],
+                (int) $stats['updated'],
+                (int) $stats['skipped']
+            ),
+        ]);
     }
 }

@@ -55,4 +55,30 @@ final class RoomPriceRepository extends AbstractRepository
             'date_to'   => ['type' => 'date_to',   'column' => 'date'],
         ];
     }
+
+    /**
+     * Lấy giá phòng cho danh sách ngày cụ thể — không paginate, không clamp.
+     * Dùng cho PriceCalculator để tránh bug silently drop khi quote nhiều đêm.
+     *
+     * @param int      $roomId
+     * @param string[] $dates  YYYY-MM-DD
+     * @return array<int,array<string,mixed>> raw rows (đã cast theo casts())
+     */
+    public function findByDateRange(int $roomId, array $dates): array
+    {
+        if ($dates === []) {
+            return [];
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . $this->tableName();
+        $placeholders = implode(',', array_fill(0, count($dates), '%s'));
+        $sql = $wpdb->prepare(
+            "SELECT * FROM {$table}
+             WHERE room_id = %d AND date IN ({$placeholders})
+             ORDER BY date ASC",
+            array_merge([$roomId], $dates)
+        );
+        $rows = $wpdb->get_results($sql, ARRAY_A) ?: [];
+        return array_map(fn(array $r) => $this->castRow($r), $rows);
+    }
 }

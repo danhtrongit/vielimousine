@@ -15,6 +15,15 @@ use Vie\Support\Money;
 
 final class OrderEmailService
 {
+    /** WP-cron hook để gửi email bất đồng bộ (sau khi order/payment đã commit). */
+    public const QUEUE_HOOK = 'vie_send_order_email';
+
+    /** Số lần retry tối đa nếu wp_mail() fail. */
+    private const MAX_RETRY = 3;
+
+    /** Khoảng cách giữa các lần retry (giây). */
+    private const RETRY_DELAY = 300;
+
     private const DEFAULT_SUBJECTS = [
         'pending_payment'    => '[{site_name}] Đặt phòng #{order_code} – Chờ thanh toán',
         'paid'               => '[{site_name}] Đã nhận thanh toán – #{order_code}',
@@ -36,48 +45,116 @@ final class OrderEmailService
         private readonly PaymentLogRepository $paymentRepo,
         private readonly HotelRepository $hotelRepo,
         private readonly RoomRepository $roomRepo,
+        private readonly \Vie\Repository\OrderRepository $orderRepo,
     ) {
     }
 
     public static function register(): void
     {
         $self = Container::get(self::class);
+        // Domain hooks → enqueue scheduled event (không block request hiện tại).
         add_action(HookRegistry::ORDER_CREATED,   [$self, 'onOrderCreated'],   20, 2);
         add_action(HookRegistry::PAYMENT_LOGGED,  [$self, 'onPaymentLogged'],  20, 3);
         add_action(HookRegistry::ORDER_CONFIRMED, [$self, 'onOrderConfirmed'], 20, 2);
         add_action(HookRegistry::ORDER_CANCELLED, [$self, 'onOrderCancelled'], 20, 3);
+        // WP-cron dispatcher — gọi MailService thực sự.
+        add_action(self::QUEUE_HOOK, [$self, 'dispatchScheduled'], 10, 4);
     }
 
-    // ---------- Hook handlers ----------
+    // ---------- Hook handlers (chỉ enqueue, không gọi wp_mail trực tiếp) ----------
 
     public function onOrderCreated(int $orderId, ?array $order): void
     {
         if (!is_array($order)) return;
-        $ctx = $this->buildContext($orderId, $order);
-
-        // Customer mail: chỉ public booking (source==='website')
-        if (($order['source'] ?? '') === 'website' && !empty($order['customer_email'])) {
-            $this->sendByType('pending_payment', $ctx, (string) $order['customer_email']);
-        }
-
-        // Admin mail luôn gửi
-        $this->sendByType('admin_notification', $ctx, $this->settings->adminRecipients());
+        $this->enqueue($orderId, 'order_created', []);
     }
 
     public function onPaymentLogged(int $paymentId, ?array $payment, ?array $order): void
     {
         if (!is_array($payment) || !is_array($order)) return;
         $type = (string) ($payment['type'] ?? '');
-        // Chỉ ghi nhận tăng/giảm — không gửi mail cho void/refund (Phase 12 có template riêng)
         if (!in_array($type, ['deposit', 'payment'], true)) {
             return;
         }
-        $ctx = $this->buildContext((int) $order['id'], $order, $payment);
+        $this->enqueue((int) $order['id'], 'payment_logged', ['payment_id' => $paymentId]);
+    }
 
-        // Admin
+    public function onOrderConfirmed(int $orderId, ?array $order): void
+    {
+        if (!is_array($order)) return;
+        $this->enqueue($orderId, 'order_confirmed', []);
+    }
+
+    public function onOrderCancelled(int $orderId, ?array $order, $refund = null): void
+    {
+        if (!is_array($order)) return;
+        // refund là array nhỏ (paid_amount, refund_amount, reason, ...) — an toàn để serialize.
+        $refundData = is_array($refund) ? $refund : [];
+        $this->enqueue($orderId, 'order_cancelled', ['refund' => $refundData]);
+    }
+
+    private function enqueue(int $orderId, string $event, array $extra): void
+    {
+        wp_schedule_single_event(time(), self::QUEUE_HOOK, [$orderId, $event, $extra, 0]);
+    }
+
+    /**
+     * WP-cron callback. Reload order/payment từ DB rồi gửi email bằng logic gốc.
+     * Nếu wp_mail fail → reschedule với attempt+1, tối đa MAX_RETRY lần.
+     */
+    public function dispatchScheduled(int $orderId, string $event, array $extra, int $attempt): void
+    {
+        try {
+            $order = $this->orderRepo->find($orderId);
+            if ($order === null) {
+                return; // order đã bị xóa cứng — không thể gửi
+            }
+
+            switch ($event) {
+                case 'order_created':
+                    $this->doOrderCreated($orderId, $order);
+                    break;
+                case 'payment_logged':
+                    $paymentId = (int) ($extra['payment_id'] ?? 0);
+                    $payment   = $paymentId > 0 ? $this->paymentRepo->find($paymentId) : null;
+                    if (is_array($payment)) {
+                        $this->doPaymentLogged($payment, $order);
+                    }
+                    break;
+                case 'order_confirmed':
+                    $this->doOrderConfirmed($orderId, $order);
+                    break;
+                case 'order_cancelled':
+                    $this->doOrderCancelled($orderId, $order, $extra['refund'] ?? null);
+                    break;
+            }
+        } catch (\Throwable $e) {
+            if ($attempt < self::MAX_RETRY) {
+                wp_schedule_single_event(
+                    time() + self::RETRY_DELAY,
+                    self::QUEUE_HOOK,
+                    [$orderId, $event, $extra, $attempt + 1]
+                );
+            }
+        }
+    }
+
+    // ---------- Real send logic (chỉ gọi trong dispatchScheduled) ----------
+
+    private function doOrderCreated(int $orderId, array $order): void
+    {
+        $ctx = $this->buildContext($orderId, $order);
+        if (($order['source'] ?? '') === 'website' && !empty($order['customer_email'])) {
+            $this->sendByType('pending_payment', $ctx, (string) $order['customer_email']);
+        }
+        $this->sendByType('admin_notification', $ctx, $this->settings->adminRecipients());
+    }
+
+    private function doPaymentLogged(array $payment, array $order): void
+    {
+        $ctx = $this->buildContext((int) $order['id'], $order, $payment);
         $this->sendByType('admin_paid', $ctx, $this->settings->adminRecipients());
 
-        // Customer
         if (empty($order['customer_email'])) return;
         $paymentStatus = (string) ($order['payment_status'] ?? '');
         if ($paymentStatus === 'paid') {
@@ -87,19 +164,16 @@ final class OrderEmailService
         }
     }
 
-    public function onOrderConfirmed(int $orderId, ?array $order): void
+    private function doOrderConfirmed(int $orderId, array $order): void
     {
-        if (!is_array($order)) return;
         if (empty($order['customer_email'])) return;
         $ctx = $this->buildContext($orderId, $order);
         $this->sendByType('confirmed', $ctx, (string) $order['customer_email']);
     }
 
-    public function onOrderCancelled(int $orderId, ?array $order, $refund = null): void
+    private function doOrderCancelled(int $orderId, array $order, $refund): void
     {
-        if (!is_array($order)) return;
         $ctx = $this->buildContext($orderId, $order, null, $refund);
-
         if (!empty($order['customer_email'])) {
             $this->sendByType('cancelled', $ctx, (string) $order['customer_email']);
         }
@@ -243,7 +317,6 @@ final class OrderEmailService
         return [
             'hotel_name'           => (string) ($item['hotel_name'] ?? ''),
             'room_name'            => (string) ($item['room_name']  ?? ''),
-            'product_code'         => (string) ($item['product_code'] ?? ''),
             'booking_type'         => $this->labelBookingType((string) ($item['booking_type'] ?? '')),
             'quantity'             => (int) ($item['quantity'] ?? 1),
             'unit_label'           => (string) ($item['unit_label'] ?? 'phòng'),
@@ -292,7 +365,7 @@ final class OrderEmailService
             $count,
             $nights,
             $adults,
-            $children > 0 ? " + {$children} trẻ" : ''
+            $children > 0 ? " + {$children} trẻ em" : ''
         );
     }
 

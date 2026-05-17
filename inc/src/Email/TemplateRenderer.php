@@ -20,7 +20,8 @@ final class TemplateRenderer
 
         $override = $this->settings->templateOverride($name);
         if ($override !== null && !empty($override['body'])) {
-            $inner = $this->applyPlaceholders((string) $override['body'], $ctx);
+            // Body override → HTML context → escape placeholder mặc định.
+            $inner = $this->applyPlaceholders((string) $override['body'], $ctx, escape: true);
         } else {
             $inner = $this->includeTemplate($name, $ctx);
         }
@@ -40,23 +41,46 @@ final class TemplateRenderer
         $tpl = ($override !== null && !empty($override['subject']))
             ? (string) $override['subject']
             : $default;
-        return $this->applyPlaceholders($tpl, $ctx);
+        // Subject là plain-text trong email header → không cần escape HTML,
+        // nhưng vẫn loại bỏ ký tự CR/LF để chống header-injection.
+        return $this->stripControlChars($this->applyPlaceholders($tpl, $ctx, escape: false));
     }
 
-    public function applyPlaceholders(string $template, array $ctx): string
+    /**
+     * Thay placeholder `{key}` bằng giá trị từ `$ctx`.
+     *
+     * - `$escape = true`: giá trị được `esc_html()` (mặc định cho body HTML).
+     *   Đây là chống XSS qua tên khách hàng / customer_note có chứa thẻ HTML.
+     * - `$escape = false`: giữ raw (cho subject hoặc field đã pre-rendered HTML
+     *   như `items` table). Key có tiền tố `_raw_` luôn bypass escape ngay cả khi
+     *   `$escape = true` — dành cho HTML chunks build sẵn trong code.
+     */
+    public function applyPlaceholders(string $template, array $ctx, bool $escape = true): string
     {
         return preg_replace_callback(
             '/\{([a-z][a-z0-9_]*)\}/i',
-            static function ($m) use ($ctx) {
-                $key = $m[1];
+            static function ($m) use ($ctx, $escape) {
+                $key   = $m[1];
                 $value = $ctx[$key] ?? '';
                 if (is_array($value) || is_object($value)) {
                     return $m[0];
                 }
-                return (string) $value;
+                $str = (string) $value;
+                if (!$escape || str_starts_with($key, '_raw_')) {
+                    return $str;
+                }
+                if (function_exists('esc_html')) {
+                    return esc_html($str);
+                }
+                return htmlspecialchars($str, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             },
             $template
         ) ?? $template;
+    }
+
+    private function stripControlChars(string $s): string
+    {
+        return preg_replace('/[\x00-\x1F\x7F]/', '', $s) ?? $s;
     }
 
     private function includeTemplate(string $name, array $ctx): string

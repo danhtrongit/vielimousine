@@ -11,21 +11,29 @@ use Vie\Http\Controllers\CouponUsageController;
 use Vie\Http\Controllers\CustomerController;
 use Vie\Http\Controllers\HealthController;
 use Vie\Http\Controllers\HotelController;
+use Vie\Http\Controllers\InvoiceController;
+use Vie\Http\Controllers\MediaController;
 use Vie\Http\Controllers\OrderActionController;
 use Vie\Http\Controllers\OrderController;
 use Vie\Http\Controllers\OrderItemController;
 use Vie\Http\Controllers\OrderLookupController;
 use Vie\Http\Controllers\PaymentLogController;
-use Vie\Http\Controllers\ProductCodeController;
 use Vie\Http\Controllers\PublicOrderController;
 use Vie\Http\Controllers\QuoteController;
 use Vie\Http\Controllers\RoomController;
 use Vie\Http\Controllers\SettingsController;
+use Vie\Http\Controllers\PricingCellsController;
+use Vie\Http\Controllers\PricingMatrixController;
+use Vie\Http\Controllers\PublicRoomPriceController;
+use Vie\Http\Controllers\ReportsController;
+use Vie\Http\Controllers\UserController;
 use Vie\Http\Controllers\RoomPriceBulkController;
 use Vie\Http\Controllers\RoomPriceController;
 use Vie\Http\Controllers\SepayWebhookController;
 use Vie\Http\Controllers\SurchargeController;
+use Vie\Http\Controllers\SurchargePriceBulkController;
 use Vie\Http\Controllers\SurchargePriceController;
+use Vie\Http\Controllers\TicketPriceBulkController;
 use Vie\Http\Controllers\TicketPriceController;
 use Vie\Http\Controllers\TokenController;
 use Vie\Service\Auth\AuthMiddleware;
@@ -65,6 +73,12 @@ final class RestRouter
             'permission_callback' => '__return_true',
         ]);
 
+        register_rest_route(VIE_API_NAMESPACE, '/public/room-prices', [
+            'methods'             => 'GET',
+            'callback'            => [PublicRoomPriceController::class, 'index'],
+            'permission_callback' => '__return_true',
+        ]);
+
         register_rest_route(VIE_API_NAMESPACE, '/payments/sepay/webhook', [
             'methods'             => 'POST',
             'callback'            => [SepayWebhookController::class, 'handle'],
@@ -101,7 +115,6 @@ final class RestRouter
         self::crudWithCaps('surcharges', SurchargeController::class, $inv, $inv);
         self::crudWithCaps('surcharge-prices', SurchargePriceController::class, $inv, $inv);
         self::crudWithCaps('ticket-prices', TicketPriceController::class, $inv, $inv);
-        self::crudWithCaps('product-codes', ProductCodeController::class, $inv, $inv);
 
         // Customers
         self::crudWithCaps('customers', CustomerController::class, 'vie_manage_customers', 'vie_manage_customers');
@@ -133,12 +146,64 @@ final class RestRouter
             'callback'            => [OrderActionController::class, 'cancel'],
             'permission_callback' => AuthMiddleware::requireCap('vie_cancel_orders'),
         ]);
+        register_rest_route(VIE_API_NAMESPACE, '/orders/(?P<id>\\d+)/transition', [
+            'methods'             => 'POST',
+            'callback'            => [OrderActionController::class, 'transition'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_orders'),
+        ]);
+
+        // Invoice — JSON data for Vue-rendered preview (primary)
+        register_rest_route(VIE_API_NAMESPACE, '/orders/(?P<id>\\d+)/invoice/data', [
+            'methods'             => 'GET',
+            'callback'            => [InvoiceController::class, 'data'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_print_order'),
+        ]);
+        // Invoice — server-rendered PDF stream (fallback/legacy via dompdf)
+        register_rest_route(VIE_API_NAMESPACE, '/orders/(?P<id>\\d+)/invoice', [
+            'methods'             => 'GET',
+            'callback'            => [InvoiceController::class, 'pdf'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_print_order'),
+        ]);
 
         // Phase 8: room price bulk upsert
         register_rest_route(VIE_API_NAMESPACE, '/room-prices/bulk', [
             'methods'             => 'POST',
             'callback'            => [RoomPriceBulkController::class, 'bulk'],
             'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+        ]);
+
+        // Phase 17: unified pricing matrix endpoints
+        register_rest_route(VIE_API_NAMESPACE, '/pricing/matrix', [
+            'methods'             => 'GET',
+            'callback'            => [PricingMatrixController::class, 'index'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/pricing/cells', [
+            'methods'             => 'POST',
+            'callback'            => [PricingCellsController::class, 'save'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/surcharge-prices/bulk', [
+            'methods'             => 'POST',
+            'callback'            => [SurchargePriceBulkController::class, 'bulk'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/ticket-prices/bulk', [
+            'methods'             => 'POST',
+            'callback'            => [TicketPriceBulkController::class, 'bulk'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+        ]);
+
+        // Phase 18: reports + users lookup
+        register_rest_route(VIE_API_NAMESPACE, '/users', [
+            'methods'             => 'GET',
+            'callback'            => [UserController::class, 'index'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_view_reports'),
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/reports/by-hotel', [
+            'methods'             => 'GET',
+            'callback'            => [ReportsController::class, 'byHotel'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_view_reports'),
         ]);
 
         // Phase 11: settings
@@ -159,6 +224,27 @@ final class RestRouter
         register_rest_route(VIE_API_NAMESPACE, '/settings/sepay', [
             ['methods' => 'GET', 'callback' => [SettingsController::class, 'getSepay'],   'permission_callback' => $manageSettings],
             ['methods' => 'PUT', 'callback' => [SettingsController::class, 'updateSepay'],'permission_callback' => $manageSettings],
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/settings/invoice', [
+            ['methods' => 'GET', 'callback' => [InvoiceController::class, 'getSettings'],   'permission_callback' => $manageSettings],
+            ['methods' => 'PUT', 'callback' => [InvoiceController::class, 'updateSettings'],'permission_callback' => $manageSettings],
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/settings/hotel-sync/run', [
+            'methods'             => 'POST',
+            'callback'            => [SettingsController::class, 'runHotelSync'],
+            'permission_callback' => $manageSettings,
+        ]);
+
+        // Phase 14: media library
+        $manageMedia = AuthMiddleware::requireCap('vie_manage_media');
+        register_rest_route(VIE_API_NAMESPACE, '/media', [
+            ['methods' => 'GET',  'callback' => [MediaController::class, 'index'], 'permission_callback' => $manageMedia],
+            ['methods' => 'POST', 'callback' => [MediaController::class, 'store'], 'permission_callback' => $manageMedia],
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/media/(?P<id>\\d+)', [
+            ['methods' => 'GET',        'callback' => [MediaController::class, 'show'],    'permission_callback' => $manageMedia],
+            ['methods' => 'PUT,PATCH',  'callback' => [MediaController::class, 'update'],  'permission_callback' => $manageMedia],
+            ['methods' => 'DELETE',     'callback' => [MediaController::class, 'destroy'], 'permission_callback' => $manageMedia],
         ]);
     }
 

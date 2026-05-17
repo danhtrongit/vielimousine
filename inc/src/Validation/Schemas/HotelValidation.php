@@ -8,7 +8,7 @@ final class HotelValidation
     public static function createRules(): array
     {
         return [
-            'post_id'                      => 'required|int|unique:vie_hotel,post_id',
+            'post_id'                      => 'nullable|int|unique:vie_hotel,post_id',
             'name'                         => 'required|string|max:255',
             'slug'                         => 'nullable|string|max:255|unique:vie_hotel,slug',
             'description'                  => 'nullable|string',

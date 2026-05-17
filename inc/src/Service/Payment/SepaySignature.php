@@ -34,6 +34,17 @@ final class SepaySignature
         return hash_equals($this->sign($params), $signature);
     }
 
+    /**
+     * Webhook signing scope đã được mở rộng thêm `paid_at` và `timestamp` để:
+     *
+     *   1. Chống tampering `paid_at` (trước đây attacker có signature hợp lệ
+     *      vẫn có thể đổi ngày thanh toán → lệch báo cáo).
+     *   2. Hỗ trợ replay-protection: webhook hợp lệ cũ không pass khi
+     *      timestamp đã ra ngoài cửa sổ 5 phút (kiểm tra ở SepayWebhook).
+     *
+     * Nếu SePay chưa gửi `timestamp` ở payload, trường trống "" được ký → vẫn
+     * tương thích ngược, chỉ là replay-window không enforce.
+     */
     public function signWebhook(array $payload): string
     {
         $payloadStr = implode('|', [
@@ -41,6 +52,8 @@ final class SepaySignature
             (string) ($payload['transaction_id']       ?? ''),
             (string) ($payload['amount']               ?? ''),
             (string) ($payload['status']               ?? ''),
+            (string) ($payload['paid_at']              ?? ''),
+            (string) ($payload['timestamp']            ?? ''),
         ]);
         return hash_hmac('sha256', $payloadStr, $this->settings->secretKey());
     }

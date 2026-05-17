@@ -11,8 +11,6 @@ final class OrderItemValidation
             'order_id'               => 'required|int|exists:vie_order,id',
             'hotel_id'               => 'required|int|exists:vie_hotel,id',
             'room_id'                => 'required|int|exists:vie_room,id',
-            'product_code_id'        => 'nullable|int',
-            'product_code'           => 'nullable|string|max:50',
             'name'                   => 'required|string|max:255',
             'booking_type'           => 'required|string|in:night,day',
             'unit_label'             => 'required|string|max:50',
@@ -42,8 +40,6 @@ final class OrderItemValidation
     public static function updateRules(int $id): array
     {
         return [
-            'product_code_id'        => 'nullable|int',
-            'product_code'           => 'nullable|string|max:50',
             'name'                   => 'nullable|string|max:255',
             'quantity'               => 'nullable|int|min:1',
             'room_subtotal'          => 'nullable|float|min:0',

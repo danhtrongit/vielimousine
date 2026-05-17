@@ -6,14 +6,16 @@ namespace Vie\Cron;
 final class SecuritySweep
 {
     public const OPTION_BLOCKED_IPS = 'vie_blocked_ips';
-    private const THRESHOLD         = 50;
+    private const THRESHOLD         = 10;    // login_failed/window per IP
+    private const WINDOW_SECONDS    = 900;   // 15 minutes
 
     public static function run(): void
     {
         global $wpdb;
         $table = $wpdb->prefix . 'vie_activity_log';
 
-        $since = gmdate('Y-m-d H:i:s', time() - HOUR_IN_SECONDS);
+        $window    = (int) apply_filters('vie_security_sweep_window_seconds', self::WINDOW_SECONDS);
+        $since     = gmdate('Y-m-d H:i:s', time() - $window);
         $threshold = (int) apply_filters('vie_security_sweep_threshold', self::THRESHOLD);
 
         $rows = $wpdb->get_results(

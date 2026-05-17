@@ -14,18 +14,16 @@ export interface Hotel {
   default_ticket_price: number;
   ticket_free_children_count: number;
   ticket_free_children_max_age: number;
-  pricing_policy: Record<string, unknown> | null;
-  cancellation_policy: CancellationPolicy | null;
+  pricing_policy: PolicyText | null;
+  cancellation_policy: PolicyText | null;
   thumbnail_id: number | null;
   gallery: number[] | null;
   is_active: boolean;
   sort_order: number;
 }
 
-export interface CancellationPolicy {
-  rules: Array<{ hours_before_checkin: number; penalty_percent: number; description: string }>;
-  refund_method?: string;
-  notes?: string;
+export interface PolicyText {
+  text: string;
 }
 
 export interface Room {
@@ -39,5 +37,8 @@ export interface Room {
   extra_adult_price: number;
   free_children_count: number;
   free_children_max_age: number;
+  thumbnail_id: number | null;
+  thumbnail_url?: string | null;
+  gallery: number[] | null;
   is_active: boolean;
 }

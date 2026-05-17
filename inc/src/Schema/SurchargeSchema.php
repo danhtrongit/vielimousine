@@ -5,7 +5,7 @@ namespace Vie\Schema;
 
 final class SurchargeSchema
 {
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.1.0';
 
     public static function install(\wpdb $wpdb): void
     {
@@ -19,6 +19,8 @@ final class SurchargeSchema
             label VARCHAR(100) NOT NULL,
             age_from TINYINT UNSIGNED NOT NULL,
             age_to TINYINT UNSIGNED NOT NULL,
+            child_index_min TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            child_index_max TINYINT UNSIGNED DEFAULT NULL,
             amount DECIMAL(12,0) NOT NULL,
             is_free TINYINT(1) NOT NULL DEFAULT 0,
             sort_order SMALLINT NOT NULL DEFAULT 0,

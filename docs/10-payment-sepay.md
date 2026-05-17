@@ -176,29 +176,59 @@ Sales nhập tay tại quầy → cùng flow, method = `cash`, không có `trans
 
 ## 10.7. Refund
 
+**Convention chốt từ Phase 13 (v2.1.0): `amount` luôn lưu số DƯƠNG cho mọi `type`.**
+`PaymentLedger::computePaidAmount` đảo dấu khi cộng dồn cho `refund` và `void`:
+
+```sql
+SUM(CASE WHEN type IN ('refund','void') THEN -amount ELSE amount END) AS paid_amount
+```
+
 ```json
 {
   "type": "refund",
-  "amount": -500000,
+  "amount": 500000,
   "method": "bank_transfer",
   "transaction_id": "FT26070598765",
   "note": "Hoàn cọc do hủy phòng"
 }
 ```
 
-Cấm `amount > 0` cho `type='refund'`. Validator enforce.
+Validator `PaymentEntryValidation` enforce `amount >= 1` cho mọi entry.
+Người dùng/kế toán đọc số dương dễ hơn; tổng đã trả tự đúng do logic đảo dấu.
+
+> **Lưu ý migration:** trước Phase 13, một số docs / file backup cũ ghi
+> `amount` âm cho refund — nếu import sẽ làm `computePaidAmount` cộng nhầm
+> dấu (`-(-x) = +x`). Trước khi import dữ liệu lịch sử, normalize bằng
+> `UPDATE vie_payment_log SET amount = ABS(amount) WHERE type IN ('refund','void')`.
 
 ## 10.8. Void / Adjustment
 
-`void` = bù trừ 1 dòng nhập sai. `adjustment` = điều chỉnh thủ công (ví dụ discount sau giao dịch).
+`void` = bù trừ 1 dòng nhập sai (đảo dấu giống refund). `adjustment` = điều
+chỉnh thủ công (dấu phụ thuộc nội dung điều chỉnh, không tự đảo).
 
 ```json
-{ "type":"void", "amount":-4000000, "method":"bank_transfer", "note":"Void dòng #15 nhập sai số tiền" }
+{ "type":"void",       "amount":4000000, "method":"bank_transfer", "note":"Void dòng #15 nhập sai số tiền" }
+{ "type":"adjustment", "amount":100000,  "method":"other",         "note":"Trừ phụ phí thẻ chạy không thành công" }
 ```
 
-```json
-{ "type":"adjustment", "amount":-100000, "method":"other", "note":"Trừ phụ phí thẻ chạy không thành công" }
+## 10.x. Webhook security (Phase 13 hardening)
+
+`SepaySignature::signWebhook` ký HMAC-SHA256 trên scope mở rộng:
+
 ```
+order_invoice_number | transaction_id | amount | status | paid_at | timestamp
+```
+
+`SepayWebhook::handle` thêm:
+
+- **Fail-closed**: nếu `vie_sepay_secret_key` rỗng → trả 503, từ chối xử lý.
+- **Replay-protection**: khi payload có `timestamp`, refuse nếu `|now - ts| > 300s`.
+- **Amount sanity**: refuse `amount <= 0` (refund đi qua endpoint admin, không qua IPN).
+- **Cancelled order guard**: nếu order đã `cancelled`, log activity
+  `sepay_webhook_into_cancelled_order` + return 200 (SePay không retry,
+  operator nhìn activity log để hoàn tiền thủ công).
+- **Whitelist `raw_payload`**: chỉ giữ field nghiệp vụ cần đối soát + mask
+  `account_number_tail` (4 chars cuối).
 
 ## 10.9. Settings
 

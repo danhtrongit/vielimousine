@@ -22,3 +22,13 @@ node_modules/
 
 # Local scratch
 vie.xlsx
+
+# Database dumps (NEVER commit — contains password hashes, secrets, PII)
+*.sql
+*.sql.gz
+db_*.sql
+dump_*.sql
+backup_*.sql
+
+# Composer (commit composer.json + composer.lock, not vendor/)
+vendor/

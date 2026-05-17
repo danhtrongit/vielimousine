@@ -6,6 +6,7 @@ import Tag from 'primevue/tag';
 import { useRouter } from 'vue-router';
 import DataTablePanel from '@/components/DataTablePanel.vue';
 import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
+import MediaThumbLazy from '@/components/media/MediaThumbLazy.vue';
 import { useUIStore } from '@/stores/ui.store';
 
 const router = useRouter();
@@ -35,6 +36,12 @@ onMounted(() => {
         <FilterBar :schema="filterSchema" @apply="update" />
       </template>
 
+      <Column field="id" header="ID" sortable style="width: 70px" />
+      <Column header="Ảnh" style="width: 80px">
+        <template #body="{ data }">
+          <MediaThumbLazy :id="data.thumbnail_id" size="sm" />
+        </template>
+      </Column>
       <Column field="name" header="Tên" sortable>
         <template #body="{ data }">
           <RouterLink :to="`/hotels/${data.id}`" class="link">{{ data.name }}</RouterLink>

@@ -18,12 +18,12 @@ const csv = useCsvExport();
 const exporting = ref(false);
 
 const filterSchema: FilterDef[] = [
-  { key: 'order_id', label: 'Order ID', type: 'string' },
+  { key: 'order_id', label: 'Mã đơn', type: 'string' },
   { key: 'type', label: 'Loại', type: 'enum', options: [
-    { label: 'Deposit', value: 'deposit' },
-    { label: 'Payment', value: 'payment' },
-    { label: 'Refund', value: 'refund' },
-    { label: 'Void', value: 'void' },
+    { label: 'Đặt cọc', value: 'deposit' },
+    { label: 'Thanh toán', value: 'payment' },
+    { label: 'Hoàn tiền', value: 'refund' },
+    { label: 'Hủy bút toán', value: 'void' },
   ]},
   { key: 'method', label: 'Phương thức', type: 'enum', options: [
     { label: 'Chuyển khoản', value: 'bank_transfer' },
@@ -31,7 +31,7 @@ const filterSchema: FilterDef[] = [
     { label: 'Tiền mặt', value: 'cash' },
     { label: 'Khác', value: 'manual' },
   ]},
-  { key: 'gateway', label: 'Gateway', type: 'string' },
+  { key: 'gateway', label: 'Cổng thanh toán', type: 'string' },
   { key: 'date_from', label: 'Từ ngày', type: 'date' },
   { key: 'date_to', label: 'Đến ngày', type: 'date' },
 ];

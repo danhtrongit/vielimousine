@@ -32,14 +32,15 @@ final class PriceCalculator
 
         $nights        = $req->nightDates();
         $nightsCount   = count($nights);
-        $roomAdultAge  = (int) ($room['free_children_max_age'] ?? 5) + 1;
+        $freeAgeCap    = (int) ($room['free_children_max_age'] ?? 5);
 
-        $guest        = new GuestComposition($req->adults, $req->childAges, $roomAdultAge);
+        $guest        = new GuestComposition($req->adults, $req->childAges);
         $allocation   = new RoomAllocation($room, $guest, $req->userRooms);
         $childPolicy  = new ChildPolicy(
             $guest->childrenUnderFloor(),
-            $guest->convertedAdultAges(),
             (int) $room['free_children_count'] * $allocation->numRooms(),
+            $freeAgeCap,
+            $allocation->spareAdultSlots(),
         );
 
         $isCombo = $req->bookingType === 'combo';
@@ -53,11 +54,12 @@ final class PriceCalculator
         );
 
         $messages = $allocation->messages();
-        if ($childPolicy->freeChildrenCount() > 0) {
-            $messages[] = "Miễn phí {$childPolicy->freeChildrenCount()} bé dưới {$roomAdultAge} tuổi (theo chính sách phòng)";
+        if ($childPolicy->policyFreeCount() > 0) {
+            $cap1 = $freeAgeCap + 1; // Vietnamese convention: "dưới N tuổi" = age < N (so cap 5 → "dưới 6 tuổi")
+            $messages[] = "Miễn phí {$childPolicy->policyFreeCount()} bé dưới {$cap1} tuổi (theo chính sách phòng)";
         }
-        if (count($guest->convertedAdultAges()) > 0) {
-            $messages[] = 'Bé ≥ ' . $roomAdultAge . ' tuổi được tính như người lớn';
+        if ($childPolicy->spareSlotFreeCount() > 0) {
+            $messages[] = "{$childPolicy->spareSlotFreeCount()} bé ngồi vào chỗ người lớn còn trống — không tính phụ thu";
         }
 
         if ($allocation->requiresQuote()) {
@@ -167,18 +169,9 @@ final class PriceCalculator
         if ($nights === []) {
             return [];
         }
-        $sorted = $nights;
-        sort($sorted);
-
-        $result = $this->roomPriceRepo->all([
-            'room_id'   => $roomId,
-            'date_from' => $sorted[0],
-            'date_to'   => $sorted[count($sorted) - 1],
-            'per_page'  => 100,
-        ]);
-
-        $map = [];
-        foreach ($result['data'] ?? [] as $row) {
+        $rows = $this->roomPriceRepo->findByDateRange($roomId, $nights);
+        $map  = [];
+        foreach ($rows as $row) {
             $map[$row['date']] = $row;
         }
         return $map;

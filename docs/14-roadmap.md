@@ -116,13 +116,91 @@ Phân chia theo phase. Mỗi phase có deliverable cụ thể, có thể QA đ�
 
 ## Phase 12 — Hardening + QA + Deploy (1.5 ngày)
 
-- [ ] Smoke test [§13.6](13-testing.md#136-smoke-test-e2e-manual).
-- [ ] Security test [§13.8](13-testing.md#138-security-test).
-- [ ] Performance test với seed 10k.
-- [ ] Tài liệu hướng dẫn người dùng (1 trang).
-- [ ] Deploy staging → UAT → production.
+- [x] Smoke test [§13.6](13-testing.md#136-smoke-test-e2e-manual).
+- [x] Security test [§13.8](13-testing.md#138-security-test).
+- [x] Performance test với seed 10k.
+- [x] Tài liệu hướng dẫn người dùng (1 trang).
+- [x] Deploy staging → UAT → production.
 
-**Tổng ước tính**: ~21 ngày dev (3 tuần làm việc).
+## Phase 13 — Hardening Sprint v2.1.0 (1 sprint, 2026-05)
+
+Audit từ 6 reviewer chuyên biệt phát hiện 8 Critical + ~30 Important. Sprint
+này fix toàn bộ trước khi mở scale; thay đổi đã chốt với chủ dự án.
+
+**Sprint A — Containment (data dump leak guard):**
+- [x] Xóa `db-full.sql` / `db_old.sql` / `db_current_*.sql` khỏi theme root (~129MB).
+- [x] `.gitignore` thêm `*.sql`, `db_*.sql`, `dump_*.sql`, `backup_*.sql`, `vendor/`.
+- [x] `app/public/.htaccess` chặn `.sql/.env/.bak/.zip` ở web layer.
+
+**Sprint B — Auth & Authorization:**
+- [x] IDOR fix `PUT/DELETE/cancel/transition /orders/{id}` — gọi `canUserViewOrder` trước mọi action.
+- [x] `OrderController::destroy` chuyển soft-cancel (qua OrderService::cancel) — không hard-delete.
+- [x] `OrderValidation::updateRules` trim — cấm client set `status/paid_amount/total/subtotal/discount/...`.
+- [x] Tắt CORS mặc định (`cors_enabled=false`, default đã đúng).
+- [x] `JwtService::decode` hard-check `alg=HS256`, `iss=vie`, clock-skew 60s.
+- [x] `SecuritySweep` threshold 50/h → 10/15min; cron `daily` → `vie_15min`.
+- [x] Helper `Support\ClientIp` cho trusted proxies + `is_ssl` qua `X-Forwarded-Proto`.
+- [x] Refresh cookie `SameSite=Lax` → `Strict`.
+- [x] `MediaService::upload` validate MIME bằng `finfo_file`, strip EXIF qua `wp_get_image_editor`.
+- [x] SPA security headers: `X-Frame-Options: DENY`, CSP, `Referrer-Policy`, `X-Content-Type-Options`.
+
+**Sprint C — Money correctness (9 items):**
+- [x] `GuestComposition` quy đổi bé **≥ 12 tuổi** sang adult (per §3.3).
+- [x] `ChildPolicy` sort DESC (oldest first per §3.4), bỏ param `$_unused`.
+- [x] `loadRoomPrices` / `loadOverrides` bỏ `per_page=100` — repository có `findByDateRange` / `findOverridesByDateRange`.
+- [x] `PricingCellsService` check `$wpdb->query === false` → throw, ROLLBACK đúng.
+- [x] 3 bulk services (room/surcharge/ticket price) thêm `START TRANSACTION` + chunk 500 cell + check return.
+- [x] **Combo bug fix** — `booking_type='combo'` không còn bị flatten về `'night'`.
+- [x] `CouponRepository::incrementUsedAtomic` compare-and-swap (`used_count < usage_limit`).
+- [x] `CouponUsageSchema` thêm `UNIQUE (coupon_id, order_id)` — chống double-record.
+- [x] `OrderService::decrementStock` compare-and-swap `WHERE stock >= needed`.
+- [x] Mọi `transition()` / `cancel()` dùng `OrderRepository::updateIfStatus` (CAS).
+
+**Sprint D — Payment & Refund:**
+- [x] `SepaySignature::signWebhook` mở rộng scope thêm `paid_at` + `timestamp`.
+- [x] `SepayWebhook` fail-closed nếu `secret_key` rỗng; replay-protection ±5 phút; reject `amount<=0`;
+  reject thanh toán vào order đã `cancelled` (trả 200, log activity cho manual refund).
+- [x] `raw_payload` whitelist field + mask `account_number_tail` (4 chars cuối).
+- [x] `InvoiceService::getOrAssignNumber` wrap `LOCK TABLES vie_order WRITE` —
+  đảm bảo số hóa đơn liên tục (compliance NĐ 123/2020 + TT 78).
+- [x] **Refund convention chốt là số DƯƠNG** (code đang đúng, docs §10 đã sửa khớp).
+- [x] Xóa dead code `PaymentLogValidation.php`.
+
+**Sprint E — Email queue + Cron:**
+- [x] `OrderEmailService` chuyển async qua `wp_schedule_single_event` (hook `vie_send_order_email`),
+  retry 3 lần × 5 phút khi `wp_mail` fail.
+- [x] `TemplateRenderer::applyPlaceholders` mặc định `esc_html` placeholder body
+  (chống XSS qua tên KH); prefix `_raw_` bypass; subject strip control chars.
+- [x] `NoShowSweep` dùng `wp_date('Y-m-d')` (WP timezone) + compare-and-swap UPDATE.
+
+**Sprint F — Public API & Data Layer:**
+- [x] `HotelDeleteService` cascade delete — chặn nếu còn order active, TX-safe.
+- [x] `single-hotel.php` chuyển raw `$wpdb` sang `HotelRepository::findByPostId` +
+  `RoomRepository::all` (tuân thủ §1.6 Repository-only).
+- [x] `ReportsController` validate date format + cap range 366 ngày + cap filter arrays 50 entries.
+- [x] `Http\RateLimiter` (transient-backed, trust ClientIp helper) áp dụng cho `/quote` (30/phút),
+  `/coupons/validate` (20/phút), `/orders/lookup` (10/5phút).
+- [x] `OrderCodeGenerator` format mới `VIE{ymd}{NNNN}{XXXX}` (4 ký tự hex random)
+  — collision space tăng × 65k chống brute-force enumeration.
+
+**Sprint G — Docs + Testing + Version:**
+- [x] Cập nhật 03-pricing.md, 10-payment-sepay.md (refund convention), 14-roadmap.md.
+- [x] Bump `VIE_CHILD_VERSION` 2.0.0 → 2.1.0; `style.css` Version 1.0.0 → 2.1.0.
+
+**Decisions locked với chủ dự án:**
+
+| # | Quyết định | Áp dụng tại |
+|---|---|---|
+| 1 | Bé ≥ 12 tuổi tính như adult | `GuestComposition::ADULT_AGE_THRESHOLD` |
+| 2 | Cancel: operator nhập số tiền hoàn tay | giữ `cancel(refund_amount)` |
+| 3 | Refund lưu số DƯƠNG, code đảo dấu khi cộng | `PaymentLedger::computePaidAmount` |
+| 4 | Invoice number LOCK TABLES khi cấp | `InvoiceService::getOrAssignNumber` |
+| 5 | Tắt CORS mặc định; widget tương lai dùng iframe same-origin + postMessage | `cors_enabled=false` |
+| 6 | Email async qua `wp_schedule_single_event` | `OrderEmailService::QUEUE_HOOK` |
+| 7 | `booking_type='combo'` lưu nguyên (BUG fix) | `OrderService.php:222` |
+| 8 | DB dump: xóa local, gitignore, chặn web | Sprint A |
+
+**Tổng ước tính**: ~21 ngày dev (3 tuần làm việc) + 1 sprint hardening Phase 13.
 
 ## Mốc kiểm tra
 

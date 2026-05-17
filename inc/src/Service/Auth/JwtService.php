@@ -7,13 +7,17 @@ use Vie\Service\Settings\AuthSettings;
 
 final class JwtService
 {
+    private const ALG = 'HS256';
+    private const ISS = 'vie';
+    private const CLOCK_SKEW = 60; // seconds tolerance for exp/iat
+
     public function __construct(private readonly AuthSettings $settings)
     {
     }
 
     public function encode(array $payload): string
     {
-        $header = self::b64UrlEncode((string) wp_json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
+        $header = self::b64UrlEncode((string) wp_json_encode(['alg' => self::ALG, 'typ' => 'JWT']));
         $body   = self::b64UrlEncode((string) wp_json_encode($payload));
         $sig    = hash_hmac('sha256', "{$header}.{$body}", $this->settings->jwtSecret(), true);
         return "{$header}.{$body}." . self::b64UrlEncode($sig);
@@ -27,6 +31,16 @@ final class JwtService
         }
         [$h, $b, $s] = $parts;
 
+        // 1. Parse header và hard-fail nếu alg/typ không khớp — chặn algorithm-confusion.
+        $headerJson = self::b64UrlDecode($h);
+        $header     = json_decode($headerJson, true);
+        if (!is_array($header)
+            || ($header['alg'] ?? '') !== self::ALG
+            || ($header['typ'] ?? 'JWT') !== 'JWT') {
+            throw new InvalidTokenException('invalid_alg', 'Thuật toán token không hợp lệ');
+        }
+
+        // 2. Verify signature (timing-safe).
         $expected = self::b64UrlEncode(
             hash_hmac('sha256', "{$h}.{$b}", $this->settings->jwtSecret(), true)
         );
@@ -34,13 +48,26 @@ final class JwtService
             throw new InvalidTokenException('invalid_signature');
         }
 
+        // 3. Decode payload.
         $decoded = self::b64UrlDecode($b);
         $payload = json_decode($decoded, true);
         if (!is_array($payload)) {
             throw new InvalidTokenException('invalid_payload');
         }
-        if (isset($payload['exp']) && (int) $payload['exp'] < time()) {
+
+        // 4. Claim checks.
+        if (($payload['iss'] ?? '') !== self::ISS) {
+            throw new InvalidTokenException('invalid_issuer', 'Token không hợp lệ');
+        }
+        $now = time();
+        if (isset($payload['exp']) && (int) $payload['exp'] < $now - self::CLOCK_SKEW) {
             throw new InvalidTokenException('expired', 'Token đã hết hạn');
+        }
+        if (isset($payload['nbf']) && (int) $payload['nbf'] > $now + self::CLOCK_SKEW) {
+            throw new InvalidTokenException('not_yet_valid', 'Token chưa có hiệu lực');
+        }
+        if (isset($payload['iat']) && (int) $payload['iat'] > $now + self::CLOCK_SKEW) {
+            throw new InvalidTokenException('invalid_iat', 'Token có timestamp bất thường');
         }
         return $payload;
     }

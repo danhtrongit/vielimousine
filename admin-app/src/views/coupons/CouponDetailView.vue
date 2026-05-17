@@ -2,13 +2,16 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Card from 'primevue/card';
-import TabView from 'primevue/tabview';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
+import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import Textarea from 'primevue/textarea';
-import Calendar from 'primevue/calendar';
-import Dropdown from 'primevue/dropdown';
+import DatePicker from 'primevue/datepicker';
+import Select from 'primevue/select';
 import MultiSelect from 'primevue/multiselect';
 import ToggleSwitch from 'primevue/toggleswitch';
 import Button from 'primevue/button';
@@ -137,8 +140,14 @@ const TYPES = [
   <div v-else>
     <h1 class="page-title">{{ isNew ? 'Tạo mã giảm giá' : coupon.code }}</h1>
 
-    <TabView>
-      <TabPanel header="Thông tin" value="info">
+    <Tabs value="info">
+      <TabList>
+        <Tab value="info">Thông tin</Tab>
+        <Tab value="scope" :disabled="isNew">Phạm vi</Tab>
+        <Tab value="usage" :disabled="isNew">Lịch sử dùng</Tab>
+      </TabList>
+      <TabPanels>
+      <TabPanel value="info">
         <Card>
           <template #content>
             <div class="grid-2">
@@ -148,7 +157,7 @@ const TYPES = [
               </div>
               <div class="field">
                 <label>Loại giảm giá</label>
-                <Dropdown v-model="coupon.type" :options="TYPES" option-label="label" option-value="value" />
+                <Select v-model="coupon.type" :options="TYPES" option-label="label" option-value="value" />
               </div>
               <div class="field">
                 <label>Giá trị {{ coupon.type === 'percentage' ? '(%)' : '(VND)' }}</label>
@@ -172,11 +181,11 @@ const TYPES = [
               </div>
               <div class="field">
                 <label>Hiệu lực từ</label>
-                <Calendar v-model="validFromDate" date-format="yy-mm-dd" show-icon show-time hour-format="24" />
+                <DatePicker v-model="validFromDate" date-format="yy-mm-dd" show-icon show-time hour-format="24" />
               </div>
               <div class="field">
                 <label>Hiệu lực đến</label>
-                <Calendar v-model="validToDate" date-format="yy-mm-dd" show-icon show-time hour-format="24" />
+                <DatePicker v-model="validToDate" date-format="yy-mm-dd" show-icon show-time hour-format="24" />
               </div>
               <div class="field grid-span-2">
                 <label>Mô tả</label>
@@ -198,7 +207,7 @@ const TYPES = [
         </div>
       </TabPanel>
 
-      <TabPanel header="Phạm vi" value="scope" :disabled="isNew">
+      <TabPanel value="scope">
         <Card>
           <template #content>
             <div class="field">
@@ -239,7 +248,7 @@ const TYPES = [
         </div>
       </TabPanel>
 
-      <TabPanel header="Lịch sử dùng" value="usage" :disabled="isNew">
+      <TabPanel value="usage">
         <DataTable :value="usage" :empty-message="'Chưa có lượt dùng'" data-key="id">
           <Column field="used_at" header="Thời gian">
             <template #body="{ data }">{{ formatDateTime(data.used_at) }}</template>
@@ -257,7 +266,8 @@ const TYPES = [
           </Column>
         </DataTable>
       </TabPanel>
-    </TabView>
+      </TabPanels>
+    </Tabs>
   </div>
 </template>
 

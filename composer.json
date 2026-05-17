@@ -1,0 +1,17 @@
+{
+    "name": "vielimousine/child-theme",
+    "description": "Vielimousine WordPress child theme — booking + admin app",
+    "type": "wordpress-theme",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "dompdf/dompdf": "^3.0"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "allow-plugins": {
+            "dompdf/php-svg-lib": false
+        }
+    }
+}

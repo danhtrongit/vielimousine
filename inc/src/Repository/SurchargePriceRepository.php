@@ -51,4 +51,32 @@ final class SurchargePriceRepository extends AbstractRepository
             'date_to'      => ['type' => 'date_to',   'column' => 'date'],
         ];
     }
+
+    /**
+     * Lấy override surcharge cho tập surcharge_ids cụ thể trong khoảng ngày —
+     * không paginate. Tránh bug clamp 100 khi quote rule × nights vượt page.
+     *
+     * @param int[]    $surchargeIds
+     * @param string[] $dates  YYYY-MM-DD (đã sort tăng dần, hoặc bất kỳ)
+     * @return array<int,array<string,mixed>>
+     */
+    public function findOverridesByDateRange(array $surchargeIds, array $dates): array
+    {
+        if ($surchargeIds === [] || $dates === []) {
+            return [];
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . $this->tableName();
+        $idPh   = implode(',', array_fill(0, count($surchargeIds), '%d'));
+        $datePh = implode(',', array_fill(0, count($dates), '%s'));
+        $sql = $wpdb->prepare(
+            "SELECT * FROM {$table}
+             WHERE is_active = 1
+               AND surcharge_id IN ({$idPh})
+               AND date IN ({$datePh})",
+            array_merge($surchargeIds, $dates)
+        );
+        $rows = $wpdb->get_results($sql, ARRAY_A) ?: [];
+        return array_map(fn(array $r) => $this->castRow($r), $rows);
+    }
 }

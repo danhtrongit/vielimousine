@@ -9,6 +9,7 @@ final readonly class ChildAssessment
         public int  $age,
         public bool $isFree,
         public bool $treatedAsAdult,
+        public int  $childIndex = 0,
     ) {
     }
 
@@ -18,6 +19,7 @@ final readonly class ChildAssessment
             'age'              => $this->age,
             'is_free'          => $this->isFree,
             'treated_as_adult' => $this->treatedAsAdult,
+            'child_index'      => $this->childIndex,
         ];
     }
 }

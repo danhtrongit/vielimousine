@@ -52,6 +52,21 @@ final class AdminAppLoader
         status_header(200);
         nocache_headers();
         header('Content-Type: text/html; charset=utf-8');
+
+        // Security headers cho SPA shell. JWT lưu trong localStorage nên phải
+        // chặn clickjacking, hạn chế resource origin, không leak referrer.
+        header('X-Frame-Options: DENY');
+        header('X-Content-Type-Options: nosniff');
+        header('Referrer-Policy: same-origin');
+        header("Content-Security-Policy: default-src 'self'; "
+            . "script-src 'self' 'unsafe-inline'; "
+            . "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            . "font-src 'self' https://fonts.gstatic.com data:; "
+            . "img-src 'self' data: https:; "
+            . "connect-src 'self'; "
+            . "frame-ancestors 'none'; "
+            . "base-uri 'self'");
+
         readfile($index);
         exit;
     }

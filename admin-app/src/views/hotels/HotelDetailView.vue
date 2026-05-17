@@ -2,7 +2,10 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import Card from 'primevue/card';
-import TabView from 'primevue/tabview';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
+import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
@@ -12,10 +15,14 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import ProgressSpinner from 'primevue/progressspinner';
 import { hotelsApi, roomsApi } from '@/api/hotels.api';
+import { mediaApi } from '@/api/media.api';
 import { useUIStore } from '@/stores/ui.store';
 import { useNotify } from '@/composables/useNotify';
-import { formatVND } from '@/composables/useFormat';
-import type { Hotel, Room, CancellationPolicy } from '@/types/hotel';
+import { formatVND, decodeEntities } from '@/composables/useFormat';
+import type { Hotel, Room } from '@/types/hotel';
+import type { MediaItem } from '@/types/media';
+import MediaPickerDialog from '@/components/media/MediaPickerDialog.vue';
+import MediaThumb from '@/components/media/MediaThumb.vue';
 
 const route = useRoute();
 const ui = useUIStore();
@@ -28,8 +35,74 @@ const saving = ref(false);
 
 const id = computed(() => Number(route.params.id));
 
-// Editable cancellation rules
-const cancelRules = ref<CancellationPolicy['rules']>([]);
+// Policy texts (free-form)
+const pricingPolicyText = ref('');
+const cancellationPolicyText = ref('');
+
+// Media picker state
+const pickerVisible = ref(false);
+const pickerMode = ref<'single' | 'multi'>('single');
+const mediaMap = ref(new Map<number, MediaItem>());
+
+const thumbItem = computed(() =>
+  hotel.value?.thumbnail_id ? mediaMap.value.get(hotel.value.thumbnail_id) ?? null : null
+);
+
+const pickerInitial = computed<number[]>(() => {
+  if (!hotel.value) return [];
+  return pickerMode.value === 'single'
+    ? (hotel.value.thumbnail_id ? [hotel.value.thumbnail_id] : [])
+    : (hotel.value.gallery ?? []);
+});
+
+async function prefetchMedia(ids: number[]) {
+  const missing = ids.filter((i) => i && !mediaMap.value.has(i));
+  if (missing.length === 0) return;
+  await Promise.all(
+    missing.map(async (i) => {
+      try {
+        const r = await mediaApi.get(i);
+        mediaMap.value.set(i, r.data);
+      } catch { /* ignore — missing/deleted media */ }
+    })
+  );
+}
+
+function openPicker(mode: 'single' | 'multi') {
+  pickerMode.value = mode;
+  pickerVisible.value = true;
+}
+
+async function onPickerSelect(ids: number[]) {
+  if (!hotel.value) return;
+  if (pickerMode.value === 'single') {
+    hotel.value.thumbnail_id = ids[0] ?? null;
+  } else {
+    hotel.value.gallery = ids;
+  }
+  await prefetchMedia(ids);
+}
+
+function removeGallery(id: number) {
+  if (!hotel.value) return;
+  hotel.value.gallery = (hotel.value.gallery ?? []).filter((x) => x !== id);
+}
+
+async function saveMedia() {
+  if (!hotel.value) return;
+  saving.value = true;
+  try {
+    await hotelsApi.update(id.value, {
+      thumbnail_id: hotel.value.thumbnail_id,
+      gallery: hotel.value.gallery,
+    });
+    notify.success('Đã lưu hình ảnh');
+  } catch (e) {
+    notify.apiError(e);
+  } finally {
+    saving.value = false;
+  }
+}
 
 async function load() {
   loading.value = true;
@@ -38,13 +111,20 @@ async function load() {
       hotelsApi.get(id.value),
       roomsApi.list({ hotel_id: id.value, per_page: 100 }),
     ]);
-    hotel.value = hResp.data;
-    rooms.value = rResp.data;
-    cancelRules.value = hotel.value.cancellation_policy?.rules ?? [];
+    hotel.value = { ...hResp.data, name: decodeEntities(hResp.data.name) };
+    rooms.value = rResp.data.map((r) => ({ ...r, name: decodeEntities(r.name) }));
+    pricingPolicyText.value = hotel.value.pricing_policy?.text ?? '';
+    cancellationPolicyText.value = hotel.value.cancellation_policy?.text ?? '';
     ui.setBreadcrumb([
       { label: 'Khách sạn', to: '/hotels' },
       { label: hotel.value.name },
     ]);
+    // Prefetch media items for thumbnail + gallery
+    const mediaIds = [
+      ...(hotel.value.thumbnail_id ? [hotel.value.thumbnail_id] : []),
+      ...(hotel.value.gallery ?? []),
+    ];
+    if (mediaIds.length > 0) await prefetchMedia(mediaIds);
   } catch (e) {
     notify.apiError(e);
   } finally {
@@ -81,28 +161,17 @@ async function savePolicy() {
   if (!hotel.value) return;
   saving.value = true;
   try {
-    const sorted = [...cancelRules.value].sort((a, b) => b.hours_before_checkin - a.hours_before_checkin);
     await hotelsApi.update(id.value, {
-      cancellation_policy: {
-        rules: sorted,
-        refund_method: hotel.value.cancellation_policy?.refund_method ?? '',
-        notes: hotel.value.cancellation_policy?.notes ?? '',
-      },
+      pricing_policy: { text: pricingPolicyText.value },
+      cancellation_policy: { text: cancellationPolicyText.value },
     });
-    notify.success('Đã lưu chính sách hủy');
+    notify.success('Đã lưu chính sách');
     await load();
   } catch (e) {
     notify.apiError(e);
   } finally {
     saving.value = false;
   }
-}
-
-function addRule() {
-  cancelRules.value.push({ hours_before_checkin: 0, penalty_percent: 100, description: '' });
-}
-function removeRule(idx: number) {
-  cancelRules.value.splice(idx, 1);
 }
 </script>
 
@@ -111,8 +180,15 @@ function removeRule(idx: number) {
   <div v-else-if="hotel">
     <h1 class="page-title">{{ hotel.name }}</h1>
 
-    <TabView>
-      <TabPanel header="Thông tin" value="info">
+    <Tabs value="info">
+      <TabList>
+        <Tab value="info">Thông tin</Tab>
+        <Tab value="media">Hình ảnh</Tab>
+        <Tab value="rooms">Phòng</Tab>
+        <Tab value="policy">Chính sách</Tab>
+      </TabList>
+      <TabPanels>
+      <TabPanel value="info">
         <Card>
           <template #content>
             <div class="grid-2">
@@ -160,60 +236,100 @@ function removeRule(idx: number) {
         </div>
       </TabPanel>
 
-      <TabPanel header="Phòng" value="rooms">
-        <DataTable :value="rooms" data-key="id" :empty-message="'Chưa có phòng'">
-          <Column field="name" header="Tên" />
-          <Column field="included_adults" header="Người lớn gồm" />
-          <Column field="max_adults" header="Người lớn tối đa" />
-          <Column field="max_children" header="Trẻ em tối đa" />
+      <TabPanel value="media">
+        <Card>
+          <template #content>
+            <div class="field">
+              <label>Ảnh đại diện</label>
+              <div class="thumb-row">
+                <MediaThumb
+                  v-if="thumbItem"
+                  :item="thumbItem"
+                  size="md"
+                  removable
+                  @remove="hotel!.thumbnail_id = null"
+                />
+                <Button label="Chọn ảnh" icon="pi pi-image" outlined @click="openPicker('single')" />
+              </div>
+            </div>
+
+            <div class="field" style="margin-top: 1.25rem">
+              <label>Gallery ({{ (hotel.gallery ?? []).length }} ảnh)</label>
+              <div v-if="(hotel.gallery ?? []).length > 0" class="gallery-grid">
+                <MediaThumb
+                  v-for="gid in (hotel.gallery ?? [])"
+                  :key="gid"
+                  :item="mediaMap.get(gid)"
+                  size="sm"
+                  removable
+                  @remove="removeGallery(gid)"
+                />
+              </div>
+              <p v-else class="muted">Chưa có ảnh gallery.</p>
+              <Button label="Thêm vào gallery" icon="pi pi-plus" outlined class="add-gallery-btn" @click="openPicker('multi')" />
+            </div>
+          </template>
+        </Card>
+        <div class="actions-row">
+          <Button label="Lưu hình ảnh" icon="pi pi-save" :loading="saving" @click="saveMedia" />
+        </div>
+
+        <MediaPickerDialog
+          v-model:visible="pickerVisible"
+          :multiple="pickerMode === 'multi'"
+          :initial="pickerInitial"
+          @select="onPickerSelect"
+        />
+      </TabPanel>
+
+      <TabPanel value="rooms">
+        <DataTable :value="rooms" data-key="id" :empty-message="'Chưa có phòng'" class="rooms-table">
+          <Column field="id" header="ID" style="width: 60px">
+            <template #body="{ data }"><span class="room-id">#{{ data.id }}</span></template>
+          </Column>
+          <Column field="name" header="Tên phòng">
+            <template #body="{ data }">
+              <div class="room-name">{{ data.name }}</div>
+            </template>
+          </Column>
+          <Column header="Sức chứa">
+            <template #body="{ data }">
+              <div class="room-cap">
+                <span><i class="pi pi-users" /> {{ data.included_adults }}<span v-if="data.max_adults > data.included_adults">–{{ data.max_adults }}</span> người lớn</span>
+                <span v-if="data.max_children > 0">
+                  <i class="pi pi-user" />
+                  tối đa {{ data.max_children }} trẻ em<span v-if="data.free_children_count > 0"> · miễn {{ data.free_children_count }}</span>
+                </span>
+              </div>
+            </template>
+          </Column>
           <Column field="base_price" header="Giá phòng">
             <template #body="{ data }">{{ formatVND(data.base_price) }}</template>
           </Column>
           <Column field="extra_adult_price" header="Phụ thu người lớn">
             <template #body="{ data }">{{ formatVND(data.extra_adult_price) }}</template>
           </Column>
-          <Column field="free_children_count" header="Bé miễn / phòng" />
-          <Column field="is_active" header="Trạng thái">
-            <template #body="{ data }">{{ data.is_active ? '✓' : '✗' }}</template>
+          <Column field="is_active" header="Trạng thái" style="width: 96px">
+            <template #body="{ data }">
+              <span :class="['room-status', data.is_active ? 'room-status-on' : 'room-status-off']">
+                <i :class="['pi', data.is_active ? 'pi-check-circle' : 'pi-ban']" />
+                {{ data.is_active ? 'Hoạt động' : 'Tạm tắt' }}
+              </span>
+            </template>
           </Column>
         </DataTable>
       </TabPanel>
 
-      <TabPanel header="Chính sách hủy" value="policy">
+      <TabPanel value="policy">
         <Card>
           <template #content>
-            <p class="muted">Mỗi rule áp dụng khi delta_hours ≥ hours_before_checkin. Sắp xếp tự động giảm dần.</p>
-            <DataTable :value="cancelRules" data-key="hours_before_checkin">
-              <Column header="Số giờ trước checkin">
-                <template #body="{ index }">
-                  <InputNumber v-model="cancelRules[index].hours_before_checkin" :min="0" show-buttons />
-                </template>
-              </Column>
-              <Column header="Phạt (%)">
-                <template #body="{ index }">
-                  <InputNumber v-model="cancelRules[index].penalty_percent" :min="0" :max="100" show-buttons suffix="%" />
-                </template>
-              </Column>
-              <Column header="Mô tả">
-                <template #body="{ index }">
-                  <InputText v-model="cancelRules[index].description" />
-                </template>
-              </Column>
-              <Column header="" style="width: 60px">
-                <template #body="{ index }">
-                  <Button icon="pi pi-trash" severity="danger" text rounded @click="removeRule(index)" />
-                </template>
-              </Column>
-            </DataTable>
-            <Button label="Thêm rule" icon="pi pi-plus" outlined class="add-rule-btn" @click="addRule" />
-
             <div class="field">
-              <label>Phương thức hoàn tiền</label>
-              <InputText v-model="hotel.cancellation_policy!.refund_method" />
+              <label>Chính sách giá</label>
+              <Textarea v-model="pricingPolicyText" rows="6" placeholder="VD: Giá đã bao gồm ăn sáng, thuế VAT..." />
             </div>
             <div class="field">
-              <label>Ghi chú</label>
-              <Textarea v-model="hotel.cancellation_policy!.notes" rows="3" />
+              <label>Chính sách hủy</label>
+              <Textarea v-model="cancellationPolicyText" rows="6" placeholder="VD: Hủy trước ≥ 48 tiếng: phí 0%&#10;Hủy trong 48–24 tiếng: phí 50%" />
             </div>
           </template>
         </Card>
@@ -221,7 +337,8 @@ function removeRule(idx: number) {
           <Button label="Lưu chính sách" icon="pi pi-save" :loading="saving" @click="savePolicy" />
         </div>
       </TabPanel>
-    </TabView>
+      </TabPanels>
+    </Tabs>
   </div>
 </template>
 
@@ -233,6 +350,27 @@ function removeRule(idx: number) {
 .field { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.75rem; }
 .field label { font-size: 0.85rem; font-weight: 500; }
 .actions-row { display: flex; justify-content: flex-end; margin-top: 1rem; }
-.add-rule-btn { margin-top: 0.75rem; }
 .muted { color: var(--p-text-muted-color); font-size: 0.85rem; margin-bottom: 0.75rem; }
+.thumb-row { display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.gallery-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+.add-gallery-btn { margin-top: 0.5rem; }
+
+/* Rooms table */
+.room-id { font-variant-numeric: tabular-nums; color: var(--p-text-muted-color); font-size: 0.85rem; }
+.room-thumb {
+  width: 56px; height: 56px; border-radius: 6px; overflow: hidden;
+  background: var(--p-surface-100); display: grid; place-items: center;
+}
+.room-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.room-thumb-empty { color: var(--p-text-muted-color); font-size: 1.4rem; }
+.room-name { font-weight: 600; }
+.room-cap { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; color: #4b5563; }
+.room-cap > span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.room-cap .pi { color: var(--p-primary-color); font-size: 0.85rem; }
+.room-status {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.78rem; font-weight: 500;
+}
+.room-status-on { background: #dcfce7; color: #166534; }
+.room-status-off { background: #f3f4f6; color: #6b7280; }
 </style>

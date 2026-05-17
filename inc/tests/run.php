@@ -46,7 +46,7 @@ foreach ($cases as $case) {
             case 'one_free_one_charged':
                 $freeCount = 0;
                 foreach ($assessments as $a) {
-                    if (!($a['treated_as_adult'] ?? false) && ($a['is_free'] ?? false)) {
+                    if ($a['is_free'] ?? false) {
                         $freeCount++;
                     }
                 }
@@ -57,24 +57,12 @@ foreach ($cases as $case) {
             case 'both_children_free':
                 $freeCount = 0;
                 foreach ($assessments as $a) {
-                    if (!($a['treated_as_adult'] ?? false) && ($a['is_free'] ?? false)) {
+                    if ($a['is_free'] ?? false) {
                         $freeCount++;
                     }
                 }
                 if ($freeCount !== 2) {
                     $errors[] = "  - both_children_free: expected 2 free children, got {$freeCount}";
-                }
-                break;
-            case 'child_treated_as_adult':
-                $treated = false;
-                foreach ($assessments as $a) {
-                    if (($a['treated_as_adult'] ?? false) === true) {
-                        $treated = true;
-                        break;
-                    }
-                }
-                if (!$treated) {
-                    $errors[] = '  - child_treated_as_adult: expected at least 1 child with treated_as_adult === true';
                 }
                 break;
         }
@@ -91,7 +79,10 @@ foreach ($cases as $case) {
 
 echo "\n--- Pricing: {$pass} passed, {$fail} failed ---\n\n";
 
-echo "=== Phase 4 — Order E2E ===\n\n";
+echo "=== Phase 3.5 — Child slot pricing ===\n\n";
+require __DIR__ . '/child-slot-pricing.php';
+
+echo "\n=== Phase 4 — Order E2E ===\n\n";
 require __DIR__ . '/order-e2e.php';
 
 echo "\n=== Phase 5 — Payment E2E ===\n\n";

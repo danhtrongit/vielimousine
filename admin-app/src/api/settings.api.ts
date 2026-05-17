@@ -37,6 +37,29 @@ export interface GeneralConfig {
   currency: string;
 }
 
+export interface InvoiceConfig {
+  company_name: string;
+  company_tax_id: string;
+  company_address: string;
+  company_phone: string;
+  company_email: string;
+  bank_name: string;
+  bank_account: string;
+  bank_holder: string;
+  logo_url: string;
+  invoice_prefix: string;
+  invoice_format: string;
+  next_seq: number;
+  reset_yearly: boolean;
+  last_seq_year: number | null;
+  vat_rate: number;
+  footer_note: string;
+}
+
+export interface InvoiceSettingsResponse {
+  config: InvoiceConfig;
+}
+
 export const settingsApi = {
   getGeneral: () =>
     api.get<Envelope<GeneralConfig>>('/settings/general').then((r) => r.data),
@@ -55,4 +78,18 @@ export const settingsApi = {
 
   updateSepay: (body: Partial<SepayConfig & { secret_key: string }>) =>
     api.put<Envelope<SepayConfig>>('/settings/sepay', body).then((r) => r.data),
+
+  getInvoice: () =>
+    api.get<Envelope<InvoiceSettingsResponse>>('/settings/invoice').then((r) => r.data),
+
+  updateInvoice: (body: Partial<InvoiceConfig>) =>
+    api.put<Envelope<InvoiceSettingsResponse>>('/settings/invoice', body).then((r) => r.data),
+
+  runHotelSync: () =>
+    api
+      .post<Envelope<{ stats: { created: number; updated: number; skipped: number }; message: string }>>(
+        '/settings/hotel-sync/run',
+        {}
+      )
+      .then((r) => r.data),
 };

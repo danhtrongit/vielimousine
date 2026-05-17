@@ -97,7 +97,7 @@ return [
         'extra_check' => 'both_children_free',
     ],
     [
-        'name'     => 'Case 4: 2NL + 1 bé 7T, Room — bé 7T tính NL',
+        'name'     => 'Case 4: 2NL + 1 bé 7T, Room — bé vẫn là trẻ em',
         'request'  => [
             'room_id'      => $premierRoom,
             'checkin'      => $today,
@@ -109,14 +109,13 @@ return [
         ],
         'expected' => [
             'num_rooms'          => 1,
-            'effective_adults'   => 3,
-            'effective_children' => 0,
+            'effective_adults'   => 2,
+            'effective_children' => 1,
             'requires_quote'     => false,
         ],
-        'extra_check' => 'child_treated_as_adult',
     ],
     [
-        'name'     => 'Case 5: 3NL + 2 bé (5,9), Premier — bé 9T thành NL, cần 2 phòng',
+        'name'     => 'Case 5: 3NL + 2 bé (5,9), Premier — vẫn 1 phòng (max_children=2)',
         'request'  => [
             'room_id'      => $premierRoom,
             'checkin'      => $today,
@@ -127,9 +126,9 @@ return [
             'booking_type' => 'room',
         ],
         'expected' => [
-            'num_rooms'          => 2,
-            'effective_adults'   => 4,
-            'effective_children' => 1,
+            'num_rooms'          => 1,
+            'effective_adults'   => 3,
+            'effective_children' => 2,
             'requires_quote'     => false,
         ],
     ],
@@ -156,7 +155,7 @@ return [
         'assert_ticket_positive' => true,
     ],
     [
-        'name'     => 'Case 7: 2NL + 1 bé 7T, Combo — bé 7T = NL, 3 vé',
+        'name'     => 'Case 7: 2NL + 1 bé 7T, Combo — bé là trẻ trong phòng nhưng tính 1 vé',
         'request'  => [
             'room_id'      => $premierRoom,
             'checkin'      => $today,
@@ -168,8 +167,8 @@ return [
         ],
         'expected' => [
             'num_rooms'          => 1,
-            'effective_adults'   => 3,
-            'effective_children' => 0,
+            'effective_adults'   => 2,
+            'effective_children' => 1,
             'seat_count'         => 3,
             'billable_seats'     => 3,
             'free_child_seats'   => 0,
@@ -200,7 +199,7 @@ return [
         'assert_ticket_positive' => true,
     ],
     [
-        'name'     => 'Case 9: 2NL + 2 bé (5,7), Combo — bé 7T = NL, bé 5T miễn vé',
+        'name'     => 'Case 9: 2NL + 2 bé (5,7), Combo — bé 5T miễn vé, bé 7T tính vé NL',
         'request'  => [
             'room_id'      => $premierRoom,
             'checkin'      => $today,
@@ -212,8 +211,8 @@ return [
         ],
         'expected' => [
             'num_rooms'          => 1,
-            'effective_adults'   => 3,
-            'effective_children' => 1,
+            'effective_adults'   => 2,
+            'effective_children' => 2,
             'seat_count'         => 4,
             'billable_seats'     => 3,
             'free_child_seats'   => 1,
@@ -222,7 +221,7 @@ return [
         'assert_ticket_positive' => true,
     ],
     [
-        'name'     => 'Case 10: 2NL + 2 bé (7,8), Combo — cả 2 bé = NL, 2 phòng',
+        'name'     => 'Case 10: 2NL + 2 bé (7,8), Combo — vẫn 1 phòng (max_children=2)',
         'request'  => [
             'room_id'      => $premierRoom,
             'checkin'      => $today,
@@ -233,9 +232,9 @@ return [
             'booking_type' => 'combo',
         ],
         'expected' => [
-            'num_rooms'          => 2,
-            'effective_adults'   => 4,
-            'effective_children' => 0,
+            'num_rooms'          => 1,
+            'effective_adults'   => 2,
+            'effective_children' => 2,
             'seat_count'         => 4,
             'billable_seats'     => 4,
             'free_child_seats'   => 0,
@@ -244,7 +243,7 @@ return [
         'assert_ticket_positive' => true,
     ],
     [
-        'name'     => 'Case 11: 4NL + 3 bé (5,4,9), Combo — bé 9T = NL, 1 vé miễn, 2 phòng',
+        'name'     => 'Case 11: 4NL + 3 bé (5,4,9), Combo — 2 phòng do max_children=2; 1 vé miễn',
         'request'  => [
             'room_id'      => $premierRoom,
             'checkin'      => $today,
@@ -256,8 +255,8 @@ return [
         ],
         'expected' => [
             'num_rooms'          => 2,
-            'effective_adults'   => 5,
-            'effective_children' => 2,
+            'effective_adults'   => 4,
+            'effective_children' => 3,
             'seat_count'         => 7,
             'billable_seats'     => 6,
             'free_child_seats'   => 1,

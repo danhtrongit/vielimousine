@@ -120,15 +120,27 @@ final class CouponService
         return max(0, (int) min($value, $subtotal));
     }
 
+    /**
+     * Ghi nhận coupon được dùng cho đơn. Atomic increment kiểm tra `used_count <
+     * usage_limit` tại DB level — chống race khi 2 đơn song song giành slot cuối.
+     *
+     * Order trong transaction: increment TRƯỚC (compare-and-swap), nếu fail throw
+     * CouponException → outer TX rollback toàn bộ order. Insert usage record SAU.
+     *
+     * @throws CouponException khi đã đạt usage_limit.
+     */
     public function recordUsage(int $couponId, int $orderId, ?string $email, int $discount): void
     {
+        $claimed = $this->couponRepo->incrementUsedAtomic($couponId);
+        if (!$claimed) {
+            throw new CouponException(['Mã giảm giá đã hết lượt sử dụng.']);
+        }
         $this->usageRepo->create([
             'coupon_id'  => $couponId,
             'order_id'   => $orderId,
             'user_email' => $email,
             'discount'   => $discount,
         ]);
-        $this->couponRepo->incrementUsed($couponId);
     }
 
     private function countUsageForEmail(int $couponId, string $email): int

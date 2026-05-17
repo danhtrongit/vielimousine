@@ -16,7 +16,9 @@ final class RoomController
         $repo   = Container::get(RoomRepository::class);
         $result = $repo->all($request->get_params());
 
-        return ResponseEnvelope::paginated($result['data'], $result['pagination'], [
+        $data = array_map([self::class, 'enrichThumbnail'], $result['data']);
+
+        return ResponseEnvelope::paginated($data, $result['pagination'], [
             'sort'            => $result['sort'],
             'filters_applied' => $result['filters_applied'],
             'available_sorts' => $repo->availableSorts(),
@@ -32,7 +34,17 @@ final class RoomController
             return ResponseEnvelope::notFound('Room');
         }
 
-        return ResponseEnvelope::success($row);
+        return ResponseEnvelope::success(self::enrichThumbnail($row));
+    }
+
+    /** Add `thumbnail_url` resolved from WP attachment for client display. */
+    private static function enrichThumbnail(array $room): array
+    {
+        $id = (int) ($room['thumbnail_id'] ?? 0);
+        $room['thumbnail_url'] = $id > 0
+            ? (string) wp_get_attachment_image_url($id, 'thumbnail')
+            : null;
+        return $room;
     }
 
     public static function store(\WP_REST_Request $request): \WP_REST_Response

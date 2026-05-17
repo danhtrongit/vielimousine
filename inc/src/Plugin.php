@@ -21,5 +21,6 @@ final class Plugin
         Frontend\ShortcodeRegistry::register();
         Frontend\PublicAssets::register();
         Cron\CronRegistry::register();
+        Admin\AdminBootstrap::register();
     }
 }

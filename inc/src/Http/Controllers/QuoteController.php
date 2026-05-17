@@ -5,6 +5,7 @@ namespace Vie\Http\Controllers;
 
 use Vie\Container;
 use Vie\DTO\QuoteRequest;
+use Vie\Http\RateLimiter;
 use Vie\Repository\RepositoryException;
 use Vie\Service\Pricing\PriceCalculator;
 use Vie\Support\ResponseEnvelope;
@@ -15,6 +16,10 @@ final class QuoteController
 {
     public static function quote(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($denied = RateLimiter::check('quote', 30, 60)) {
+            return $denied;
+        }
+
         $data = $request->get_json_params() ?? [];
         if (!is_array($data)) {
             $data = [];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Vie\Http\Controllers;
 
 use Vie\Container;
+use Vie\Http\RateLimiter;
 use Vie\Repository\CustomerRepository;
 use Vie\Repository\HotelRepository;
 use Vie\Repository\OrderItemRepository;
@@ -15,6 +16,11 @@ final class OrderLookupController
 {
     public static function lookup(\WP_REST_Request $request): \WP_REST_Response
     {
+        // Rate-limit chống brute-force code+phone (endpoint công khai, không auth).
+        if ($denied = RateLimiter::check('order_lookup', 10, 300)) {
+            return $denied;
+        }
+
         $code  = trim((string) $request->get_param('code'));
         $phone = trim((string) $request->get_param('phone'));
 

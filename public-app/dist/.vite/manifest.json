@@ -1,0 +1,61 @@
+{
+  "_main-BFkCP-nt.js": {
+    "file": "assets/main-BFkCP-nt.js",
+    "name": "main",
+    "css": [
+      "assets/main-LvDNpB0x.css"
+    ],
+    "assets": [
+      "assets/primeicons-DMOk5skT.eot",
+      "assets/primeicons-C6QP2o4f.woff2",
+      "assets/primeicons-WjwUDZjB.woff",
+      "assets/primeicons-MpK4pl85.ttf",
+      "assets/primeicons-Dr5RGzOO.svg"
+    ]
+  },
+  "_main-LvDNpB0x.css": {
+    "file": "assets/main-LvDNpB0x.css",
+    "src": "_main-LvDNpB0x.css"
+  },
+  "node_modules/primeicons/fonts/primeicons.eot": {
+    "file": "assets/primeicons-DMOk5skT.eot",
+    "src": "node_modules/primeicons/fonts/primeicons.eot"
+  },
+  "node_modules/primeicons/fonts/primeicons.svg": {
+    "file": "assets/primeicons-Dr5RGzOO.svg",
+    "src": "node_modules/primeicons/fonts/primeicons.svg"
+  },
+  "node_modules/primeicons/fonts/primeicons.ttf": {
+    "file": "assets/primeicons-MpK4pl85.ttf",
+    "src": "node_modules/primeicons/fonts/primeicons.ttf"
+  },
+  "node_modules/primeicons/fonts/primeicons.woff": {
+    "file": "assets/primeicons-WjwUDZjB.woff",
+    "src": "node_modules/primeicons/fonts/primeicons.woff"
+  },
+  "node_modules/primeicons/fonts/primeicons.woff2": {
+    "file": "assets/primeicons-C6QP2o4f.woff2",
+    "src": "node_modules/primeicons/fonts/primeicons.woff2"
+  },
+  "src/entries/hotel.ts": {
+    "file": "assets/hotel-C-1hrc_i.js",
+    "name": "hotel",
+    "src": "src/entries/hotel.ts",
+    "isEntry": true,
+    "imports": [
+      "_main-BFkCP-nt.js"
+    ],
+    "css": [
+      "assets/hotel-DGJj8gVA.css"
+    ]
+  },
+  "src/entries/success.ts": {
+    "file": "assets/success-C-RaepkT.js",
+    "name": "success",
+    "src": "src/entries/success.ts",
+    "isEntry": true,
+    "imports": [
+      "_main-BFkCP-nt.js"
+    ]
+  }
+}

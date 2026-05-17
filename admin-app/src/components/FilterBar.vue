@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue';
 import InputText from 'primevue/inputtext';
-import Calendar from 'primevue/calendar';
-import Dropdown from 'primevue/dropdown';
+import DatePicker from 'primevue/datepicker';
+import Select from 'primevue/select';
 import Button from 'primevue/button';
 import { useRoute } from 'vue-router';
+import { ymdLocal } from '@/composables/useFormat';
 
 export interface FilterDef {
   key: string;
@@ -46,19 +47,21 @@ function reset() {
     <div v-for="f in schema" :key="f.key" class="filter-item">
       <label>{{ f.label }}</label>
       <InputText v-if="f.type === 'string'" v-model="state[f.key]" :placeholder="f.label" />
-      <Dropdown
+      <Select
         v-else-if="f.type === 'enum'"
         v-model="state[f.key]"
         :options="f.options ?? []"
         option-label="label"
         option-value="value"
         :placeholder="`Tất cả ${f.label.toLowerCase()}`"
+        :filter="(f.options?.length ?? 0) > 6"
+        filter-placeholder="Tìm…"
         show-clear
       />
-      <Calendar
+      <DatePicker
         v-else-if="f.type === 'date'"
         :model-value="state[f.key] ? new Date(state[f.key]) : null"
-        @update:model-value="(v: any) => state[f.key] = v instanceof Date ? v.toISOString().slice(0,10) : ''"
+        @update:model-value="(v: any) => state[f.key] = v instanceof Date ? ymdLocal(v) : ''"
         date-format="yy-mm-dd"
         show-icon
       />

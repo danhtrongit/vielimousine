@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Vie\Http\Controllers;
 
 use Vie\Container;
+use Vie\Http\RateLimiter;
 use Vie\Service\Coupon\CouponService;
 use Vie\Support\ResponseEnvelope;
 use Vie\Support\Validator;
@@ -13,6 +14,10 @@ final class CouponActionController
 {
     public static function validateCoupon(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($denied = RateLimiter::check('coupon_validate', 20, 60)) {
+            return $denied;
+        }
+
         $data = $request->get_json_params() ?? [];
         if (!is_array($data)) {
             $data = [];

@@ -72,4 +72,17 @@ final class HotelRepository extends AbstractRepository
         }
         return parent::create($data);
     }
+
+    public function findByPostId(int $postId): ?array
+    {
+        if ($postId <= 0) {
+            return null;
+        }
+        global $wpdb;
+        $row = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM {$this->table()} WHERE post_id = %d LIMIT 1", $postId),
+            ARRAY_A
+        );
+        return $row !== null ? $this->castRow($row) : null;
+    }
 }

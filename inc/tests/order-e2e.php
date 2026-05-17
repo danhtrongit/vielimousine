@@ -181,10 +181,9 @@ $stockBefore = (int) $wpdb->get_var($wpdb->prepare(
     $premierRoom,
     $plus7
 ));
-$cancelled1 = $orderSvc->cancel((int) $order1['id'], 'E2E test full refund');
+$cancelled1 = $orderSvc->cancel((int) $order1['id'], 'E2E test full refund', 0, (int) $order1['total']);
 $assert('order status=cancelled', $cancelled1['status'] === 'cancelled');
-$assert('penalty=0%', ($cancelled1['refund_preview']['item_refunds'][0]['penalty_percent'] ?? -1) === 0);
-$assert('actual_refund = total', (int) $cancelled1['refund_preview']['actual_refund'] === (int) $order1['total']);
+$assert('refund_amount = total', (int) $cancelled1['refund']['refund_amount'] === (int) $order1['total']);
 
 $stockAfter = (int) $wpdb->get_var($wpdb->prepare(
     "SELECT stock FROM {$wpdb->prefix}vie_room_price WHERE room_id = %d AND date = %s",
@@ -214,10 +213,9 @@ $orderRepo->update((int) $order6['id'], [
     'paid_amount'    => (int) $order6['total'],
     'payment_status' => 'paid',
 ]);
-$cancelled6 = $orderSvc->cancel((int) $order6['id'], 'E2E close-checkin');
-$pen = $cancelled6['refund_preview']['item_refunds'][0]['penalty_percent'] ?? -1;
-$assert('penalty=100% (within 24h)', $pen === 100);
-$assert('actual_refund=0', (int) $cancelled6['refund_preview']['actual_refund'] === 0);
+$cancelled6 = $orderSvc->cancel((int) $order6['id'], 'E2E close-checkin', 0, 0);
+$assert('refund_amount=0 (manual, none entered)', (int) $cancelled6['refund']['refund_amount'] === 0);
+$assert('paid_amount preserved', (int) $cancelled6['refund']['paid_amount'] === (int) $order6['total']);
 
 // --- Scenario 7: Coupon validate endpoint logic ---
 echo "\nScenario 7: CouponService::validate behavior\n";

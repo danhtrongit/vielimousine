@@ -54,21 +54,41 @@ Validator (Service layer):
 
 Input: `room.included_adults`, `room.max_adults`, `room.max_children`, `adults`, `childAges`, `userRooms`.
 
-### Bước 1: Quy đổi bé ≥ ngưỡng phòng → NL
+### Bước 1: Quy đổi bé ≥ ngưỡng adult → NL
 
-Phân phòng dùng **ngưỡng phòng** `vie_room.free_children_max_age` (default 5). Vé xe dùng **ngưỡng vé** `vie_hotel.ticket_free_children_max_age` (default 5) — xem §3.5. Hai ngưỡng độc lập nhau (xem [02-database.md §2.5](02-database.md#25-vie_room)).
+**Phase 13 (v2.1.0) — quyết định chốt với chủ dự án:** "Trẻ em đủ **12 tuổi**
+trở lên đều phải tính là người lớn." Ngưỡng `12` là hằng số global
+(`GuestComposition::ADULT_AGE_THRESHOLD`), không phụ thuộc `room.free_children_max_age`.
+
+Override khi cần (config, không khuyến nghị):
+- Filter: `apply_filters('vie_adult_age_threshold', 12)`
+- Option:  `update_option('vie_adult_age_threshold', 12)` (1..99)
+
+Vé xe vẫn dùng **ngưỡng vé** riêng `vie_hotel.ticket_free_children_max_age`
+(default 5) — xem §3.5. Hai ngưỡng độc lập.
 
 ```php
-$roomAdultAgeFloor = $room->free_children_max_age + 1; // 5 + 1 = 6 — ngưỡng cho PHÒNG
+const ADULT_AGE_THRESHOLD = 12; // tuổi >= 12 = adult
 $childrenUnderFloor = [];
 $convertedAdults    = 0;
 foreach ($childAges as $age) {
-    if ($age >= $roomAdultAgeFloor) $convertedAdults++;
-    else                            $childrenUnderFloor[] = $age;
+    if ($age >= ADULT_AGE_THRESHOLD) $convertedAdults++;
+    else                              $childrenUnderFloor[] = $age;
 }
 $effectiveAdults   = $adults + $convertedAdults;
 $effectiveChildren = count($childrenUnderFloor);
 ```
+
+**Ví dụ nhóm 2 NL + 2 bé 12T:**
+- `effectiveAdults = 2 + 2 = 4`
+- `effectiveChildren = 0`
+- Với room `max_adults=2, included_adults=2`: cần **2 phòng** (4 NL chia 2 phòng × 2 NL).
+- Hoặc khách yêu cầu `userRooms=1`: cần `1 phòng + 2 giường phụ` (nếu `extra_adult_price > 0`).
+
+**Lưu ý:** ngưỡng `room.free_children_max_age` (default 5) **chỉ còn dùng cho
+free-quota của room policy** (§3.4) — không còn xác định ai là "adult". Trẻ
+6-11T vẫn là child (đi vào `ChildPolicy`), chỉ không được hưởng free-quota
+(vì `freeAgeCap = 5`); sẽ được tính qua surcharge rule nếu match.
 
 ### Bước 2: Tính số phòng
 

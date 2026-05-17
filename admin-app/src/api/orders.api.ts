@@ -11,6 +11,10 @@ export const ordersApi = {
     api.post<Envelope<OrderDetail>>('/orders', body, {
       headers: idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : undefined,
     }).then(r => r.data),
-  cancel: (id: number, reason: string) =>
-    api.post<Envelope<OrderDetail>>(`/orders/${id}/cancel`, { reason }).then(r => r.data),
+  update: (id: number, body: Partial<Order>) =>
+    api.put<Envelope<OrderDetail>>(`/orders/${id}`, body).then(r => r.data),
+  cancel: (id: number, reason: string, refundAmount = 0) =>
+    api.post<Envelope<OrderDetail>>(`/orders/${id}/cancel`, { reason, refund_amount: refundAmount }).then(r => r.data),
+  transition: (id: number, status: 'confirmed' | 'completed' | 'no_show') =>
+    api.post<Envelope<OrderDetail>>(`/orders/${id}/transition`, { status }).then(r => r.data),
 };
