@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+
+# Local scratch
+vie.xlsx
+
+# Database dumps (NEVER commit — contains password hashes, secrets, PII)
+*.sql
+*.sql.gz
+db_*.sql
+dump_*.sql
+backup_*.sql
+
+# Composer (commit composer.json + composer.lock, not vendor/)
+vendor/
