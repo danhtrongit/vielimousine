@@ -22,6 +22,7 @@ final class SchemaManager
         'vie_coupon_usage'    => CouponUsageSchema::class,
         'vie_token'           => TokenSchema::class,
         'vie_activity_log'    => ActivityLogSchema::class,
+        'vie_quote_inquiry'   => QuoteInquirySchema::class,
     ];
 
     public static function install(): void

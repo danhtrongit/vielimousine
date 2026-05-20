@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import Card from 'primevue/card';
+import { computed, onMounted, ref, watch } from 'vue';
 import Chart from 'primevue/chart';
-import ProgressSpinner from 'primevue/progressspinner';
+import PageHeader from '@/components/PageHeader.vue';
+import StatCard from '@/components/StatCard.vue';
+import SectionCard from '@/components/SectionCard.vue';
+import LoadingState from '@/components/LoadingState.vue';
 import { ordersApi } from '@/api/orders.api';
 import { paymentsApi } from '@/api/payments.api';
 import { useUIStore } from '@/stores/ui.store';
@@ -34,22 +36,37 @@ onMounted(async () => {
 });
 
 const todayOrdersCount = computed(() =>
-  orders30d.value.filter((o) => o.created_at.startsWith(todayStr)).length
+  orders30d.value.filter((o) => o.created_at.startsWith(todayStr)).length,
 );
 
 const revenue30d = computed(() =>
   orders30d.value
     .filter((o) => o.status !== 'cancelled')
-    .reduce((sum, o) => sum + (o.total ?? 0), 0)
+    .reduce((sum, o) => sum + (o.total ?? 0), 0),
 );
 
 const paid30d = computed(() =>
   payments30d.value
     .filter((p) => p.type === 'payment' || p.type === 'deposit')
-    .reduce((sum, p) => sum + (p.amount ?? 0), 0)
+    .reduce((sum, p) => sum + (p.amount ?? 0), 0),
 );
 
+const confirmedCount = computed(() =>
+  orders30d.value.filter((o) => o.status === 'confirmed' || o.status === 'completed').length,
+);
+
+function readToken(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+const chartTick = ref(0);
+watch(() => ui.theme, () => { chartTick.value++; });
+
 const chartData = computed(() => {
+  // Force recompute when theme changes
+  void chartTick.value;
+
   const buckets: Record<string, number> = {};
   for (let i = 29; i >= 0; i--) {
     const d = ymdLocal(new Date(today.getTime() - i * 24 * 3600 * 1000));
@@ -61,82 +78,128 @@ const chartData = computed(() => {
     if (buckets[d] !== undefined) buckets[d] += o.total;
   }
   const labels = Object.keys(buckets).map((d) => d.slice(5));
+
+  const primary = readToken('--p-primary-500', '#fa541c');
+  const primarySoft = `${primary}1a`;
+
   return {
     labels,
     datasets: [{
       label: 'Doanh thu (VND)',
       data: Object.values(buckets),
-      borderColor: '#fa541c',
-      backgroundColor: 'rgba(250, 84, 28, 0.1)',
+      borderColor: primary,
+      backgroundColor: primarySoft,
+      pointBackgroundColor: primary,
+      pointRadius: 0,
+      pointHoverRadius: 5,
       fill: true,
-      tension: 0.3,
+      tension: 0.35,
+      borderWidth: 2,
     }],
   };
 });
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
-  scales: {
-    y: {
-      ticks: {
-        callback: (v: number) => new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(v),
+const chartOptions = computed(() => {
+  void chartTick.value;
+  const axis = readToken('--app-chart-axis', '#64748b');
+  const grid = readToken('--app-chart-grid', '#e2e8f0');
+  const tooltipBg = ui.theme === 'dark'
+    ? readToken('--p-surface-100', '#f1f5f9')
+    : readToken('--p-surface-900', '#0f172a');
+  const tooltipColor = ui.theme === 'dark'
+    ? readToken('--p-surface-900', '#0f172a')
+    : '#ffffff';
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { intersect: false, mode: 'index' as const },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: tooltipBg,
+        titleColor: tooltipColor,
+        bodyColor: tooltipColor,
+        padding: 10,
+        cornerRadius: 8,
+        displayColors: false,
+        callbacks: {
+          label: (ctx: any) => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' đ',
+        },
       },
     },
-  },
-};
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: axis, font: { size: 11 } },
+      },
+      y: {
+        grid: { color: grid, drawBorder: false },
+        ticks: {
+          color: axis,
+          font: { size: 11 },
+          callback: (v: number) =>
+            new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(v),
+        },
+      },
+    },
+  };
+});
 </script>
 
 <template>
-  <div v-if="loading" class="loading">
-    <ProgressSpinner />
-  </div>
-  <div v-else>
-    <h1 class="page-title">Tổng quan</h1>
+  <div class="dashboard">
+    <PageHeader title="Tổng quan" subtitle="Số liệu 30 ngày gần nhất" icon="pi pi-th-large" />
 
-    <div class="cards">
-      <Card class="card-orders">
-        <template #title><span>Đơn hôm nay</span></template>
-        <template #content>
-          <div class="card-value">{{ todayOrdersCount }}</div>
-          <div class="card-sub">đơn hàng mới</div>
-        </template>
-      </Card>
+    <LoadingState v-if="loading" variant="skeleton-cards" :rows="3" />
 
-      <Card class="card-revenue">
-        <template #title><span>Doanh thu 30 ngày</span></template>
-        <template #content>
-          <div class="card-value">{{ formatVND(revenue30d) }}</div>
-          <div class="card-sub">đã xác nhận + chờ</div>
-        </template>
-      </Card>
+    <template v-else>
+      <div class="kpi-grid">
+        <StatCard
+          label="Đơn hôm nay"
+          :value="todayOrdersCount"
+          sub="đơn hàng mới"
+          icon="pi pi-shopping-cart"
+          accent="primary"
+        />
+        <StatCard
+          label="Doanh thu 30 ngày"
+          :value="formatVND(revenue30d)"
+          sub="đã xác nhận + chờ"
+          icon="pi pi-chart-line"
+          accent="info"
+        />
+        <StatCard
+          label="Đã thu 30 ngày"
+          :value="formatVND(paid30d)"
+          sub="deposit + payment"
+          icon="pi pi-wallet"
+          accent="success"
+        />
+        <StatCard
+          label="Đơn xác nhận"
+          :value="confirmedCount"
+          sub="trong 30 ngày"
+          icon="pi pi-check-circle"
+          accent="neutral"
+          :mono="true"
+        />
+      </div>
 
-      <Card class="card-paid">
-        <template #title><span>Đã thu 30 ngày</span></template>
-        <template #content>
-          <div class="card-value">{{ formatVND(paid30d) }}</div>
-          <div class="card-sub">deposit + payment</div>
-        </template>
-      </Card>
-    </div>
-
-    <Card class="chart-card">
-      <template #title><span>Doanh thu hàng ngày (30 ngày qua)</span></template>
-      <template #content>
+      <SectionCard title="Doanh thu hàng ngày" subtitle="30 ngày qua" icon="pi pi-chart-line">
         <div class="chart-wrap">
           <Chart type="line" :data="chartData" :options="chartOptions" />
         </div>
-      </template>
-    </Card>
+      </SectionCard>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.loading { display: grid; place-items: center; min-height: 60vh; }
-.page-title { margin: 0 0 1.25rem; font-size: 1.5rem; font-weight: 600; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
-.card-value { font-size: 1.75rem; font-weight: 700; color: var(--p-primary-color); }
-.card-sub { color: var(--p-text-muted-color); font-size: 0.85rem; margin-top: 0.25rem; }
+.dashboard { display: flex; flex-direction: column; gap: var(--space-4); }
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--space-4);
+}
 .chart-wrap { height: 320px; }
 </style>

@@ -8,6 +8,7 @@ import Dialog from 'primevue/dialog';
 import ProgressSpinner from 'primevue/progressspinner';
 import MediaGrid from '@/components/media/MediaGrid.vue';
 import MediaUploader from '@/components/media/MediaUploader.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { mediaApi } from '@/api/media.api';
 import { useUIStore } from '@/stores/ui.store';
 import { useNotify } from '@/composables/useNotify';
@@ -144,10 +145,9 @@ function formatBytes(n: number): string {
 
 <template>
   <div>
-    <div class="page-head">
-      <h1 class="page-title">Thư viện ảnh</h1>
+    <PageHeader title="Thư viện ảnh" subtitle="Quản lý media" icon="pi pi-images">
       <Button label="Tải lên" icon="pi pi-upload" @click="uploadVisible = true" />
-    </div>
+    </PageHeader>
 
     <div class="toolbar">
       <InputText v-model="search" placeholder="Tìm theo tên file…" class="search-input" />
@@ -236,8 +236,6 @@ function formatBytes(n: number): string {
 </template>
 
 <style scoped>
-.page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-.page-title { margin: 0; font-size: 1.5rem; font-weight: 600; }
 .toolbar { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .search-input { flex: 1; max-width: 360px; }
 .muted { color: var(--p-text-muted-color); font-size: 0.85rem; }

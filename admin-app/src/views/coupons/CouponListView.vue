@@ -6,6 +6,7 @@ import Tag from 'primevue/tag';
 import { useRouter } from 'vue-router';
 import DataTablePanel from '@/components/DataTablePanel.vue';
 import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { formatVND, formatDate } from '@/composables/useFormat';
 
@@ -35,10 +36,9 @@ function fmtValue(type: string, value: number): string {
 
 <template>
   <div>
-    <div class="header">
-      <h1 class="page-title">Mã giảm giá</h1>
+    <PageHeader title="Mã giảm giá" subtitle="Quản lý khuyến mãi" icon="pi pi-ticket">
       <Button label="Tạo mới" icon="pi pi-plus" @click="router.push('/coupons/new')" />
-    </div>
+    </PageHeader>
 
     <DataTablePanel
       endpoint="/coupons"
@@ -94,8 +94,6 @@ function fmtValue(type: string, value: number): string {
 </template>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.page-title { margin: 0; font-size: 1.5rem; font-weight: 600; }
 .link { color: var(--p-primary-600); font-weight: 500; text-decoration: none; }
 .link:hover { text-decoration: underline; }
 .truncate { display: inline-block; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }

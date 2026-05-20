@@ -49,10 +49,24 @@ const paymentLabel = computed(() => ({
 const banner = computed(() => {
   if (!order.value) return null;
   const ps = order.value.payment_status;
-  if (ps === 'paid') return { cls: 'vh-success-banner-ok', text: `✓ Thanh toán thành công. Cảm ơn ${order.value.customer_name || 'Quý khách'}!` };
-  if (order.value.status === 'cancelled') return { cls: 'vh-success-banner-err', text: 'Đơn đã bị hủy.' };
-  if (ps === 'pending') return { cls: 'vh-success-banner-warn', text: '⏳ Đang chờ thanh toán. Trang này sẽ tự cập nhật.' };
-  return { cls: 'vh-success-banner-ok', text: '✓ Đặt phòng thành công!' };
+  if (ps === 'paid') {
+    return {
+      cls: 'vh-success-banner-ok',
+      icon: 'pi-check-circle',
+      text: `Thanh toán thành công. Cảm ơn ${order.value.customer_name || 'Quý khách'}!`,
+    };
+  }
+  if (order.value.status === 'cancelled') {
+    return { cls: 'vh-success-banner-err', icon: 'pi-times-circle', text: 'Đơn đã bị hủy.' };
+  }
+  if (ps === 'pending') {
+    return {
+      cls: 'vh-success-banner-warn',
+      icon: 'pi-clock',
+      text: 'Đang chờ thanh toán. Trang này sẽ tự cập nhật khi có kết quả.',
+    };
+  }
+  return { cls: 'vh-success-banner-ok', icon: 'pi-check-circle', text: 'Đặt phòng thành công!' };
 });
 
 const remaining = computed(() => {
@@ -88,7 +102,10 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
     </div>
 
     <template v-else>
-      <div :class="['vh-success-banner', banner?.cls]">{{ banner?.text }}</div>
+      <div :class="['vh-success-banner', banner?.cls]" role="status">
+        <i :class="['pi', banner?.icon]" aria-hidden="true" />
+        <span>{{ banner?.text }}</span>
+      </div>
 
       <div class="vh-success-card">
         <div class="vh-success-head">
@@ -129,7 +146,14 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
           Vui lòng kiểm tra hộp thư (cả Spam).
         </p>
 
-        <button v-if="order.payment_status === 'pending'" type="button" class="vh-btn" :disabled="refreshing" @click="refresh">
+        <button
+          v-if="order.payment_status === 'pending'"
+          type="button"
+          class="vh-btn"
+          :disabled="refreshing"
+          @click="refresh"
+        >
+          <i :class="['pi', refreshing ? 'pi-spin pi-spinner' : 'pi-refresh']" aria-hidden="true" />
           {{ refreshing ? 'Đang kiểm tra…' : 'Kiểm tra trạng thái' }}
         </button>
       </div>

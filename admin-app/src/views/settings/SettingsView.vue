@@ -16,6 +16,7 @@ import InputNumber from 'primevue/inputnumber';
 import Textarea from 'primevue/textarea';
 import ProgressSpinner from 'primevue/progressspinner';
 import EmailTemplateEditor from './EmailTemplateEditor.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { useNotify } from '@/composables/useNotify';
 import {
@@ -223,7 +224,7 @@ async function runHotelSync() {
 
 <template>
   <div>
-    <h1 class="page-title">Cài đặt</h1>
+    <PageHeader title="Cài đặt" subtitle="Cấu hình hệ thống" icon="pi pi-cog" />
 
     <div v-if="loading" class="loading">
       <ProgressSpinner style="width: 40px; height: 40px" />
@@ -390,7 +391,6 @@ async function runHotelSync() {
 </template>
 
 <style scoped>
-.page-title { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 600; }
 .loading { display: grid; place-items: center; min-height: 200px; }
 .section { padding: 0.5rem 0 1rem; }
 .section h3 { margin: 0 0 0.5rem; font-size: 1rem; font-weight: 600; }

@@ -1,0 +1,1 @@
+import{d as o,u as c,G as s,g as p,W as u}from"./index-DcLJVgcZ.js";const f=o({__name:"Can",props:{cap:{},capAny:{}},setup(a){const e=a,t=c(),n=u(()=>e.cap?t.can(e.cap):e.capAny?t.canAny(e.capAny):!0);return(r,m)=>n.value?s(r.$slots,"default",{key:0}):p("",!0)}});export{f as _};

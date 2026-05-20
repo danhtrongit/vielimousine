@@ -17,6 +17,7 @@ final class EmailSettings
         'admin_notification',
         'admin_paid',
         'admin_cancelled',
+        'checkin_code',
     ];
 
     /**

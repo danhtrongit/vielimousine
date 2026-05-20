@@ -1,0 +1,194 @@
+import { definePreset } from '@primeuix/themes';
+import Aura from '@primeuix/themes/aura';
+
+/**
+ * Vielimousine Public theme preset.
+ *
+ * Kept in lockstep with `admin-app/src/styles/preset.ts` so two SPA bundles
+ * share the SAME visual language (brand orange #fa541c, slate neutrals, radius,
+ * focus ring). If you change one, change the other.
+ */
+export const VieLimoPreset = definePreset(Aura, {
+  primitive: {
+    vielimo: {
+      50: '#fff2eb',
+      100: '#ffe0cd',
+      200: '#ffc09a',
+      300: '#ff9a64',
+      400: '#ff7237',
+      500: '#fa541c',
+      600: '#e34112',
+      700: '#bd3210',
+      800: '#962812',
+      900: '#7a2212',
+      950: '#420f06',
+    },
+  },
+  semantic: {
+    primary: {
+      50: '{vielimo.50}',
+      100: '{vielimo.100}',
+      200: '{vielimo.200}',
+      300: '{vielimo.300}',
+      400: '{vielimo.400}',
+      500: '{vielimo.500}',
+      600: '{vielimo.600}',
+      700: '{vielimo.700}',
+      800: '{vielimo.800}',
+      900: '{vielimo.900}',
+      950: '{vielimo.950}',
+    },
+    focusRing: {
+      width: '2px',
+      style: 'solid',
+      color: '{primary.500}',
+      offset: '2px',
+      shadow: '0 0 0 4px rgba(250, 84, 28, 0.15)',
+    },
+    formField: {
+      borderRadius: '10px',
+      paddingX: '0.85rem',
+      paddingY: '0.65rem',
+      transitionDuration: '180ms',
+    },
+    list: {
+      padding: '0.25rem 0.25rem',
+      gap: '2px',
+      option: {
+        padding: '0.55rem 0.8rem',
+        borderRadius: '6px',
+      },
+    },
+    colorScheme: {
+      light: {
+        primary: {
+          color: '{primary.500}',
+          contrastColor: '#ffffff',
+          hoverColor: '{primary.600}',
+          activeColor: '{primary.700}',
+        },
+        highlight: {
+          background: '{primary.50}',
+          focusBackground: '{primary.100}',
+          color: '{primary.700}',
+          focusColor: '{primary.800}',
+        },
+        surface: {
+          0: '#ffffff',
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+          950: '#020617',
+        },
+        formField: {
+          background: '#ffffff',
+          borderColor: '{surface.300}',
+          hoverBorderColor: '{surface.400}',
+          focusBorderColor: '{primary.500}',
+          invalidBorderColor: '{red.500}',
+          color: '{surface.900}',
+          placeholderColor: '{surface.400}',
+        },
+        text: {
+          color: '{surface.900}',
+          mutedColor: '{surface.500}',
+        },
+        content: {
+          background: '#ffffff',
+          hoverBackground: '{surface.50}',
+          borderColor: '{surface.200}',
+          color: '{surface.900}',
+        },
+      },
+      dark: {
+        primary: {
+          color: '{primary.400}',
+          contrastColor: '{surface.950}',
+          hoverColor: '{primary.300}',
+          activeColor: '{primary.200}',
+        },
+        highlight: {
+          background: 'color-mix(in srgb, {primary.400}, transparent 80%)',
+          focusBackground: 'color-mix(in srgb, {primary.400}, transparent 70%)',
+          color: '{primary.300}',
+          focusColor: '{primary.200}',
+        },
+        surface: {
+          0: '#ffffff',
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+          950: '#020617',
+        },
+        formField: {
+          background: '{surface.900}',
+          borderColor: '{surface.700}',
+          hoverBorderColor: '{surface.600}',
+          focusBorderColor: '{primary.400}',
+          invalidBorderColor: '{red.400}',
+          color: '{surface.0}',
+          placeholderColor: '{surface.500}',
+        },
+        text: {
+          color: '{surface.0}',
+          mutedColor: '{surface.400}',
+        },
+        content: {
+          background: '{surface.900}',
+          hoverBackground: '{surface.800}',
+          borderColor: '{surface.700}',
+          color: '{surface.0}',
+        },
+      },
+    },
+  },
+  components: {
+    button: {
+      root: {
+        borderRadius: '10px',
+        paddingX: '1rem',
+        paddingY: '0.65rem',
+        gap: '0.5rem',
+        transitionDuration: '180ms',
+      },
+    },
+    card: {
+      root: {
+        borderRadius: '14px',
+      },
+      body: {
+        padding: '1.25rem',
+        gap: '0.75rem',
+      },
+    },
+    dialog: {
+      root: {
+        borderRadius: '16px',
+      },
+    },
+    tag: {
+      root: {
+        borderRadius: '999px',
+        padding: '0.2rem 0.65rem',
+        gap: '0.35rem',
+        fontWeight: '500',
+      },
+    },
+  },
+});
+
+export default VieLimoPreset;

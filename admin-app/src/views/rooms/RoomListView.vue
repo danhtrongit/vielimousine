@@ -10,6 +10,7 @@ import Select from 'primevue/select';
 import { useRouter } from 'vue-router';
 import DataTablePanel from '@/components/DataTablePanel.vue';
 import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { useLookupStore } from '@/stores/lookup.store';
 import { useNotify } from '@/composables/useNotify';
@@ -99,10 +100,9 @@ function hotelName(hotelId: number): string {
 
 <template>
   <div>
-    <div class="header">
-      <h1 class="page-title">Phòng</h1>
+    <PageHeader title="Phòng" subtitle="Quản lý phòng và sức chứa" icon="pi pi-th-large">
       <Button label="Tạo phòng" icon="pi pi-plus" @click="openCreate" />
-    </div>
+    </PageHeader>
     <DataTablePanel
       :key="refreshKey"
       endpoint="/rooms"
@@ -208,8 +208,6 @@ function hotelName(hotelId: number): string {
 </template>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.page-title { margin: 0; font-size: 1.5rem; font-weight: 600; }
 .link { color: var(--p-primary-600); font-weight: 500; text-decoration: none; }
 .link:hover { text-decoration: underline; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem 1rem; }

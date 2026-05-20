@@ -4,8 +4,9 @@ import PrimeVue from 'primevue/config';
 import ToastService from 'primevue/toastservice';
 import ConfirmationService from 'primevue/confirmationservice';
 import Tooltip from 'primevue/tooltip';
-import Aura from '@primeuix/themes/aura';
 import 'primeicons/primeicons.css';
+import './styles/tokens.css';
+import VieLimoPreset from './styles/preset';
 import App from './App.vue';
 import router from './router';
 
@@ -15,7 +16,7 @@ app.use(createPinia());
 app.use(router);
 app.use(PrimeVue, {
   theme: {
-    preset: Aura,
+    preset: VieLimoPreset,
     options: {
       prefix: 'p',
       darkModeSelector: '.dark-mode',

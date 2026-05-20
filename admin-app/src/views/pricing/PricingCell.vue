@@ -8,6 +8,7 @@ const props = defineProps<{
   width?: number;
   pending?: boolean;
   error?: boolean;
+  isDefault?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -52,7 +53,7 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="cell-input-wrap" :class="{ pending, error, editing }">
+  <div class="cell-input-wrap" :class="{ pending, error, editing, 'is-default': isDefault && !editing }">
     <input
       type="text"
       inputmode="numeric"
@@ -81,6 +82,7 @@ function onKeydown(e: KeyboardEvent) {
 .cell-input-wrap input:focus { border-color: var(--p-primary-500); background: var(--p-surface-0); box-shadow: 0 0 0 2px var(--p-primary-100); }
 .cell-input-wrap.pending input { background: var(--p-yellow-50); border-color: var(--p-yellow-400); }
 .cell-input-wrap.error input { background: var(--p-red-50); border-color: var(--p-red-500); }
+.cell-input-wrap.is-default input { color: var(--p-text-muted-color); font-style: italic; }
 .ind { position: absolute; right: -10px; top: 50%; transform: translateY(-50%); font-size: 0.6rem; }
 .ind-pending { color: var(--p-yellow-600); }
 .ind-error { color: var(--p-red-600); font-weight: bold; }

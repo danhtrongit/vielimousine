@@ -5,6 +5,7 @@ import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import DataTablePanel from '@/components/DataTablePanel.vue';
 import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { useNotify } from '@/composables/useNotify';
 import { useCsvExport } from '@/composables/useCsvExport';
@@ -89,10 +90,9 @@ async function exportAll() {
 
 <template>
   <div>
-    <div class="header">
-      <h1 class="page-title">Sổ thanh toán</h1>
+    <PageHeader title="Sổ thanh toán" subtitle="Lịch sử giao dịch" icon="pi pi-wallet">
       <Button label="Xuất CSV" icon="pi pi-download" :loading="exporting" outlined @click="exportAll" />
-    </div>
+    </PageHeader>
 
     <DataTablePanel
       endpoint="/payments"
@@ -144,8 +144,6 @@ async function exportAll() {
 </template>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.page-title { margin: 0; font-size: 1.5rem; font-weight: 600; }
 .link { color: var(--p-primary-600); font-weight: 500; text-decoration: none; }
 .link:hover { text-decoration: underline; }
 .txn { font-family: monospace; font-size: 0.85rem; background: var(--p-surface-100); padding: 2px 5px; border-radius: 3px; }

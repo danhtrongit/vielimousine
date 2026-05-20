@@ -31,6 +31,7 @@ final class OrderEmailService
         'confirmed'          => '[{site_name}] Xác nhận đặt phòng #{order_code}',
         'completed'          => '[{site_name}] Cảm ơn quý khách – #{order_code}',
         'cancelled'          => '[{site_name}] Đã hủy đặt phòng #{order_code}',
+        'checkin_code'       => '[{site_name}] Mã nhận phòng #{order_code}',
         'admin_notification' => '[ĐẶT PHÒNG MỚI] #{order_code} – {customer_name} – Seats:{total_seats}',
         'admin_paid'         => '[THU TIỀN] #{order_code} +{payment_amount}',
         'admin_cancelled'    => '[HỦY] #{order_code} hoàn {refund_amount}',
@@ -180,6 +181,25 @@ final class OrderEmailService
         $this->sendByType('admin_cancelled', $ctx, $this->settings->adminRecipients());
     }
 
+    /**
+     * Gửi email mã nhận phòng cho khách. Gọi đồng bộ (admin click "Gửi").
+     * Trả về true nếu wp_mail trả true, false nếu fail/không có dữ liệu.
+     */
+    public function sendCheckinCode(int $orderId): bool
+    {
+        $order = $this->orderRepo->find($orderId);
+        if (!is_array($order)) {
+            return false;
+        }
+        $email = (string) ($order['customer_email'] ?? '');
+        $code  = (string) ($order['checkin_code'] ?? '');
+        if ($email === '' || $code === '') {
+            return false;
+        }
+        $ctx = $this->buildContext($orderId, $order);
+        return $this->sendByType('checkin_code', $ctx, $email);
+    }
+
     // ---------- Public API (cũng dùng cho test mail) ----------
 
     /**
@@ -262,6 +282,7 @@ final class OrderEmailService
             // Coupon / voucher
             'coupon_code'     => (string) ($order['coupon_code'] ?? ''),
             'voucher_code'    => (string) ($order['voucher_code'] ?? ''),
+            'checkin_code'    => (string) ($order['checkin_code'] ?? ''),
 
             // Notes
             'customer_note'   => (string) ($order['customer_note'] ?? ''),

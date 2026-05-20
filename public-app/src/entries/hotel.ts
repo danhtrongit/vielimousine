@@ -2,7 +2,8 @@ import { createApp } from 'vue';
 import HotelDetailApp from '@/components/HotelDetailApp.vue';
 import BookingWidget from '@/components/BookingWidget.vue';
 import { installPrimeVue } from '@/plugins/primevue';
-import '../styles/main.css';
+import '@/styles/tokens.css';
+import '@/styles/main.css';
 
 // Mount main booking app (search + rooms + inline checkout)
 const mainMounts = document.querySelectorAll('[data-vie-public-hotel]');

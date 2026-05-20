@@ -6,6 +6,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import ProgressSpinner from 'primevue/progressspinner';
 import StatusTag from '@/components/StatusTag.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { customersApi } from '@/api/customers.api';
 import { ordersApi } from '@/api/orders.api';
 import { useUIStore } from '@/stores/ui.store';
@@ -47,7 +48,7 @@ onMounted(async () => {
 <template>
   <div v-if="loading" class="loading"><ProgressSpinner /></div>
   <div v-else-if="customer">
-    <h1 class="page-title">{{ customer.name }}</h1>
+    <PageHeader :title="customer.name" subtitle="Hồ sơ khách hàng" icon="pi pi-user" />
 
     <Card class="info-card">
       <template #content>
@@ -93,7 +94,6 @@ onMounted(async () => {
 
 <style scoped>
 .loading { display: grid; place-items: center; min-height: 60vh; }
-.page-title { margin: 0 0 1.25rem; font-size: 1.5rem; font-weight: 600; }
 .info-card { margin-bottom: 1.5rem; }
 .kv-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem 1.5rem; }
 .kv { display: flex; gap: 0.5rem; font-size: 0.95rem; }

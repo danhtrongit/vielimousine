@@ -5,7 +5,7 @@ import RoomCard from './RoomCard.vue';
 import InlineCheckout from './InlineCheckout.vue';
 import MobileCta from './MobileCta.vue';
 import { prefillFromQuery, setSelection } from '@/composables/useBookingState';
-import { startQuotePolling } from '@/composables/useQuotes';
+import { registerRooms } from '@/composables/useQuotes';
 
 interface RoomData {
   id: number;
@@ -32,7 +32,7 @@ const props = defineProps<{
 
 onMounted(() => {
   prefillFromQuery();
-  startQuotePolling(props.rooms.map((r) => r.id));
+  registerRooms(props.rooms.map((r) => r.id));
 
   // Auto-pick room from query
   const sp = new URLSearchParams(window.location.search);

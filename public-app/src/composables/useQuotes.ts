@@ -2,27 +2,36 @@ import { watch } from 'vue';
 import { api } from '@/api/client';
 import type { Quote, QuoteRequest } from '@/api/types';
 import {
-  search, quotes, quoteErrors, quoteLoading, quoteKey,
+  search, quotes, quoteErrors, quoteLoading, quoteKey, priceChecked, setSelection,
   type BookingType,
 } from './useBookingState';
 
 const inflight = new Map<string, AbortController>();
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let registeredRoomIds: number[] = [];
 
 const TYPES: BookingType[] = ['room', 'combo'];
 
-export function startQuotePolling(roomIds: number[]) {
-  const refresh = () => {
-    if (!search.checkin || !search.checkout) return;
-    for (const rid of roomIds) {
-      for (const t of TYPES) void fetchQuoteForRoom(rid, t);
-    }
-  };
-  watch(search, () => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(refresh, 500);
-  });
-  refresh();
+// When user edits the search form, previously-loaded prices become stale.
+// Clear them and force a fresh "Kiểm tra giá" click before any booking action.
+watch(search, () => {
+  priceChecked.value = false;
+  quotes.clear();
+  quoteErrors.clear();
+  setSelection(null);
+}, { deep: true });
+
+export function registerRooms(roomIds: number[]) {
+  registeredRoomIds = roomIds.slice();
+}
+
+export async function refreshQuotes(): Promise<void> {
+  if (!search.checkin || !search.checkout) return;
+  const tasks: Promise<void>[] = [];
+  for (const rid of registeredRoomIds) {
+    for (const t of TYPES) tasks.push(fetchQuoteForRoom(rid, t));
+  }
+  await Promise.all(tasks);
+  priceChecked.value = true;
 }
 
 export async function fetchQuoteForRoom(roomId: number, bookingType: BookingType): Promise<void> {

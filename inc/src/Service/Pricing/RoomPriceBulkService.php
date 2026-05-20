@@ -14,6 +14,13 @@ final class RoomPriceBulkService
     private const CHUNK_CELLS = 500;
 
     /**
+     * Bulk upsert giá phòng / tồn / nguồn theo (room_ids × dates).
+     *
+     * Chỉ các field client gửi mới được UPDATE trên row đã có — các field
+     * còn lại giữ nguyên giá trị cũ. Với INSERT (override mới), điền field
+     * thiếu bằng default của room (base_price / extra_adult_price) để tránh
+     * "wipe to 0" khi user chỉ muốn set 1 field.
+     *
      * @return array{rows_affected: int, dates_count: int, rooms_count: int, cells_count: int}
      */
     public function bulkUpsert(array $scope, array $values, int $actorUserId): array
@@ -32,15 +39,50 @@ final class RoomPriceBulkService
             return ['rows_affected' => 0, 'dates_count' => 0, 'rooms_count' => 0, 'cells_count' => 0];
         }
 
-        $now      = current_time('mysql');
-        $price    = (int) ($values['price']             ?? 0);
-        $extra    = (int) ($values['extra_adult_price'] ?? 0);
-        $stock    = (int) ($values['stock']             ?? 0);
-        $isActive = isset($values['is_active']) ? (int) (bool) $values['is_active'] : 1;
-        $source   = (string) ($values['source'] ?? 'manual');
+        // Detect which value keys client explicitly sent.
+        $hasPrice  = array_key_exists('price',             $values);
+        $hasExtra  = array_key_exists('extra_adult_price', $values);
+        $hasStock  = array_key_exists('stock',             $values);
+        $hasActive = array_key_exists('is_active',         $values);
+        $hasSource = array_key_exists('source',            $values);
 
-        // Build danh sách cells, chunk theo CHUNK_CELLS để tránh vượt
-        // max_allowed_packet (mặc định 4-64MB tùy hosting) và max_prepared_stmt_count.
+        $priceVal  = $hasPrice  ? (int) $values['price']             : 0;
+        $extraVal  = $hasExtra  ? (int) $values['extra_adult_price'] : 0;
+        $stockVal  = $hasStock  ? (int) $values['stock']             : 0;
+        $activeVal = $hasActive ? (int) (bool) $values['is_active']  : 1;
+        $sourceVal = $hasSource ? (string) $values['source']         : 'manual';
+
+        // Per-room defaults — only fetched if user omitted price/extra (INSERT path needs sane fallback).
+        $roomDefaults = [];
+        if (!$hasPrice || !$hasExtra) {
+            $roomTable    = $wpdb->prefix . 'vie_room';
+            $placeholders = implode(',', array_fill(0, count($roomIds), '%d'));
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, base_price, extra_adult_price FROM {$roomTable} WHERE id IN ({$placeholders})",
+                    $roomIds
+                ),
+                ARRAY_A
+            ) ?: [];
+            foreach ($rows as $r) {
+                $roomDefaults[(int) $r['id']] = [
+                    'price' => (int) $r['base_price'],
+                    'extra' => (int) $r['extra_adult_price'],
+                ];
+            }
+        }
+
+        // Dynamic UPDATE clause — only columns user touched get overwritten.
+        $updateParts = [];
+        if ($hasPrice)  $updateParts[] = 'price = VALUES(price)';
+        if ($hasExtra)  $updateParts[] = 'extra_adult_price = VALUES(extra_adult_price)';
+        if ($hasStock)  $updateParts[] = 'stock = VALUES(stock)';
+        if ($hasActive) $updateParts[] = 'is_active = VALUES(is_active)';
+        if ($hasSource) $updateParts[] = 'source = VALUES(source)';
+        $updateParts[] = 'updated_at = VALUES(updated_at)';
+        $updateClause = implode(', ', $updateParts);
+
+        $now   = current_time('mysql');
         $cells = [];
         foreach ($roomIds as $rid) {
             foreach ($dates as $date) {
@@ -56,24 +98,23 @@ final class RoomPriceBulkService
                 $placeholders = [];
                 $params       = [];
                 foreach ($chunk as [$rid, $date]) {
+                    $defaults = $roomDefaults[$rid] ?? ['price' => 0, 'extra' => 0];
                     $placeholders[] = '(%d, %s, %d, %d, %d, %d, %s, %s, %s)';
                     array_push(
                         $params,
                         $rid, $date,
-                        $price, $extra, $stock, $isActive, $source,
+                        $hasPrice ? $priceVal : $defaults['price'],
+                        $hasExtra ? $extraVal : $defaults['extra'],
+                        $stockVal,    // 0 nếu client không gửi — đúng default cho override mới
+                        $activeVal,
+                        $sourceVal,
                         $now, $now
                     );
                 }
                 $sql = "INSERT INTO {$table}
                         (room_id, date, price, extra_adult_price, stock, is_active, source, created_at, updated_at)
                         VALUES " . implode(',', $placeholders) . "
-                        ON DUPLICATE KEY UPDATE
-                            price = VALUES(price),
-                            extra_adult_price = VALUES(extra_adult_price),
-                            stock = VALUES(stock),
-                            is_active = VALUES(is_active),
-                            source = VALUES(source),
-                            updated_at = VALUES(updated_at)";
+                        ON DUPLICATE KEY UPDATE {$updateClause}";
                 $prepared = $wpdb->prepare($sql, ...$params);
                 $result   = $wpdb->query($prepared);
                 if ($result === false) {

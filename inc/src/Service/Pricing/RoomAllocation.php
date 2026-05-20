@@ -35,8 +35,10 @@ final class RoomAllocation
 
         $totalCapacityAdults   = $this->numRooms * $capacity;
         $totalCapacityChildren = $this->numRooms * $maxChildren;
-        $extraBedsAllowed      = $this->numRooms * max(0, $capacity - $included);
 
+        // Note: kiểm tra giường phụ (extraAdultBeds > numRooms × (capacity - included))
+        // là tương đương với effAdults > totalCapacityAdults nên đã gộp vào check dưới
+        // để tránh trùng thông báo.
         if ($effAdults > $totalCapacityAdults) {
             $this->requiresQuote = true;
             $this->messages[]    = 'Số người lớn vượt quá sức chứa — Liên hệ báo giá';
@@ -44,10 +46,6 @@ final class RoomAllocation
         if ($effChildren > $totalCapacityChildren) {
             $this->requiresQuote = true;
             $this->messages[]    = 'Số trẻ em vượt quá sức chứa — Liên hệ báo giá';
-        }
-        if ($this->extraAdultBeds > $extraBedsAllowed) {
-            $this->requiresQuote = true;
-            $this->messages[]    = 'Số giường phụ vượt giới hạn — Liên hệ báo giá';
         }
     }
 

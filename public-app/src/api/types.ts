@@ -122,3 +122,23 @@ export interface OrderLookup {
   paid_amount: number;
   items: OrderLookupItem[];
 }
+
+export interface QuoteInquiryRequest {
+  customer: { phone: string; name: string; email: string | null };
+  note?: string | null;
+  item: {
+    room_id: number;
+    booking_type: 'room' | 'combo';
+    checkin: string;
+    checkout: string;
+    adults: number;
+    child_ages: number[];
+    user_rooms?: number;
+  };
+}
+
+export interface QuoteInquiryResponse {
+  id: number;
+  status: string;
+  message: string;
+}

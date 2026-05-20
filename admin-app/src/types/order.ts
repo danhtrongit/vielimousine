@@ -24,6 +24,8 @@ export interface Order {
   payment_status: 'pending' | 'partial' | 'paid' | 'refunded';
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
   invoice_number: string | null;
+  checkin_code: string | null;
+  checkin_code_sent_at: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
   confirmed_at: string | null;

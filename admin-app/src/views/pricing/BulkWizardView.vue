@@ -10,6 +10,7 @@ import DatePicker from 'primevue/datepicker';
 import InputNumber from 'primevue/inputnumber';
 import ToggleSwitch from 'primevue/toggleswitch';
 import Message from 'primevue/message';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { useLookupStore } from '@/stores/lookup.store';
 import { useNotify } from '@/composables/useNotify';
@@ -141,7 +142,7 @@ async function submit() {
 
 <template>
   <div>
-    <h1 class="page-title">Cập nhật hàng loạt</h1>
+    <PageHeader title="Cập nhật hàng loạt" subtitle="Áp giá theo khoảng ngày" icon="pi pi-bolt" />
 
     <Steps :model="steps" :active-step="stepIndex" :readonly="true" class="wizard-steps" />
 
@@ -290,7 +291,6 @@ async function submit() {
 </template>
 
 <style scoped>
-.page-title { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 600; }
 .wizard-steps { margin-bottom: 1.5rem; }
 .step-content { padding: 1rem; min-height: 280px; }
 .step-content h3 { margin: 0 0 1rem; font-size: 1.1rem; }

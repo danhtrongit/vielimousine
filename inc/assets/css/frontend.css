@@ -1,11 +1,57 @@
-/* Vielimousine — Public frontend (Phase 10) */
+/**
+ * Vielimousine — Public frontend (legacy shortcodes)
+ *
+ * Used by `[vie_hotel_search]`, `[vie_checkout]`, `[vie_order_success]` when
+ * rendered as plain server-side HTML (i.e. without the Vue SPA mounted).
+ *
+ * Visual language MUST match the Vue public app (`public-app/src/styles/`)
+ * which in turn mirrors the admin SPA. To stay in sync, this file declares
+ * the same token set inline (so it works even when the Vue bundle isn't
+ * loaded on a page) and reuses the same colors, radius, and motion scales.
+ */
 
-.vie-public {
-  font-family: Tahoma, Arial, sans-serif;
-  color: #1f2937;
-  font-size: 15px;
-  line-height: 1.55;
-  max-width: 1100px;
+/* ---------- Tokens ---------- */
+.vie-public,
+.vie-public-hotel {
+  /* Brand */
+  --vie-primary: #fa541c;
+  --vie-primary-600: #e34112;
+  --vie-primary-700: #bd3210;
+  --vie-primary-50: #fff2eb;
+
+  /* Neutrals (slate) */
+  --vie-text-strong: #0f172a;
+  --vie-text: #1e293b;
+  --vie-muted: #64748b;
+  --vie-subtle: #94a3b8;
+  --vie-border: #e2e8f0;
+  --vie-divider: #f1f5f9;
+  --vie-card-bg: #ffffff;
+  --vie-bg: #f8fafc;
+
+  /* Semantic */
+  --vie-success: #16a34a;
+  --vie-success-50: #f0fdf4;
+  --vie-success-border: #86efac;
+  --vie-warn: #d97706;
+  --vie-warn-50: #fffbeb;
+  --vie-warn-border: #fcd34d;
+  --vie-danger: #dc2626;
+  --vie-danger-50: #fef2f2;
+  --vie-danger-border: #fca5a5;
+
+  /* Scales */
+  --vie-radius: 12px;
+  --vie-radius-sm: 8px;
+  --vie-radius-pill: 999px;
+  --vie-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --vie-shadow-lg: 0 12px 16px -4px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+
+  /* font-family intentionally unset — inherit from parent WordPress theme */
+  color: var(--vie-text);
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 1200px;
   margin: 1.5rem auto;
   padding: 0 1rem;
 }
@@ -14,102 +60,162 @@
 .vie-public *::before,
 .vie-public *::after { box-sizing: border-box; }
 
-.vie-public h1, .vie-public h2, .vie-public h3 {
-  font-family: Tahoma, Arial, sans-serif;
-  color: #111827;
-  font-weight: 600;
-  line-height: 1.3;
+.vie-public h1,
+.vie-public h2,
+.vie-public h3 {
+  color: var(--vie-text-strong);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
-.vie-public h1 { font-size: 1.6rem; margin: 0 0 1rem; }
-.vie-public h2 { font-size: 1.25rem; margin: 1.25rem 0 .75rem; }
-.vie-public h3 { font-size: 1rem; margin: 1rem 0 .5rem; }
+.vie-public h1 { font-size: 1.75rem; margin: 0 0 1.25rem; }
+.vie-public h2 { font-size: 1.25rem; margin: 1.5rem 0 0.85rem; }
+.vie-public h3 { font-size: 1.05rem; margin: 1rem 0 0.5rem; }
 
-.vie-public p { margin: 0 0 .75rem; }
-.vie-public a { color: #1d4ed8; text-decoration: none; }
-.vie-public a:hover { text-decoration: underline; }
+.vie-public p { margin: 0 0 0.85rem; }
+.vie-public a {
+  color: var(--vie-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.vie-public a:hover {
+  color: var(--vie-primary-600);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
-.vie-public__muted { color: #6b7280; font-size: 0.9rem; }
-.vie-public__loading { color: #6b7280; font-style: italic; }
-.vie-public__error-inline { color: #b91c1c; background: #fee2e2; padding: .65rem .85rem; border-radius: 6px; border: 1px solid #fca5a5; }
+.vie-public :focus-visible {
+  outline: 2px solid var(--vie-primary);
+  outline-offset: 2px;
+  border-radius: var(--vie-radius-sm);
+}
+
+.vie-public__muted { color: var(--vie-muted); font-size: 0.9rem; }
+.vie-public__loading { color: var(--vie-muted); font-style: italic; }
+.vie-public__error-inline {
+  color: var(--vie-danger);
+  background: var(--vie-danger-50);
+  padding: 0.7rem 0.95rem;
+  border-radius: var(--vie-radius-sm);
+  border: 1px solid var(--vie-danger-border);
+}
 
 /* ---------- Buttons ---------- */
 .vie-public__btn {
-  display: inline-block;
-  border: 1px solid #d1d5db;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--vie-border);
   background: #fff;
-  color: #1f2937;
-  padding: .55rem 1.1rem;
-  border-radius: 6px;
+  color: var(--vie-text-strong);
+  padding: 0.7rem 1.15rem;
+  min-height: 44px;
+  border-radius: var(--vie-radius-sm);
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background .15s ease, border-color .15s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+    box-shadow 0.18s ease, opacity 0.18s ease;
   text-decoration: none;
 }
-.vie-public__btn:hover { background: #f3f4f6; }
+.vie-public__btn:hover {
+  background: var(--vie-bg);
+  border-color: #cbd5e1;
+}
+.vie-public__btn:active { transform: translateY(1px); }
 .vie-public__btn--primary {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
+  background: var(--vie-primary);
+  border-color: var(--vie-primary);
+  color: #fff;
+  box-shadow: 0 8px 24px -8px rgba(250, 84, 28, 0.35);
+}
+.vie-public__btn--primary:hover {
+  background: var(--vie-primary-600);
+  border-color: var(--vie-primary-600);
   color: #fff;
 }
-.vie-public__btn--primary:hover { background: #1e40af; border-color: #1e40af; color: #fff; }
-.vie-public__btn:disabled { opacity: .55; cursor: not-allowed; }
+.vie-public__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 /* ---------- Form ---------- */
-.vie-public__form { display: flex; flex-direction: column; gap: 1rem; }
+.vie-public__form { display: flex; flex-direction: column; gap: 1.1rem; }
 .vie-public__fieldset {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
+  border: 1px solid var(--vie-border);
+  border-radius: var(--vie-radius);
+  padding: 1.1rem 1.35rem;
   margin: 0;
-  background: #fff;
+  background: var(--vie-card-bg);
+  box-shadow: var(--vie-shadow);
 }
 .vie-public__fieldset legend {
-  padding: 0 .5rem;
-  color: #111827;
-  font-weight: 600;
+  padding: 0 0.5rem;
+  color: var(--vie-text-strong);
+  font-weight: 700;
 }
 
 .vie-public__row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 0.85rem;
 }
 .vie-public__row--3 { grid-template-columns: repeat(3, 1fr); }
-.vie-public__field { display: flex; flex-direction: column; gap: .35rem; }
-.vie-public__field label { font-size: .85rem; font-weight: 500; color: #374151; }
-.vie-public__field .required { color: #dc2626; }
+.vie-public__field { display: flex; flex-direction: column; gap: 0.35rem; }
+.vie-public__field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--vie-text);
+}
+.vie-public__field .required { color: var(--vie-danger); }
 
 .vie-public__input,
 .vie-public__select,
 .vie-public__textarea {
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: .55rem .7rem;
-  font-size: .95rem;
-  font-family: inherit;
+  border: 1px solid var(--vie-border);
+  border-radius: var(--vie-radius-sm);
+  padding: 0.65rem 0.85rem;
+  font-size: 1rem;
   background: #fff;
   width: 100%;
-  color: #111827;
+  min-height: 44px;
+  color: var(--vie-text-strong);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.vie-public__textarea { min-height: 80px; resize: vertical; }
+.vie-public__textarea { min-height: 88px; resize: vertical; }
 .vie-public__input:focus,
 .vie-public__select:focus,
 .vie-public__textarea:focus {
   outline: none;
-  border-color: #1d4ed8;
-  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
+  border-color: var(--vie-primary);
+  box-shadow: 0 0 0 4px rgba(250, 84, 28, 0.15);
 }
 
 .vie-public__inline-group {
   display: flex;
-  gap: .5rem;
+  gap: 0.5rem;
 }
 .vie-public__inline-group .vie-public__input { flex: 1; }
 
-.vie-public__coupon-status { margin-top: .35rem; font-size: .85rem; }
-.vie-public__coupon-status--ok { color: #047857; }
-.vie-public__coupon-status--err { color: #b91c1c; }
+.vie-public__coupon-status {
+  margin-top: 0.4rem;
+  font-size: 0.88rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--vie-radius-sm);
+}
+.vie-public__coupon-status--ok {
+  color: #166534;
+  background: var(--vie-success-50);
+}
+.vie-public__coupon-status--err {
+  color: #b91c1c;
+  background: var(--vie-danger-50);
+}
 
 /* ---------- Layout: checkout grid ---------- */
 .vie-public__checkout-grid {
@@ -121,67 +227,97 @@
 .vie-public__summary {
   position: sticky;
   top: 1rem;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
+  background: var(--vie-card-bg);
+  border: 1px solid var(--vie-border);
+  border-radius: var(--vie-radius);
+  padding: 1.25rem 1.35rem;
+  box-shadow: var(--vie-shadow);
 }
 .vie-public__summary h2 { margin-top: 0; }
 .vie-public__sum-row {
   display: flex;
   justify-content: space-between;
-  padding: .35rem 0;
-  border-bottom: 1px dashed #e5e7eb;
-  font-size: .92rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px dashed var(--vie-divider);
+  font-size: 0.92rem;
+  gap: 0.5rem;
 }
 .vie-public__sum-row:last-child { border-bottom: none; }
-.vie-public__sum-row--discount { color: #047857; }
+.vie-public__sum-row--discount { color: #166534; font-weight: 600; }
 .vie-public__total-line {
-  margin-top: .9rem;
-  padding-top: .75rem;
-  border-top: 2px solid #1f2937;
-  font-size: 1.1rem;
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 2px solid var(--vie-text-strong);
+  font-size: 1.05rem;
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600;
+  color: var(--vie-text-strong);
 }
-.vie-public__total-line strong { font-size: 1.2rem; color: #b91c1c; }
+.vie-public__total-line strong {
+  font-size: 1.4rem;
+  color: var(--vie-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
 
 .vie-public__notes {
-  margin: .75rem 0 0;
+  margin: 0.85rem 0 0;
   padding-left: 1.1rem;
-  font-size: .85rem;
-  color: #4b5563;
+  font-size: 0.86rem;
+  color: var(--vie-muted);
 }
-.vie-public__notes li { margin-bottom: .25rem; }
+.vie-public__notes li { margin-bottom: 0.25rem; }
 
-/* ---------- Room cards ---------- */
+/* ---------- Room cards (shortcode) ---------- */
 .vie-public__rooms-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
   margin-top: 1rem;
 }
 .vie-public__room-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 1rem;
-  background: #fff;
+  border: 1px solid var(--vie-border);
+  border-radius: var(--vie-radius);
+  padding: 1.1rem 1.25rem;
+  background: var(--vie-card-bg);
   display: flex;
   flex-direction: column;
-  gap: .5rem;
+  gap: 0.55rem;
+  box-shadow: var(--vie-shadow);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.vie-public__room-card:hover {
+  box-shadow: var(--vie-shadow-lg);
+  border-color: #ffc09a;
+  transform: translateY(-1px);
 }
 .vie-public__room-card h3 { margin: 0; }
-.vie-public__room-price { font-weight: 600; color: #b91c1c; margin: 0; }
+.vie-public__room-price {
+  font-weight: 700;
+  color: var(--vie-primary);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
+}
 .vie-public__room-card .vie-public__btn { margin-top: auto; }
 
 /* ---------- Success page ---------- */
 .vie-public__success-card {
-  background: #f0fdf4;
-  border: 1px solid #86efac;
-  border-radius: 8px;
+  background: var(--vie-success-50);
+  border: 1px solid var(--vie-success-border);
+  border-radius: var(--vie-radius);
   padding: 1.5rem;
+  box-shadow: var(--vie-shadow);
 }
-.vie-public__success-card h2 { margin-top: 0; color: #166534; }
+.vie-public__success-card h2 {
+  margin-top: 0;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .vie-public__order-items {
   list-style: none;
   padding: 0;
@@ -189,63 +325,63 @@
 }
 .vie-public__order-items li {
   background: #fff;
-  border: 1px solid #d1fae5;
-  border-radius: 6px;
-  padding: .75rem 1rem;
-  margin-bottom: .5rem;
+  border: 1px solid var(--vie-border);
+  border-radius: var(--vie-radius-sm);
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 0.5rem;
 }
 
-/* ---------- Policy section ---------- */
-.vie-public-hotel { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; font-family: Tahoma, Arial, sans-serif; }
-.vie-public-hotel__booking, .vie-public-hotel__policy {
+/* ---------- Policy section (hotel page) ---------- */
+.vie-public-hotel {
+  /* font-family intentionally unset — inherit from parent WordPress theme */
+  max-width: 1200px;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+.vie-public-hotel__booking,
+.vie-public-hotel__policy {
   margin: 2rem 0;
-  padding: 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
+  padding: 1.25rem;
+  border: 1px solid var(--vie-border);
+  border-radius: var(--vie-radius);
+  background: var(--vie-card-bg);
+  box-shadow: var(--vie-shadow);
 }
 .vie-public-hotel__policy table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: .5rem;
+  margin-top: 0.5rem;
+  font-size: 0.92rem;
 }
 .vie-public-hotel__policy th,
 .vie-public-hotel__policy td {
-  border: 1px solid #e5e7eb;
-  padding: .5rem .75rem;
+  border: 1px solid var(--vie-divider);
+  padding: 0.6rem 0.85rem;
   text-align: left;
-  font-size: .9rem;
 }
-.vie-public-hotel__policy th { background: #f9fafb; font-weight: 600; }
+.vie-public-hotel__policy th {
+  background: var(--vie-bg);
+  font-weight: 700;
+  color: var(--vie-text-strong);
+}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
+  .vie-public { font-size: 15px; }
   .vie-public__row,
   .vie-public__row--3,
   .vie-public__checkout-grid { grid-template-columns: 1fr; }
   .vie-public__summary { position: static; }
+  .vie-public h1 { font-size: 1.4rem; }
 }
 
 /* ============================================================
-   Single Hotel — parent theme overrides
-   Parent rules: vielimousine/assets/css/single-hotel.css
-   Goal: keep parent's header / gallery / combo / utilities visual
-         but give the Vue booking section and sidebar widget a clean
-         canvas (no excessive padding, no green form wrapper).
+   Single Hotel — parent theme overrides (unchanged behaviour)
    ============================================================ */
 
-/* 1. Main column article: parent sets `padding: 20px 80px` which is
-      too much horizontal space and squeezes the Vue room cards.
-      Replace with a reasonable vertical-only rhythm. */
 body.single-hotel .vie-row .cell.vie-col-9 article {
-  padding:  0 !important;
+  padding: 0 !important;
 }
-
-/* 2. Vue booking section: sits in the article flow.
-      Section title reuses parent's `.single-tour-title-content` styling
-      (uppercase 22px) so it visually aligns with Combo / Utilities titles.
-      scroll-margin-top compensates parent's sticky #bottom-header so the
-      "ĐẶT NGAY" anchor (href="#form_booking") lands at section top, not under header. */
 body.single-hotel .vie-booking-section {
   margin: 24px 0;
   scroll-margin-top: 120px;
@@ -254,60 +390,39 @@ body.single-hotel .vie-booking-section .single-tour-title-content {
   margin-top: 0;
   margin-bottom: 16px;
 }
-
-/* 3. Vue room app root: parent has no rule for these classes, but the
-      article's old `padding: 20px 80px` was the only culprit. After (1)
-      these collapse to flex column with the gap defined in main.css.
-      Keep this as a defensive reset against any future parent change. */
 body.single-hotel .vh-app-embedded,
 body.single-hotel .vh-room {
   padding: 0 !important;
 }
-
-/* 4. Booking-unavailable fallback (when hotel chưa cấu hình rooms). */
 body.single-hotel .vie-booking-unavailable {
   margin: 24px 0;
   padding: 16px 20px;
-  background: #fff7e6;
-  border: 1px solid #ffd591;
-  border-radius: 6px;
+  background: var(--vie-warn-50, #fffbeb);
+  border: 1px solid var(--vie-warn-border, #fcd34d);
+  border-radius: var(--vie-radius, 12px);
   color: #874d00;
 }
-
-/* 5. Sidebar widget: parent stacks 2 boxes flush —
-      `.single_tour_sidebar-price-inner` (green header, rounded top)
-      `.single_tour_sidebar-form-inner` (form area, rounded bottom).
-      Make the Vue widget flow as the form-inner content seamlessly:
-      no double card, no green tint, top corners flush with the header. */
 body.single-hotel .vie-row .cell.vie-col-3 .single_tour_sidebar-form-inner:has(#vie-booking-widget) {
   background: #fff;
   padding: 0;
   border-radius: 0 0 8px 8px;
   overflow: hidden;
-  border: 1px solid var(--vie-border, #e5e7eb);
+  border: 1px solid #e2e8f0;
   border-top: none;
 }
 body.single-hotel #vie-booking-widget {
   display: block;
   background: #fff;
 }
-body.single-hotel #vie-booking-widget .vh-widget-wrap {
-  margin: 0;
-}
-/* Neutralize widget's own border/shadow/rounding inside sidebar so it
-   acts like the content of parent's form-inner box, not a nested card. */
+body.single-hotel #vie-booking-widget .vh-widget-wrap { margin: 0; }
 body.single-hotel #vie-booking-widget .vh-widget {
   border: none;
   border-radius: 0;
   box-shadow: none;
   padding: 16px 14px;
 }
-
-/* 6. Mobile: parent stacks col-9 + col-3, sticky becomes useless.
-      Make sure the widget doesn't get cropped or stick awkwardly. */
 @media only screen and (max-width: 47.99875rem) {
   body.single-hotel .vie-row .cell.vie-col-3 .single_tour_sidebar-wrapper {
     position: static;
   }
 }
-

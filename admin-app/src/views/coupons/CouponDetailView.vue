@@ -18,6 +18,7 @@ import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import ProgressSpinner from 'primevue/progressspinner';
+import PageHeader from '@/components/PageHeader.vue';
 import { couponsApi, couponUsageApi, type Coupon, type CouponUsage } from '@/api/coupons.api';
 import { useUIStore } from '@/stores/ui.store';
 import { useLookupStore } from '@/stores/lookup.store';
@@ -138,7 +139,7 @@ const TYPES = [
 <template>
   <div v-if="loading" class="loading"><ProgressSpinner /></div>
   <div v-else>
-    <h1 class="page-title">{{ isNew ? 'Tạo mã giảm giá' : coupon.code }}</h1>
+    <PageHeader :title="isNew ? 'Tạo mã giảm giá' : (coupon.code ?? '')" icon="pi pi-ticket" />
 
     <Tabs value="info">
       <TabList>
@@ -152,7 +153,7 @@ const TYPES = [
           <template #content>
             <div class="grid-2">
               <div class="field">
-                <label>Code <span style="color: red">*</span></label>
+                <label>Code <span class="required-mark">*</span></label>
                 <InputText v-model="coupon.code" :disabled="!isNew" placeholder="SUMMER10" />
               </div>
               <div class="field">
@@ -273,7 +274,6 @@ const TYPES = [
 
 <style scoped>
 .loading { display: grid; place-items: center; min-height: 60vh; }
-.page-title { margin: 0 0 1.25rem; font-size: 1.5rem; font-weight: 600; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .grid-span-2 { grid-column: span 2; }
 .field { display: flex; flex-direction: column; gap: 0.35rem; }

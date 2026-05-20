@@ -1,4 +1,4 @@
-import { reactive, computed } from 'vue';
+import { reactive, computed, ref } from 'vue';
 import type { Quote } from '@/api/types';
 import { ymd } from './useFormat';
 
@@ -36,6 +36,10 @@ export function quoteKey(roomId: number, type: BookingType): string {
 export const quotes = reactive(new Map<string, Quote>());
 export const quoteErrors = reactive(new Map<string, string>());
 export const quoteLoading = reactive(new Set<string>());
+
+// True once the user has explicitly clicked "Kiểm tra giá".
+// Reset to false whenever search params change so stale prices can't be booked.
+export const priceChecked = ref(false);
 
 export const selection = reactive<{ roomId: number | null; bookingType: BookingType }>({
   roomId: null,

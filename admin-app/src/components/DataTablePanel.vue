@@ -1,17 +1,30 @@
 <script setup lang="ts">
 import DataTable from 'primevue/datatable';
 import Paginator, { type PageState } from 'primevue/paginator';
-import ProgressSpinner from 'primevue/progressspinner';
 import { useApiList } from '@/composables/useApiList';
+import EmptyState from './EmptyState.vue';
+import LoadingState from './LoadingState.vue';
 
-const props = defineProps<{
-  endpoint: string;
-  defaults?: Record<string, unknown>;
-}>();
+const props = withDefaults(
+  defineProps<{
+    endpoint: string;
+    defaults?: Record<string, unknown>;
+    /** 'normal' | 'compact' — controls cell padding density */
+    density?: 'normal' | 'compact';
+    emptyTitle?: string;
+    emptyDescription?: string;
+    emptyIcon?: string;
+  }>(),
+  {
+    density: 'normal',
+    emptyTitle: 'Không có dữ liệu',
+    emptyIcon: 'pi pi-inbox',
+  },
+);
 
 const { data, pagination, loading, error, updateQuery } = useApiList<Record<string, unknown>>(
   props.endpoint,
-  props.defaults ?? {}
+  props.defaults ?? {},
 );
 
 function onPage(e: PageState) {
@@ -28,21 +41,43 @@ function onSort(e: { sortField?: unknown; sortOrder?: number | null }) {
 </script>
 
 <template>
-  <div class="data-table-panel">
+  <div class="data-table-panel" :class="`density-${density}`">
     <slot name="filters" :update="updateQuery" />
-    <div v-if="error" class="error-banner">{{ error }}</div>
-    <DataTable
-      :value="data"
-      :loading="loading"
-      lazy
-      removable-sort
-      @sort="onSort"
-      data-key="id"
-    >
-      <template #empty>{{ loading ? 'Đang tải...' : 'Không có dữ liệu' }}</template>
-      <slot />
-    </DataTable>
+    <slot name="toolbar" :update="updateQuery" />
+
+    <div v-if="error" class="error-banner" role="alert">
+      <i class="pi pi-exclamation-triangle" aria-hidden="true" />
+      <span>{{ error }}</span>
+    </div>
+
+    <div class="table-wrap">
+      <DataTable
+        :value="data"
+        :loading="false"
+        lazy
+        removable-sort
+        @sort="onSort"
+        data-key="id"
+        striped-rows
+        scrollable
+        scroll-height="flex"
+      >
+        <template #empty>
+          <LoadingState v-if="loading" variant="skeleton-table" :rows="6" />
+          <EmptyState
+            v-else
+            inset
+            :icon="emptyIcon"
+            :title="emptyTitle"
+            :description="emptyDescription"
+          />
+        </template>
+        <slot />
+      </DataTable>
+    </div>
+
     <Paginator
+      v-if="pagination.total > 0"
       :rows="pagination.per_page"
       :total-records="pagination.total"
       :rows-per-page-options="[10, 20, 50, 100]"
@@ -50,18 +85,38 @@ function onSort(e: { sortField?: unknown; sortOrder?: number | null }) {
       @page="onPage"
       template="FirstPageLink PrevPageLink CurrentPageReport NextPageLink LastPageLink RowsPerPageDropdown"
       current-page-report-template="Trang {currentPage}/{totalPages} ({totalRecords} bản ghi)"
+      class="paginator"
     />
-    <ProgressSpinner v-if="loading" style="position:absolute;top:50%;left:50%;width:32px;height:32px" />
   </div>
 </template>
 
 <style scoped>
-.data-table-panel { position: relative; }
+.data-table-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+}
 .error-banner {
-  padding: 0.75rem 1rem;
-  background: var(--p-red-50);
-  color: var(--p-red-700);
-  border-radius: 0.5rem;
-  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--app-tint-danger);
+  color: var(--app-on-tint-danger);
+  border: 1px solid var(--app-tint-danger-border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+.paginator { background: transparent; padding: 0; border: 0; }
+
+.density-compact :deep(.p-datatable .p-datatable-thead > tr > th),
+.density-compact :deep(.p-datatable .p-datatable-tbody > tr > td) {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.875rem;
 }
 </style>

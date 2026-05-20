@@ -5,6 +5,7 @@ import Button from 'primevue/button';
 import { useRouter } from 'vue-router';
 import DataTablePanel from '@/components/DataTablePanel.vue';
 import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { formatDate } from '@/composables/useFormat';
 
@@ -22,7 +23,7 @@ onMounted(() => {
 
 <template>
   <div>
-    <h1 class="page-title">Khách hàng</h1>
+    <PageHeader title="Khách hàng" icon="pi pi-users" />
     <DataTablePanel
       endpoint="/customers"
       :defaults="{ sort: 'created_at', order: 'desc' }"
@@ -53,5 +54,4 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page-title { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 600; }
 </style>

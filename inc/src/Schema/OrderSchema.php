@@ -5,7 +5,7 @@ namespace Vie\Schema;
 
 final class OrderSchema
 {
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.1.0';
 
     public static function install(\wpdb $wpdb): void
     {
@@ -48,6 +48,8 @@ final class OrderSchema
             partner_payment_status VARCHAR(30) NOT NULL DEFAULT 'not_created',
             invoice_number VARCHAR(100) DEFAULT NULL,
             voucher_code VARCHAR(100) DEFAULT NULL,
+            checkin_code VARCHAR(100) DEFAULT NULL,
+            checkin_code_sent_at DATETIME DEFAULT NULL,
             status VARCHAR(20) NOT NULL DEFAULT 'pending',
             confirmed_at DATETIME DEFAULT NULL,
             cancelled_at DATETIME DEFAULT NULL,

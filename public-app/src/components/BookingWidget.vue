@@ -13,6 +13,11 @@ const totalText = computed(() => {
   if (quote.value.requires_quote) return 'Liên hệ';
   return formatVND(quote.value.total);
 });
+const childrenSummary = computed(() => {
+  if (search.childAges.length === 0) return '';
+  const ages = search.childAges.map((a) => `${a} tuổi`).join(', ');
+  return `, ${search.childAges.length} trẻ em (${ages})`;
+});
 
 function scrollToCheckout() {
   document.querySelector('[data-vh-checkout]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -37,7 +42,10 @@ function scrollToCheckout() {
         <div class="vh-widget-meta">
           <div><i class="pi pi-calendar" /> {{ formatDateVN(search.checkin) }} → {{ formatDateVN(search.checkout) }}</div>
           <div><i class="pi pi-moon" /> {{ quote.nights }} đêm · {{ quote.num_rooms }} phòng</div>
-          <div><i class="pi pi-users" /> {{ search.adults }} người lớn{{ search.childAges.length > 0 ? `, ${search.childAges.length} trẻ em` : '' }}</div>
+          <div><i class="pi pi-users" /> {{ search.adults }} người lớn{{ childrenSummary }}</div>
+          <div v-if="selection.bookingType === 'combo' && quote.seat_count > 0">
+            <i class="pi pi-ticket" /> {{ quote.seat_count }} vé khứ hồi
+          </div>
         </div>
 
         <div v-if="quote.requires_quote" class="vh-widget-lines vh-muted">
@@ -45,17 +53,14 @@ function scrollToCheckout() {
         </div>
         <div v-else class="vh-widget-lines">
           <div class="vh-line">
-            <span>{{ quote.num_rooms }} phòng × {{ quote.nights }} đêm</span>
-            <span>{{ formatVND(quote.room_subtotal) }}</span>
+            <span>{{ quote.num_rooms }} phòng × {{ quote.nights }} đêm{{ selection.bookingType === 'combo' ? ' (combo)' : '' }}</span>
+            <span>{{ formatVND(quote.room_subtotal + (selection.bookingType === 'combo' ? quote.ticket_subtotal : 0)) }}</span>
           </div>
           <div v-if="quote.extra_adult_subtotal" class="vh-line">
             <span>Phụ thu người lớn</span><span>{{ formatVND(quote.extra_adult_subtotal) }}</span>
           </div>
           <div v-if="quote.child_surcharge_total" class="vh-line">
             <span>Phụ thu trẻ em</span><span>{{ formatVND(quote.child_surcharge_total) }}</span>
-          </div>
-          <div v-if="quote.ticket_subtotal" class="vh-line">
-            <span>Vé xe</span><span>{{ formatVND(quote.ticket_subtotal) }}</span>
           </div>
           <div v-if="quote.discount" class="vh-line vh-line-discount">
             <span>Giảm giá</span><span>−{{ formatVND(quote.discount) }}</span>

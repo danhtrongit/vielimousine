@@ -4,10 +4,13 @@ declare(strict_types=1);
 namespace Vie\Http\Controllers;
 
 use Vie\Container;
+use Vie\Email\OrderEmailService;
+use Vie\Repository\ActivityLogRepository;
 use Vie\Repository\OrderRepository;
 use Vie\Service\Order\IllegalTransitionException;
 use Vie\Service\Order\OrderNotFoundException;
 use Vie\Service\Order\OrderService;
+use Vie\Service\Settings\EmailSettings;
 use Vie\Support\ResponseEnvelope;
 
 final class OrderActionController
@@ -61,6 +64,103 @@ final class OrderActionController
                 ['code' => 'illegal_transition', 'field' => 'status', 'message' => $e->getMessage()],
             ], 409);
         }
+    }
+
+    /**
+     * POST /orders/{id}/send-checkin-code
+     * Lưu mã nhận phòng (do khách sạn cấp) và gửi email cho khách.
+     * Chỉ cho phép khi đơn đã thanh toán đủ (payment_status = paid).
+     */
+    public static function sendCheckinCode(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $id = (int) $request->get_param('id');
+        if ($denied = self::ensureCanAccess($id)) {
+            return $denied;
+        }
+
+        $body = $request->get_json_params();
+        if (!is_array($body)) {
+            $body = [];
+        }
+        $code = trim((string) ($body['checkin_code'] ?? ''));
+
+        if ($code === '') {
+            return ResponseEnvelope::error([
+                ['code' => 'validation_error', 'field' => 'checkin_code', 'message' => 'Vui lòng nhập mã nhận phòng'],
+            ], 422);
+        }
+        if (mb_strlen($code) > 100) {
+            return ResponseEnvelope::error([
+                ['code' => 'validation_error', 'field' => 'checkin_code', 'message' => 'Mã nhận phòng tối đa 100 ký tự'],
+            ], 422);
+        }
+
+        $repo  = Container::get(OrderRepository::class);
+        $order = $repo->find($id);
+        if ($order === null) {
+            return ResponseEnvelope::notFound('Đơn hàng');
+        }
+
+        if (($order['payment_status'] ?? '') !== 'paid') {
+            return ResponseEnvelope::error([
+                ['code' => 'order_not_paid', 'field' => null, 'message' => 'Đơn chưa thanh toán đủ, không thể gửi mã nhận phòng'],
+            ], 409);
+        }
+        if (($order['status'] ?? '') === 'cancelled') {
+            return ResponseEnvelope::error([
+                ['code' => 'order_cancelled', 'field' => null, 'message' => 'Đơn đã hủy, không thể gửi mã nhận phòng'],
+            ], 409);
+        }
+        if (empty($order['customer_email'])) {
+            return ResponseEnvelope::error([
+                ['code' => 'no_customer_email', 'field' => null, 'message' => 'Đơn không có email khách hàng để gửi'],
+            ], 422);
+        }
+
+        // Template phải đang bật — nếu admin tắt template trong Settings → Email,
+        // sendByType sẽ silently trả false → tránh báo "email_failed" gây hiểu lầm.
+        if (!Container::get(EmailSettings::class)->isTemplateEnabled('checkin_code')) {
+            return ResponseEnvelope::error([
+                ['code' => 'template_disabled', 'field' => null, 'message' => 'Email "Mã nhận phòng" đang tắt trong Cài đặt → Email'],
+            ], 409);
+        }
+
+        // Lưu code trước (để sendCheckinCode đọc lại từ DB), nhưng KHÔNG set timestamp
+        // cho tới khi wp_mail thực sự return true — tránh DB nói dối về việc đã gửi.
+        $previousCode = (string) ($order['checkin_code'] ?? '');
+        $repo->update($id, ['checkin_code' => $code]);
+
+        $emailSvc = Container::get(OrderEmailService::class);
+        $sent = $emailSvc->sendCheckinCode($id);
+
+        if (!$sent) {
+            return ResponseEnvelope::error([
+                ['code' => 'email_failed', 'field' => null, 'message' => 'Không gửi được email mã nhận phòng'],
+            ], 500);
+        }
+
+        $now = current_time('mysql');
+        $repo->update($id, ['checkin_code_sent_at' => $now]);
+
+        // Audit log: ghi nhận admin nào đã cấp mã (và mã cũ → mã mới nếu là re-send).
+        Container::get(ActivityLogRepository::class)->create([
+            'actor_user_id' => (int) get_current_user_id(),
+            'entity_type'   => 'order',
+            'entity_id'     => $id,
+            'action'        => 'checkin_code_sent',
+            'before_json'   => $previousCode !== '' ? ['checkin_code' => $previousCode] : null,
+            'after_json'    => ['checkin_code' => $code, 'sent_at' => $now],
+            'ip'            => $_SERVER['REMOTE_ADDR']     ?? null,
+            'user_agent'    => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        ]);
+
+        $orderSvc = Container::get(OrderService::class);
+        try {
+            $detail = $orderSvc->buildDetail($id);
+        } catch (OrderNotFoundException $e) {
+            $detail = $repo->find($id);
+        }
+        return ResponseEnvelope::success($detail);
     }
 
     public static function cancel(\WP_REST_Request $request): \WP_REST_Response

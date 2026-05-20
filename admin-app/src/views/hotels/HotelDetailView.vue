@@ -23,6 +23,7 @@ import type { Hotel, Room } from '@/types/hotel';
 import type { MediaItem } from '@/types/media';
 import MediaPickerDialog from '@/components/media/MediaPickerDialog.vue';
 import MediaThumb from '@/components/media/MediaThumb.vue';
+import PageHeader from '@/components/PageHeader.vue';
 
 const route = useRoute();
 const ui = useUIStore();
@@ -178,7 +179,7 @@ async function savePolicy() {
 <template>
   <div v-if="loading" class="loading"><ProgressSpinner /></div>
   <div v-else-if="hotel">
-    <h1 class="page-title">{{ hotel.name }}</h1>
+    <PageHeader :title="hotel.name" subtitle="Chi tiết khách sạn" icon="pi pi-building" />
 
     <Tabs value="info">
       <TabList>
@@ -344,7 +345,6 @@ async function savePolicy() {
 
 <style scoped>
 .loading { display: grid; place-items: center; min-height: 60vh; }
-.page-title { margin: 0 0 1.25rem; font-size: 1.5rem; font-weight: 600; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .grid-span-2 { grid-column: span 2; }
 .field { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.75rem; }

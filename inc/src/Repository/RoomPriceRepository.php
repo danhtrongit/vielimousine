@@ -81,4 +81,25 @@ final class RoomPriceRepository extends AbstractRepository
         $rows = $wpdb->get_results($sql, ARRAY_A) ?: [];
         return array_map(fn(array $r) => $this->castRow($r), $rows);
     }
+
+    /**
+     * Lấy toàn bộ override room_price trong khoảng ngày — không paginate, không clamp.
+     * Dùng cho PricingMatrixController: matrix cần thấy mọi override để render UI đúng.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function findAllInDateRange(string $dateFrom, string $dateTo): array
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . $this->tableName();
+        $sql = $wpdb->prepare(
+            "SELECT * FROM {$table}
+             WHERE date BETWEEN %s AND %s
+             ORDER BY date ASC, room_id ASC",
+            $dateFrom,
+            $dateTo
+        );
+        $rows = $wpdb->get_results($sql, ARRAY_A) ?: [];
+        return array_map(fn(array $r) => $this->castRow($r), $rows);
+    }
 }

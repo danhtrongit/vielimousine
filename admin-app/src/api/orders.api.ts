@@ -17,4 +17,6 @@ export const ordersApi = {
     api.post<Envelope<OrderDetail>>(`/orders/${id}/cancel`, { reason, refund_amount: refundAmount }).then(r => r.data),
   transition: (id: number, status: 'confirmed' | 'completed' | 'no_show') =>
     api.post<Envelope<OrderDetail>>(`/orders/${id}/transition`, { status }).then(r => r.data),
+  sendCheckinCode: (id: number, checkinCode: string) =>
+    api.post<Envelope<OrderDetail>>(`/orders/${id}/send-checkin-code`, { checkin_code: checkinCode }).then(r => r.data),
 };

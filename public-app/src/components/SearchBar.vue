@@ -3,7 +3,9 @@ import { computed, watch, ref } from 'vue';
 import DatePicker from 'primevue/datepicker';
 import Select from 'primevue/select';
 import InputNumber from 'primevue/inputnumber';
-import { search } from '@/composables/useBookingState';
+import Button from 'primevue/button';
+import { search, priceChecked } from '@/composables/useBookingState';
+import { refreshQuotes } from '@/composables/useQuotes';
 import { ymd, parseYmd } from '@/composables/useFormat';
 
 const adultOptions = Array.from({ length: 8 }, (_, i) => ({ label: `${i + 1} người`, value: i + 1 }));
@@ -46,6 +48,21 @@ const ageProxies = computed(() => search.childAges.map((_, i) => ageProxyFor(i))
 
 const today = new Date();
 today.setHours(0, 0, 0, 0);
+
+const checking = ref(false);
+
+async function checkPrice() {
+  if (checking.value) return;
+  checking.value = true;
+  try {
+    await Promise.all([
+      refreshQuotes(),
+      new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+    ]);
+  } finally {
+    checking.value = false;
+  }
+}
 </script>
 
 <template>
@@ -55,24 +72,61 @@ today.setHours(0, 0, 0, 0);
     </h2>
     <div class="vh-search-row">
       <div class="vh-field">
-        <label>Nhận phòng</label>
-        <DatePicker v-model="checkin" date-format="dd/mm/yy" :min-date="today" show-icon icon-display="input" fluid />
+        <label for="vh-checkin"><i class="pi pi-calendar" aria-hidden="true" /> Nhận phòng</label>
+        <DatePicker
+          input-id="vh-checkin"
+          v-model="checkin"
+          date-format="dd/mm/yy"
+          :min-date="today"
+          show-icon
+          icon-display="input"
+          fluid
+        />
       </div>
       <div class="vh-field">
-        <label>Trả phòng</label>
-        <DatePicker v-model="checkout" date-format="dd/mm/yy" :min-date="today" show-icon icon-display="input" fluid />
+        <label for="vh-checkout"><i class="pi pi-calendar" aria-hidden="true" /> Trả phòng</label>
+        <DatePicker
+          input-id="vh-checkout"
+          v-model="checkout"
+          date-format="dd/mm/yy"
+          :min-date="today"
+          show-icon
+          icon-display="input"
+          fluid
+        />
       </div>
       <div class="vh-field">
-        <label>Số phòng</label>
-        <Select v-model="search.userRooms" :options="roomOptions" option-label="label" option-value="value" fluid />
+        <label for="vh-rooms"><i class="pi pi-th-large" aria-hidden="true" /> Số phòng</label>
+        <Select
+          input-id="vh-rooms"
+          v-model="search.userRooms"
+          :options="roomOptions"
+          option-label="label"
+          option-value="value"
+          fluid
+        />
       </div>
       <div class="vh-field">
-        <label>Người lớn</label>
-        <Select v-model="search.adults" :options="adultOptions" option-label="label" option-value="value" fluid />
+        <label for="vh-adults"><i class="pi pi-users" aria-hidden="true" /> Người lớn</label>
+        <Select
+          input-id="vh-adults"
+          v-model="search.adults"
+          :options="adultOptions"
+          option-label="label"
+          option-value="value"
+          fluid
+        />
       </div>
       <div class="vh-field">
-        <label>Số trẻ em</label>
-        <Select v-model="childCount" :options="childOptions" option-label="label" option-value="value" fluid />
+        <label for="vh-children"><i class="pi pi-user" aria-hidden="true" /> Số trẻ em</label>
+        <Select
+          input-id="vh-children"
+          v-model="childCount"
+          :options="childOptions"
+          option-label="label"
+          option-value="value"
+          fluid
+        />
       </div>
     </div>
     <div v-if="search.childAges.length > 0" class="vh-search-row vh-child-ages">
@@ -90,6 +144,21 @@ today.setHours(0, 0, 0, 0);
           class="vh-age-input"
         />
       </div>
+    </div>
+    <div class="vh-search-actions">
+      <p class="vh-search-hint" :class="{ 'vh-search-hint-ok': priceChecked }">
+        <i :class="['pi', priceChecked ? 'pi-check-circle' : 'pi-info-circle']" aria-hidden="true" />
+        <span v-if="priceChecked">Giá đã cập nhật — bạn có thể chọn phòng bên dưới.</span>
+        <span v-else>Bấm "Kiểm tra giá" để xem giá thực tế và chọn phòng.</span>
+      </p>
+      <Button
+        :label="priceChecked ? 'Cập nhật giá' : 'Kiểm tra giá'"
+        icon="pi pi-search"
+        size="large"
+        :loading="checking"
+        :disabled="checking"
+        @click="checkPrice"
+      />
     </div>
   </section>
 </template>

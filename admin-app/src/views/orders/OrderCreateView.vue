@@ -12,6 +12,7 @@ import Textarea from 'primevue/textarea';
 import Chips from 'primevue/chips';
 import Message from 'primevue/message';
 import ProgressSpinner from 'primevue/progressspinner';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { useLookupStore, ORDER_SOURCES } from '@/stores/lookup.store';
 import { useNotify } from '@/composables/useNotify';
@@ -233,7 +234,7 @@ onMounted(() => { lookup.ensureLoaded(); });
 
 <template>
   <div>
-    <h1 class="page-title">Tạo đơn mới</h1>
+    <PageHeader title="Tạo đơn mới" subtitle="Wizard nhập đơn" icon="pi pi-plus-circle" />
 
     <Steps :model="steps" :active-step="stepIndex" :readonly="true" class="wizard-steps" />
 
@@ -256,11 +257,11 @@ onMounted(() => { lookup.ensureLoaded(); });
           </div>
           <div class="grid-2">
             <div class="field">
-              <label>Số điện thoại <span style="color:red">*</span></label>
+              <label>Số điện thoại <span class="required-mark">*</span></label>
               <InputText v-model="wizard.customer.phone" />
             </div>
             <div class="field">
-              <label>Họ tên <span style="color:red">*</span></label>
+              <label>Họ tên <span class="required-mark">*</span></label>
               <InputText v-model="wizard.customer.name" />
             </div>
             <div class="field grid-span-2">
@@ -416,7 +417,7 @@ onMounted(() => { lookup.ensureLoaded(); });
               <div class="confirm-kv"><span>Loại đặt:</span> {{ wizard.item.booking_type === 'combo' ? 'Combo (phòng + vé)' : 'Phòng' }}</div>
               <div class="confirm-kv"><span>Tạm tính:</span> {{ formatVND(quote?.subtotal ?? 0) }}</div>
               <div v-if="couponDiscount > 0" class="confirm-kv">
-                <span>Giảm giá ({{ wizard.couponCode }}):</span> <strong style="color: var(--p-red-600)">-{{ formatVND(couponDiscount) }}</strong>
+                <span>Giảm giá ({{ wizard.couponCode }}):</span> <strong class="discount-amount">-{{ formatVND(couponDiscount) }}</strong>
               </div>
               <div class="confirm-kv confirm-total">
                 <span>Tổng:</span> <strong>{{ formatVND(totalAfterCoupon) }}</strong>
@@ -454,8 +455,8 @@ onMounted(() => { lookup.ensureLoaded(); });
 </template>
 
 <style scoped>
-.page-title { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 600; }
 .wizard-steps { margin-bottom: 1.5rem; }
+.discount-amount { color: var(--p-red-600); }
 .wizard-card :deep(.p-card-content) { padding: 0; }
 .step-content { padding: 1.5rem; min-height: 320px; }
 .step-content h3 { margin: 0 0 1.25rem; font-size: 1.1rem; }

@@ -12,6 +12,11 @@ final class SurchargePriceBulkService
     public function __construct(private readonly ActivityLogRepository $activityRepo) {}
 
     /**
+     * Bulk upsert phụ thu theo (surcharge_ids × dates).
+     *
+     * Chỉ field client gửi mới UPDATE; INSERT mới fill amount thiếu bằng
+     * surcharge.amount để khi user "reset" (is_active=false) không wipe về 0.
+     *
      * @return array{rows_affected: int, dates_count: int, surcharges_count: int, cells_count: int}
      */
     public function bulkUpsert(array $scope, array $values, int $actorUserId): array
@@ -30,10 +35,36 @@ final class SurchargePriceBulkService
             return ['rows_affected' => 0, 'dates_count' => 0, 'surcharges_count' => 0, 'cells_count' => 0];
         }
 
-        $now      = current_time('mysql');
-        $amount   = (int) ($values['amount']    ?? 0);
-        $isActive = isset($values['is_active']) ? (int) (bool) $values['is_active'] : 1;
+        $hasAmount = array_key_exists('amount',    $values);
+        $hasActive = array_key_exists('is_active', $values);
 
+        $amountVal = $hasAmount ? (int) $values['amount']           : 0;
+        $activeVal = $hasActive ? (int) (bool) $values['is_active'] : 1;
+
+        // Per-surcharge default — only fetched if user omitted amount.
+        $surchargeDefaults = [];
+        if (!$hasAmount) {
+            $surTable     = $wpdb->prefix . 'vie_surcharge';
+            $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, amount FROM {$surTable} WHERE id IN ({$placeholders})",
+                    $ids
+                ),
+                ARRAY_A
+            ) ?: [];
+            foreach ($rows as $r) {
+                $surchargeDefaults[(int) $r['id']] = (int) $r['amount'];
+            }
+        }
+
+        $updateParts = [];
+        if ($hasAmount) $updateParts[] = 'amount = VALUES(amount)';
+        if ($hasActive) $updateParts[] = 'is_active = VALUES(is_active)';
+        $updateParts[] = 'updated_at = VALUES(updated_at)';
+        $updateClause = implode(', ', $updateParts);
+
+        $now   = current_time('mysql');
         $cells = [];
         foreach ($ids as $sid) {
             foreach ($dates as $date) {
@@ -50,15 +81,18 @@ final class SurchargePriceBulkService
                 $params       = [];
                 foreach ($chunk as [$sid, $date]) {
                     $placeholders[] = '(%d, %s, %d, %d, %s, %s)';
-                    array_push($params, $sid, $date, $amount, $isActive, $now, $now);
+                    array_push(
+                        $params,
+                        $sid, $date,
+                        $hasAmount ? $amountVal : ($surchargeDefaults[$sid] ?? 0),
+                        $activeVal,
+                        $now, $now
+                    );
                 }
                 $sql = "INSERT INTO {$table}
                         (surcharge_id, date, amount, is_active, created_at, updated_at)
                         VALUES " . implode(',', $placeholders) . "
-                        ON DUPLICATE KEY UPDATE
-                            amount = VALUES(amount),
-                            is_active = VALUES(is_active),
-                            updated_at = VALUES(updated_at)";
+                        ON DUPLICATE KEY UPDATE {$updateClause}";
                 $prepared = $wpdb->prepare($sql, ...$params);
                 $result   = $wpdb->query($prepared);
                 if ($result === false) {

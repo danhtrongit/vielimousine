@@ -100,10 +100,14 @@ final class PriceCalculator
                 break;
             }
 
-            $price            = (int) $row['price'];
-            $extraAdultPrice  = (int) ($row['extra_adult_price'] !== null && $row['extra_adult_price'] !== ''
-                ? $row['extra_adult_price']
-                : ($room['extra_adult_price'] ?? 0));
+            $price = (int) $row['price'];
+            // Cột extra_adult_price là NOT NULL nên luôn có giá trị (default 0). Coi 0 như
+            // "không override" → fallback về room.extra_adult_price để bug "quên set PT NL
+            // khi update price" không làm mất phụ thu của giường phụ.
+            $rowExtraAdult   = (int) ($row['extra_adult_price'] ?? 0);
+            $extraAdultPrice = $rowExtraAdult > 0
+                ? $rowExtraAdult
+                : (int) ($room['extra_adult_price'] ?? 0);
 
             $roomSubtotal       += $price * $allocation->numRooms();
             $extraAdultSubtotal += $extraAdultPrice * $allocation->extraAdultBeds();

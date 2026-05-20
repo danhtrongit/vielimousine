@@ -159,7 +159,10 @@ final class OrderService
                 'customer_name'         => (string) ($req->customer['name'] ?? $customer['name'] ?? ''),
                 'customer_email'        => $req->customer['email'] ?? ($customer['email'] ?? null),
                 'customer_vat'          => $req->customer['vat'] ?? null,
-                'sales_user_id'         => $req->salesUserId,
+                // Nếu client không truyền (vd tạo đơn từ admin wizard), mặc định
+                // dùng user đang đăng nhập làm sales — khớp expectation "ai tạo
+                // là người bán" cho mọi báo cáo.
+                'sales_user_id'         => $req->salesUserId ?? (get_current_user_id() ?: null),
                 'source'                => $req->source,
                 'checkin'               => $checkinMin,
                 'checkout'              => $checkoutMax,

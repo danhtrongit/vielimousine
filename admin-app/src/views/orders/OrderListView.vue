@@ -8,6 +8,7 @@ import DataTablePanel from '@/components/DataTablePanel.vue';
 import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
 import StatusTag from '@/components/StatusTag.vue';
 import Can from '@/components/Can.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { ORDER_STATUSES, PAYMENT_STATUSES, ORDER_SOURCES } from '@/stores/lookup.store';
 import { formatVND, formatDate } from '@/composables/useFormat';
@@ -35,12 +36,11 @@ function rowClick(data: { id: number }) {
 
 <template>
   <div>
-    <div class="header">
-      <h1 class="page-title">Đơn hàng</h1>
+    <PageHeader title="Đơn hàng" subtitle="Quản lý booking" icon="pi pi-shopping-cart">
       <Can cap="vie_create_orders">
         <Button label="Tạo đơn mới" icon="pi pi-plus" @click="router.push('/orders/new')" />
       </Can>
-    </div>
+    </PageHeader>
 
     <DataTablePanel
       endpoint="/orders"
@@ -93,8 +93,6 @@ function rowClick(data: { id: number }) {
 </template>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.page-title { margin: 0; font-size: 1.5rem; font-weight: 600; }
 .link { color: var(--p-primary-600); font-weight: 500; text-decoration: none; }
 .link:hover { text-decoration: underline; }
 .customer-cell small { color: var(--p-text-muted-color); }

@@ -20,6 +20,7 @@ use Vie\Http\Controllers\OrderLookupController;
 use Vie\Http\Controllers\PaymentLogController;
 use Vie\Http\Controllers\PublicOrderController;
 use Vie\Http\Controllers\QuoteController;
+use Vie\Http\Controllers\QuoteInquiryController;
 use Vie\Http\Controllers\RoomController;
 use Vie\Http\Controllers\SettingsController;
 use Vie\Http\Controllers\PricingCellsController;
@@ -70,6 +71,12 @@ final class RestRouter
         register_rest_route(VIE_API_NAMESPACE, '/public/orders', [
             'methods'             => 'POST',
             'callback'            => [PublicOrderController::class, 'create'],
+            'permission_callback' => '__return_true',
+        ]);
+
+        register_rest_route(VIE_API_NAMESPACE, '/public/quote-inquiries', [
+            'methods'             => 'POST',
+            'callback'            => [QuoteInquiryController::class, 'create'],
             'permission_callback' => '__return_true',
         ]);
 
@@ -151,6 +158,11 @@ final class RestRouter
             'callback'            => [OrderActionController::class, 'transition'],
             'permission_callback' => AuthMiddleware::requireCap('vie_manage_orders'),
         ]);
+        register_rest_route(VIE_API_NAMESPACE, '/orders/(?P<id>\\d+)/send-checkin-code', [
+            'methods'             => 'POST',
+            'callback'            => [OrderActionController::class, 'sendCheckinCode'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_orders'),
+        ]);
 
         // Invoice — JSON data for Vue-rendered preview (primary)
         register_rest_route(VIE_API_NAMESPACE, '/orders/(?P<id>\\d+)/invoice/data', [
@@ -203,6 +215,11 @@ final class RestRouter
         register_rest_route(VIE_API_NAMESPACE, '/reports/by-hotel', [
             'methods'             => 'GET',
             'callback'            => [ReportsController::class, 'byHotel'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_view_reports'),
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/reports/orders-export', [
+            'methods'             => 'GET',
+            'callback'            => [ReportsController::class, 'ordersDetailedExport'],
             'permission_callback' => AuthMiddleware::requireCap('vie_view_reports'),
         ]);
 

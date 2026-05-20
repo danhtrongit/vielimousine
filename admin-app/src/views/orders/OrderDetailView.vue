@@ -13,11 +13,13 @@ import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import Textarea from 'primevue/textarea';
 import InputNumber from 'primevue/inputnumber';
+import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import ProgressSpinner from 'primevue/progressspinner';
 import StatusTag from '@/components/StatusTag.vue';
 import Can from '@/components/Can.vue';
 import InvoiceDialog from '@/components/InvoiceDialog.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { ordersApi } from '@/api/orders.api';
 import { paymentsApi } from '@/api/payments.api';
 import { useUIStore } from '@/stores/ui.store';
@@ -68,6 +70,7 @@ async function load() {
     const resp = await ordersApi.get(orderId.value);
     order.value = resp.data;
     costDraft.value = resp.data.cost_total ?? 0;
+    checkinCodeInput.value = resp.data.checkin_code ?? '';
     ui.setBreadcrumb([
       { label: 'Đơn hàng', to: '/orders' },
       { label: order.value.code },
@@ -180,6 +183,51 @@ const quickAmounts = computed<Array<{ label: string; value: number }>>(() => {
 
 const transitioning = ref<string | null>(null);
 
+const checkinCodeInput = ref('');
+const sendingCheckinCode = ref(false);
+const canSendCheckinCode = computed(() =>
+  !!order.value
+  && order.value.payment_status === 'paid'
+  && order.value.status !== 'cancelled'
+);
+const checkinCodeDirty = computed(() =>
+  !!order.value && checkinCodeInput.value.trim() !== (order.value.checkin_code ?? '')
+);
+
+async function sendCheckinCode() {
+  const code = checkinCodeInput.value.trim();
+  if (!code) {
+    notify.warn('Vui lòng nhập mã nhận phòng');
+    return;
+  }
+  if (!order.value?.customer_email) {
+    notify.warn('Đơn không có email khách hàng để gửi');
+    return;
+  }
+  const savedCode = order.value?.checkin_code ?? '';
+  const email = order.value!.customer_email;
+  let confirmMsg: string;
+  if (!savedCode) {
+    confirmMsg = `Gửi mã nhận phòng (${code}) cho ${email}?`;
+  } else if (code === savedCode) {
+    confirmMsg = `Gửi lại email mã nhận phòng (${code}) cho ${email}?`;
+  } else {
+    confirmMsg = `Cập nhật mã nhận phòng từ "${savedCode}" → "${code}" và gửi email cho ${email}?`;
+  }
+  if (!confirm(confirmMsg)) return;
+
+  sendingCheckinCode.value = true;
+  try {
+    await ordersApi.sendCheckinCode(orderId.value, code);
+    notify.success('Đã gửi mã nhận phòng cho khách');
+    await load();
+  } catch (e) {
+    notify.apiError(e, 'Không gửi được mã nhận phòng');
+  } finally {
+    sendingCheckinCode.value = false;
+  }
+}
+
 const costDraft = ref(0);
 const savingCost = ref(false);
 const previewProfit = computed(() => (order.value ? order.value.total - costDraft.value : 0));
@@ -236,55 +284,50 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
     <ProgressSpinner />
   </div>
   <div v-else-if="order">
-    <div class="header">
-      <div>
-        <h1 class="page-title">{{ order.code }}</h1>
-        <div class="header-tags">
-          <StatusTag :value="order.status" />
-          <StatusTag :value="order.payment_status" kind="payment" />
-        </div>
-      </div>
-      <div class="header-actions">
-        <Can cap="vie_manage_orders">
-          <Button
-            v-for="t in allowedTransitions"
-            :key="t.key"
-            :label="t.label"
-            :icon="t.icon"
-            :severity="t.severity"
-            :loading="transitioning === t.key"
-            :disabled="transitioning !== null"
-            @click="doTransition(t.key, t.confirmMsg)"
-          />
-        </Can>
-        <Can :cap-any="['vie_manage_payments', 'vie_view_all_orders']">
-          <Button
-            label="Ghi thanh toán"
-            icon="pi pi-wallet"
-            severity="success"
-            @click="paymentDialog = true"
-            :disabled="order.status === 'cancelled'"
-          />
-        </Can>
+    <PageHeader :title="order.code" subtitle="Chi tiết đơn hàng" icon="pi pi-shopping-cart">
+      <Can cap="vie_manage_orders">
         <Button
-          v-if="canPrintInvoice"
-          label="Xuất hoá đơn"
-          icon="pi pi-file-pdf"
-          severity="secondary"
-          outlined
-          @click="openInvoiceDialog"
+          v-for="t in allowedTransitions"
+          :key="t.key"
+          :label="t.label"
+          :icon="t.icon"
+          :severity="t.severity"
+          :loading="transitioning === t.key"
+          :disabled="transitioning !== null"
+          @click="doTransition(t.key, t.confirmMsg)"
         />
-        <Can cap="vie_cancel_orders">
-          <Button
-            label="Hủy đơn"
-            icon="pi pi-times"
-            severity="danger"
-            outlined
-            :disabled="!canCancel"
-            @click="openCancelDialog"
-          />
-        </Can>
-      </div>
+      </Can>
+      <Can :cap-any="['vie_manage_payments', 'vie_view_all_orders']">
+        <Button
+          label="Ghi thanh toán"
+          icon="pi pi-wallet"
+          severity="success"
+          @click="paymentDialog = true"
+          :disabled="order.status === 'cancelled'"
+        />
+      </Can>
+      <Button
+        v-if="canPrintInvoice"
+        label="Xuất hoá đơn"
+        icon="pi pi-file-pdf"
+        severity="secondary"
+        outlined
+        @click="openInvoiceDialog"
+      />
+      <Can cap="vie_cancel_orders">
+        <Button
+          label="Hủy đơn"
+          icon="pi pi-times"
+          severity="danger"
+          outlined
+          :disabled="!canCancel"
+          @click="openCancelDialog"
+        />
+      </Can>
+    </PageHeader>
+    <div class="header-tags">
+      <StatusTag :value="order.status" />
+      <StatusTag :value="order.payment_status" kind="payment" />
     </div>
 
     <div class="summary-grid">
@@ -361,6 +404,52 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
           <div class="kv"><span>Trẻ em:</span><strong>{{ order.children }}</strong></div>
         </template>
       </Card>
+
+      <Can cap="vie_manage_orders">
+        <Card v-if="canSendCheckinCode">
+          <template #title>Mã nhận phòng</template>
+          <template #content>
+            <p class="muted" style="margin: 0 0 0.75rem;">
+              Mã do khách sạn cấp sau khi đơn được thanh toán. Nhập và gửi email cho khách.
+            </p>
+            <div v-if="order.checkin_code_sent_at" class="kv">
+              <span>Đã gửi lúc:</span>
+              <strong>{{ formatDateTime(order.checkin_code_sent_at) }}</strong>
+            </div>
+            <div v-if="!order.customer_email" class="muted" style="color: var(--p-red-600); margin-bottom: 0.5rem;">
+              Đơn không có email khách — không thể gửi.
+            </div>
+            <div class="field">
+              <label>Mã nhận phòng</label>
+              <InputText
+                v-model="checkinCodeInput"
+                placeholder="VD: ABC123"
+                :disabled="sendingCheckinCode || !order.customer_email"
+                maxlength="100"
+                fluid
+              />
+            </div>
+            <div class="actions-row">
+              <Button
+                :label="!order.checkin_code ? 'Gửi mã cho khách' : checkinCodeDirty ? 'Cập nhật & Gửi' : 'Gửi lại mã'"
+                icon="pi pi-send"
+                size="small"
+                :loading="sendingCheckinCode"
+                :disabled="!checkinCodeInput.trim() || !order.customer_email"
+                @click="sendCheckinCode"
+              />
+              <Button
+                v-if="checkinCodeDirty && order.checkin_code"
+                label="Khôi phục"
+                size="small"
+                text
+                :disabled="sendingCheckinCode"
+                @click="checkinCodeInput = order.checkin_code ?? ''"
+              />
+            </div>
+          </template>
+        </Card>
+      </Can>
     </div>
 
     <Tabs value="items">
@@ -449,7 +538,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
         <p>Bạn có chắc muốn hủy đơn <strong>{{ order.code }}</strong>?</p>
         <p class="muted">Đã thanh toán: <strong>{{ formatVND(order.paid_amount) }}</strong>. Nhập số tiền cần hoàn cho khách (có thể để 0).</p>
         <div class="field">
-          <label>Lý do hủy <span style="color: red">*</span></label>
+          <label>Lý do hủy <span class="required-mark">*</span></label>
           <Textarea v-model="cancelReason" rows="3" autoResize />
         </div>
         <div class="field">
@@ -529,10 +618,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
 
 <style scoped>
 .loading { display: grid; place-items: center; min-height: 60vh; }
-.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
-.page-title { margin: 0; font-size: 1.5rem; font-weight: 600; }
-.header-tags { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-.header-actions { display: flex; gap: 0.5rem; }
+.header-tags { display: flex; gap: 0.5rem; margin: -0.75rem 0 1.25rem; }
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
 .kv { display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.9rem; }
 .kv-total { border-top: 1px solid var(--p-surface-200); margin-top: 0.5rem; padding-top: 0.5rem; }

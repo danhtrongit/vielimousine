@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import {
-  getQuote, getError, isLoading, setSelection, selection,
+  getQuote, getError, isLoading, setSelection, selection, priceChecked,
   type BookingType,
 } from '@/composables/useBookingState';
 import { formatVND } from '@/composables/useFormat';
@@ -80,7 +80,11 @@ function pick(type: BookingType) {
 </script>
 
 <template>
-  <article class="vh-room" :class="{ 'vh-room-picked': isPicked }">
+  <article
+    class="vh-room"
+    :class="{ 'vh-room-picked': isPicked }"
+    :aria-labelledby="`room-${room.id}-name`"
+  >
     <div class="vh-room-media">
       <div
         v-if="room.thumbnail_url"
@@ -93,7 +97,7 @@ function pick(type: BookingType) {
 
     <div class="vh-room-body">
       <header class="vh-room-head">
-        <h3 class="vh-room-name">{{ room.name }}</h3>
+        <h3 :id="`room-${room.id}-name`" class="vh-room-name">{{ room.name }}</h3>
         <p v-if="room.description" class="vh-room-desc">{{ room.description }}</p>
       </header>
 
@@ -146,16 +150,30 @@ function pick(type: BookingType) {
       </template>
     </Dialog>
 
-    <aside class="vh-room-cta">
-      <div class="vh-opt" :class="{ 'vh-opt-picked': pickedType === 'room' }">
+    <aside class="vh-room-cta" aria-label="Tuỳ chọn đặt phòng">
+      <div
+        class="vh-opt"
+        :class="{ 'vh-opt-picked': pickedType === 'room' }"
+        :aria-pressed="pickedType === 'room'"
+      >
         <div class="vh-opt-head">
-          <i class="pi pi-key" />
+          <i class="pi pi-key" aria-hidden="true" />
           <span>Chỉ phòng</span>
         </div>
         <div class="vh-opt-price">
-          <span v-if="roomOpt.state === 'loading'" class="vh-skeleton"></span>
+          <span
+            v-if="roomOpt.state === 'loading'"
+            class="vh-skeleton"
+            aria-label="Đang tính giá phòng"
+          ></span>
           <template v-else>
-            <span :class="['vh-price-amount', roomOpt.state === 'unavailable' && 'vh-price-na', roomOpt.state === 'requires-quote' && 'vh-price-contact']">
+            <span
+              :class="[
+                'vh-price-amount',
+                roomOpt.state === 'unavailable' && 'vh-price-na',
+                roomOpt.state === 'requires-quote' && 'vh-price-contact',
+              ]"
+            >
               {{ roomOpt.total }}
             </span>
             <small v-if="roomOpt.hint && roomOpt.state === 'quote'" class="vh-price-hint">{{ roomOpt.hint }}</small>
@@ -163,25 +181,41 @@ function pick(type: BookingType) {
           </template>
         </div>
         <Button
-          :label="pickedType === 'room' ? 'Đã chọn' : 'Chọn phòng'"
-          :icon="pickedType === 'room' ? 'pi pi-check' : undefined"
+          :label="pickedType === 'room' ? 'Đã chọn' : (priceChecked ? 'Chọn phòng' : 'Kiểm tra giá trước')"
+          :icon="pickedType === 'room' ? 'pi pi-check' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock')"
+          :icon-pos="pickedType === 'room' ? 'left' : 'right'"
           :severity="pickedType === 'room' ? 'success' : undefined"
-          :disabled="roomOpt.unavailable || roomOpt.loading"
+          :disabled="!priceChecked || roomOpt.unavailable || roomOpt.loading"
+          :aria-label="pickedType === 'room' ? `Đã chọn phòng ${room.name}` : `Chọn phòng ${room.name}`"
           size="small"
           fluid
           @click="pick('room')"
         />
       </div>
 
-      <div class="vh-opt vh-opt-combo" :class="{ 'vh-opt-picked': pickedType === 'combo' }">
+      <div
+        class="vh-opt vh-opt-combo"
+        :class="{ 'vh-opt-picked': pickedType === 'combo' }"
+        :aria-pressed="pickedType === 'combo'"
+      >
         <div class="vh-opt-head">
-          <i class="pi pi-car" />
+          <i class="pi pi-car" aria-hidden="true" />
           <span>Combo <small>(Phòng + vé xe)</small></span>
         </div>
         <div class="vh-opt-price">
-          <span v-if="comboOpt.state === 'loading'" class="vh-skeleton"></span>
+          <span
+            v-if="comboOpt.state === 'loading'"
+            class="vh-skeleton"
+            aria-label="Đang tính giá combo"
+          ></span>
           <template v-else>
-            <span :class="['vh-price-amount', comboOpt.state === 'unavailable' && 'vh-price-na', comboOpt.state === 'requires-quote' && 'vh-price-contact']">
+            <span
+              :class="[
+                'vh-price-amount',
+                comboOpt.state === 'unavailable' && 'vh-price-na',
+                comboOpt.state === 'requires-quote' && 'vh-price-contact',
+              ]"
+            >
               {{ comboOpt.total }}
             </span>
             <small v-if="comboOpt.hint && comboOpt.state === 'quote'" class="vh-price-hint">{{ comboOpt.hint }}</small>
@@ -189,10 +223,12 @@ function pick(type: BookingType) {
           </template>
         </div>
         <Button
-          :label="pickedType === 'combo' ? 'Đã chọn' : 'Chọn combo'"
-          :icon="pickedType === 'combo' ? 'pi pi-check' : undefined"
+          :label="pickedType === 'combo' ? 'Đã chọn' : (priceChecked ? 'Chọn combo' : 'Kiểm tra giá trước')"
+          :icon="pickedType === 'combo' ? 'pi pi-check' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock')"
+          :icon-pos="pickedType === 'combo' ? 'left' : 'right'"
           :severity="pickedType === 'combo' ? 'success' : 'warn'"
-          :disabled="comboOpt.unavailable || comboOpt.loading"
+          :disabled="!priceChecked || comboOpt.unavailable || comboOpt.loading"
+          :aria-label="pickedType === 'combo' ? `Đã chọn combo cho ${room.name}` : `Chọn combo cho ${room.name}`"
           size="small"
           fluid
           @click="pick('combo')"

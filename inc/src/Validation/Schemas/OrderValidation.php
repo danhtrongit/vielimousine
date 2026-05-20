@@ -64,6 +64,8 @@ final class OrderValidation
             'dropoff'                 => 'nullable|array',
             'partner_payment_status'  => 'nullable|string|max:30',
             'voucher_code'            => 'nullable|string|max:100',
+            'cost_total'              => 'nullable|float|min:0',
+            'profit_total'            => 'nullable|float',
         ];
     }
 }

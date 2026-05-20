@@ -18,6 +18,7 @@ final class PublicAssets
 
         // Legacy vie-public.js — kept for [vie_hotel_search], [vie_checkout],
         // [vie_order_success] shortcodes outside the Vue app (e.g. /dat-phong page).
+        // Font: inherit from parent theme (no Google Fonts enqueue).
         wp_enqueue_style(
             'vie-public',
             VIE_CHILD_URL . '/inc/assets/css/frontend.css',

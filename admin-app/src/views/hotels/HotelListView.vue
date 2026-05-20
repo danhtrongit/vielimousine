@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router';
 import DataTablePanel from '@/components/DataTablePanel.vue';
 import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
 import MediaThumbLazy from '@/components/media/MediaThumbLazy.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 
 const router = useRouter();
@@ -27,7 +28,7 @@ onMounted(() => {
 
 <template>
   <div>
-    <h1 class="page-title">Khách sạn</h1>
+    <PageHeader title="Khách sạn" subtitle="Danh sách cơ sở lưu trú" icon="pi pi-building" />
     <DataTablePanel
       endpoint="/hotels"
       :defaults="{ sort: 'sort_order', order: 'asc' }"
@@ -51,7 +52,7 @@ onMounted(() => {
       <Column field="star_rating" header="Hạng sao">
         <template #body="{ data }">
           <span v-if="data.star_rating">
-            <i v-for="i in data.star_rating" :key="i" class="pi pi-star-fill" style="color: #f59e0b" />
+            <i v-for="i in data.star_rating" :key="i" class="pi pi-star-fill star-icon" />
           </span>
         </template>
       </Column>
@@ -72,7 +73,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page-title { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 600; }
 .link { color: var(--p-primary-600); font-weight: 500; text-decoration: none; }
 .link:hover { text-decoration: underline; }
+.star-icon { color: var(--p-amber-500); }
 </style>

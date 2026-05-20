@@ -21,25 +21,23 @@ final class PricingMatrixController
                 ['code' => 'validation_error', 'field' => 'date_from', 'message' => 'date_from và date_to bắt buộc'],
             ], 422);
         }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)
+            || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+            return ResponseEnvelope::error([
+                ['code' => 'validation_error', 'field' => 'date_from', 'message' => 'date format phải là YYYY-MM-DD'],
+            ], 422);
+        }
 
-        $params = [
-            'date_from' => $dateFrom,
-            'date_to'   => $dateTo,
-            'per_page'  => 5000,
-        ];
-
-        $roomRepo   = Container::get(RoomPriceRepository::class);
-        $surRepo    = Container::get(SurchargePriceRepository::class);
-        $ticketRepo = Container::get(TicketPriceRepository::class);
-
-        $rooms     = $roomRepo->all($params);
-        $surcharges = $surRepo->all($params);
-        $tickets   = $ticketRepo->all($params);
+        // Bỏ qua pagination clamp 100 của AbstractRepository — matrix cần toàn bộ
+        // override trong window để UI tô đúng từng cell.
+        $rooms      = Container::get(RoomPriceRepository::class)->findAllInDateRange($dateFrom, $dateTo);
+        $surcharges = Container::get(SurchargePriceRepository::class)->findAllInDateRange($dateFrom, $dateTo);
+        $tickets    = Container::get(TicketPriceRepository::class)->findAllInDateRange($dateFrom, $dateTo);
 
         return ResponseEnvelope::success([
-            'room_prices'      => $rooms['data'] ?? [],
-            'surcharge_prices' => $surcharges['data'] ?? [],
-            'ticket_prices'    => $tickets['data'] ?? [],
+            'room_prices'      => $rooms,
+            'surcharge_prices' => $surcharges,
+            'ticket_prices'    => $tickets,
             'date_from'        => $dateFrom,
             'date_to'          => $dateTo,
         ]);

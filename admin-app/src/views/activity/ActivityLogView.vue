@@ -5,6 +5,7 @@ import Dialog from 'primevue/dialog';
 import Tag from 'primevue/tag';
 import DataTablePanel from '@/components/DataTablePanel.vue';
 import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { formatDateTime } from '@/composables/useFormat';
 import type { ActivityLog } from '@/api/activityLog.api';
@@ -59,7 +60,7 @@ function isOrderLink(row: ActivityLog): boolean {
 
 <template>
   <div>
-    <h1 class="page-title">Nhật ký hệ thống</h1>
+    <PageHeader title="Nhật ký hệ thống" subtitle="Lịch sử thao tác" icon="pi pi-history" />
 
     <DataTablePanel
       endpoint="/activity-log"
@@ -120,7 +121,6 @@ function isOrderLink(row: ActivityLog): boolean {
 </template>
 
 <style scoped>
-.page-title { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 600; }
 .link { color: var(--p-primary-600); text-decoration: none; font-weight: 500; }
 .link:hover { text-decoration: underline; }
 .btn-link { background: none; border: none; color: var(--p-primary-600); cursor: pointer; padding: 0; font-weight: 500; }

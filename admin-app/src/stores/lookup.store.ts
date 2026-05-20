@@ -4,7 +4,30 @@ import { roomsApi } from '@/api/rooms.api';
 import { surchargesApi, type Surcharge } from '@/api/surcharges.api';
 import { usersApi, type VieUser } from '@/api/users.api';
 import type { Hotel, Room } from '@/types/hotel';
+import type { Envelope } from '@/types/envelope';
 import { decodeEntities } from '@/composables/useFormat';
+
+// Backend clamps per_page at 100 (AbstractRepository::pagination). Lookup
+// endpoints must cover the entire active dataset for filtering/UI, so we
+// follow pagination metadata and fetch all pages instead of relying on a
+// large per_page hint that would be silently truncated.
+const LOOKUP_PAGE_SIZE = 100;
+
+async function fetchAllPages<T>(
+  list: (params: Record<string, unknown>) => Promise<Envelope<T[]>>,
+  params: Record<string, unknown>,
+): Promise<T[]> {
+  const first = await list({ ...params, per_page: LOOKUP_PAGE_SIZE, page: 1 });
+  const totalPages = first.meta?.pagination?.total_pages ?? 1;
+  if (totalPages <= 1) return first.data;
+
+  const rest = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, i) =>
+      list({ ...params, per_page: LOOKUP_PAGE_SIZE, page: i + 2 }),
+    ),
+  );
+  return first.data.concat(...rest.map((r) => r.data));
+}
 
 export const useLookupStore = defineStore('lookup', {
   state: () => ({
@@ -37,15 +60,15 @@ export const useLookupStore = defineStore('lookup', {
       if (this.loaded || this.loading) return;
       this.loading = true;
       try {
-        const [hotelsResp, roomsResp, surchargesResp, usersResp] = await Promise.all([
-          hotelsApi.list({ per_page: 100, is_active: 1 }),
-          roomsApi.list({ per_page: 100, is_active: 1 }),
-          surchargesApi.list({ per_page: 200, is_active: 1 }),
+        const [hotelsAll, roomsAll, surchargesAll, usersResp] = await Promise.all([
+          fetchAllPages(hotelsApi.list, { is_active: 1 }),
+          fetchAllPages(roomsApi.list, { is_active: 1 }),
+          fetchAllPages(surchargesApi.list, { is_active: 1 }),
           usersApi.list().catch(() => ({ data: [] as VieUser[] })),
         ]);
-        this.hotels = hotelsResp.data.map((h) => ({ ...h, name: decodeEntities(h.name) }));
-        this.rooms = roomsResp.data.map((r) => ({ ...r, name: decodeEntities(r.name) }));
-        this.surcharges = surchargesResp.data.map((s) => ({ ...s, label: decodeEntities(s.label) }));
+        this.hotels = hotelsAll.map((h) => ({ ...h, name: decodeEntities(h.name) }));
+        this.rooms = roomsAll.map((r) => ({ ...r, name: decodeEntities(r.name) }));
+        this.surcharges = surchargesAll.map((s) => ({ ...s, label: decodeEntities(s.label) }));
         this.users = (usersResp.data ?? []).map((u) => ({ ...u, display_name: decodeEntities(u.display_name) }));
         this.loaded = true;
       } finally {

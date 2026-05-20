@@ -73,6 +73,7 @@ final class Fixtures
 
             'coupon_code'     => 'WELCOME10',
             'voucher_code'    => '',
+            'checkin_code'    => 'CK-DEMO-2026',
 
             'order_description'        => '1× phòng — 2 đêm — 2 người lớn + 1 trẻ',
             'cancellation_policy_html' => '<p>Miễn phí hủy trước 48 giờ. Sau đó phí 50%.</p>',
