@@ -32,6 +32,7 @@ final class OrderRepository extends AbstractRepository
             'payment_status', 'paid_amount', 'paid_at',
             'partner_payment_status',
             'invoice_number', 'voucher_code',
+            'checkin_code', 'checkin_code_sent_at',
             'status', 'confirmed_at', 'cancelled_at', 'cancel_reason', 'completed_at',
             'created_by', 'ip', 'user_agent',
         ];
@@ -121,22 +122,6 @@ final class OrderRepository extends AbstractRepository
         if (user_can($userId, 'vie_view_all_orders')) {
             return true;
         }
-        if (user_can($userId, 'vie_view_orders_own_hotel')) {
-            $managed = get_user_meta($userId, 'vie_managed_hotels', true);
-            $managed = is_array($managed) ? array_map('intval', $managed) : [];
-            if ($managed === []) {
-                return false;
-            }
-            global $wpdb;
-            $placeholders = implode(',', array_fill(0, count($managed), '%d'));
-            $params = array_merge([(int) $order['id']], $managed);
-            $count = (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->prefix}vie_order_item
-                 WHERE order_id = %d AND hotel_id IN ({$placeholders})",
-                ...$params
-            ));
-            return $count > 0;
-        }
         if (user_can($userId, 'vie_view_own_orders')) {
             return (int) ($order['sales_user_id'] ?? 0) === $userId;
         }
@@ -151,27 +136,6 @@ final class OrderRepository extends AbstractRepository
         }
 
         if (user_can($userId, 'vie_view_all_orders')) {
-            return $params;
-        }
-
-        if (user_can($userId, 'vie_view_orders_own_hotel')) {
-            $managed = get_user_meta($userId, 'vie_managed_hotels', true);
-            $managed = is_array($managed) ? array_map('intval', $managed) : [];
-            if ($managed === []) {
-                $params['__force_empty'] = true;
-                return $params;
-            }
-            global $wpdb;
-            $placeholders = implode(',', array_fill(0, count($managed), '%d'));
-            $orderIds = $wpdb->get_col($wpdb->prepare(
-                "SELECT DISTINCT order_id FROM {$wpdb->prefix}vie_order_item WHERE hotel_id IN ({$placeholders})",
-                ...$managed
-            ));
-            if (empty($orderIds)) {
-                $params['__force_empty'] = true;
-                return $params;
-            }
-            $params['id__in'] = array_map('intval', $orderIds);
             return $params;
         }
 

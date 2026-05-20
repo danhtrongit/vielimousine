@@ -5,10 +5,19 @@ namespace Vie\Service\Auth;
 
 final class RoleInstaller
 {
-    public const ROLE_MANAGER       = 'vie_manager';
     public const ROLE_SALES         = 'vie_sales';
-    public const ROLE_ACCOUNTANT    = 'vie_accountant';
     public const ROLE_HOTEL_MANAGER = 'vie_hotel_manager';
+
+    public const OBSOLETE_ROLES = [
+        'vie_manager',
+        'vie_accountant',
+    ];
+
+    public const OBSOLETE_CAPS = [
+        'vie_view_orders_own_hotel',
+        'vie_view_reports_own_hotel',
+        'vie_manage_inventory_own_hotel',
+    ];
 
     public const ALL_CAPS = [
         'vie_manage_hotels',
@@ -16,18 +25,15 @@ final class RoleInstaller
         'vie_manage_orders',
         'vie_view_all_orders',
         'vie_view_own_orders',
-        'vie_view_orders_own_hotel',
         'vie_create_orders',
         'vie_cancel_orders',
         'vie_manage_customers',
         'vie_manage_coupons',
         'vie_manage_payments',
         'vie_view_reports',
-        'vie_view_reports_own_hotel',
         'vie_view_audit',
         'vie_use_price_check',
         'vie_print_order',
-        'vie_manage_inventory_own_hotel',
         'vie_manage_settings',
         'vie_manage_media',
     ];
@@ -39,26 +45,17 @@ final class RoleInstaller
             foreach (self::ALL_CAPS as $cap) {
                 $admin->add_cap($cap);
             }
+            foreach (self::OBSOLETE_CAPS as $cap) {
+                $admin->remove_cap($cap);
+            }
         }
 
-        self::ensureRole(self::ROLE_MANAGER, 'Vie Manager', [
-            'read'                  => true,
-            'vie_manage_hotels'     => true,
-            'vie_manage_inventory'  => true,
-            'vie_manage_orders'     => true,
-            'vie_view_all_orders'   => true,
-            'vie_create_orders'     => true,
-            'vie_cancel_orders'     => true,
-            'vie_manage_customers'  => true,
-            'vie_manage_coupons'    => true,
-            'vie_view_reports'      => true,
-            'vie_use_price_check'   => true,
-            'vie_print_order'       => true,
-            'vie_manage_settings'   => true,
-            'vie_manage_media'      => true,
-        ]);
+        self::ensureRole(self::ROLE_HOTEL_MANAGER, 'Quản lý khách sạn', array_merge(
+            ['read' => true],
+            array_fill_keys(self::ALL_CAPS, true)
+        ));
 
-        self::ensureRole(self::ROLE_SALES, 'Vie Sales', [
+        self::ensureRole(self::ROLE_SALES, 'Sale', [
             'read'                => true,
             'vie_create_orders'   => true,
             'vie_view_own_orders' => true,
@@ -67,19 +64,7 @@ final class RoleInstaller
             'vie_print_order'     => true,
         ]);
 
-        self::ensureRole(self::ROLE_ACCOUNTANT, 'Vie Accountant', [
-            'read'                  => true,
-            'vie_view_all_orders'   => true,
-            'vie_view_reports'      => true,
-            'vie_manage_payments'   => true,
-        ]);
-
-        self::ensureRole(self::ROLE_HOTEL_MANAGER, 'Vie Hotel Manager', [
-            'read'                            => true,
-            'vie_view_orders_own_hotel'       => true,
-            'vie_manage_inventory_own_hotel'  => true,
-            'vie_view_reports_own_hotel'      => true,
-        ]);
+        self::migrateObsoleteRoles();
     }
 
     private static function ensureRole(string $slug, string $name, array $caps): void
@@ -92,6 +77,26 @@ final class RoleInstaller
         foreach ($caps as $cap => $grant) {
             if ($grant === true) {
                 $existing->add_cap($cap);
+            }
+        }
+        foreach (self::OBSOLETE_CAPS as $cap) {
+            $existing->remove_cap($cap);
+        }
+    }
+
+    private static function migrateObsoleteRoles(): void
+    {
+        foreach (self::OBSOLETE_ROLES as $oldRole) {
+            $users = get_users(['role' => $oldRole, 'fields' => ['ID']]);
+            foreach ($users as $u) {
+                $wpUser = new \WP_User((int) $u->ID);
+                $wpUser->remove_role($oldRole);
+                if (!in_array(self::ROLE_HOTEL_MANAGER, (array) $wpUser->roles, true)) {
+                    $wpUser->add_role(self::ROLE_HOTEL_MANAGER);
+                }
+            }
+            if (get_role($oldRole) !== null) {
+                remove_role($oldRole);
             }
         }
     }

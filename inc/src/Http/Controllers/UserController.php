@@ -12,10 +12,8 @@ final class UserController
     {
         $vieRoles = [
             'administrator',
-            RoleInstaller::ROLE_MANAGER,
-            RoleInstaller::ROLE_SALES,
-            RoleInstaller::ROLE_ACCOUNTANT,
             RoleInstaller::ROLE_HOTEL_MANAGER,
+            RoleInstaller::ROLE_SALES,
         ];
 
         $users = get_users([
