@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { formatCompact } from '@/composables/useFormat';
+
+const thousandsFormatter = new Intl.NumberFormat('vi-VN');
+function formatThousands(v: number): string {
+  return v === 0 ? '0' : thousandsFormatter.format(v);
+}
 
 const props = defineProps<{
   modelValue: number;
@@ -22,7 +26,7 @@ watch(() => props.modelValue, (v) => {
   if (!editing.value) draft.value = String(v);
 });
 
-const displayText = computed(() => formatCompact(props.modelValue));
+const displayText = computed(() => formatThousands(props.modelValue));
 
 function onFocus(e: FocusEvent) {
   editing.value = true;
@@ -58,8 +62,8 @@ function onKeydown(e: KeyboardEvent) {
       type="text"
       inputmode="numeric"
       :value="editing ? draft : displayText"
-      :placeholder="placeholder !== undefined ? formatCompact(placeholder) : '0'"
-      :style="{ width: (width ?? 80) + 'px' }"
+      :placeholder="placeholder !== undefined ? formatThousands(placeholder) : '0'"
+      :style="{ width: (width ?? 100) + 'px' }"
       @focus="onFocus"
       @input="onInput"
       @blur="commit"
