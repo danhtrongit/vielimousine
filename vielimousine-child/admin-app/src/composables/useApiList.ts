@@ -12,9 +12,34 @@ export interface ApiListResult<T> {
   error: Ref<string | null>;
   fetchData: () => Promise<void>;
   updateQuery: (patch: Record<string, unknown>) => void;
+  clearStored: () => void;
 }
 
-export function useApiList<T>(endpoint: string, defaults: Record<string, unknown> = {}): ApiListResult<T> {
+export interface UseApiListOptions {
+  storageKey?: string;
+}
+
+function readStored(key: string): Record<string, string> | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === 'string') out[k] = v;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export function useApiList<T>(
+  endpoint: string,
+  defaults: Record<string, unknown> = {},
+  options: UseApiListOptions = {},
+): ApiListResult<T> {
   const route = useRoute();
   const router = useRouter();
   const data = ref<T[]>([]) as Ref<T[]>;
@@ -25,6 +50,17 @@ export function useApiList<T>(endpoint: string, defaults: Record<string, unknown
   const filtersApplied = ref<Record<string, unknown>>({});
   const loading = ref(false);
   const error = ref<string | null>(null);
+
+  // Restore persisted filters when arriving with an empty query.
+  // Skips the initial fetch — the route-change triggered by router.replace will do it.
+  let skipInitialFetch = false;
+  if (options.storageKey && Object.keys(route.query).length === 0) {
+    const saved = readStored(options.storageKey);
+    if (saved && Object.keys(saved).length > 0) {
+      router.replace({ query: saved });
+      skipInitialFetch = true;
+    }
+  }
 
   async function fetchData() {
     loading.value = true;
@@ -52,7 +88,20 @@ export function useApiList<T>(endpoint: string, defaults: Record<string, unknown
     router.replace({ query: next as Record<string, string> });
   }
 
-  watch(() => route.query, fetchData, { immediate: true, deep: true });
+  function clearStored() {
+    if (!options.storageKey) return;
+    try { localStorage.removeItem(options.storageKey); } catch { /* ignore quota */ }
+  }
 
-  return { data, pagination, availableSorts, filtersApplied, loading, error, fetchData, updateQuery };
+  watch(() => route.query, fetchData, { immediate: !skipInitialFetch, deep: true });
+
+  if (options.storageKey) {
+    watch(() => route.query, (q) => {
+      try {
+        localStorage.setItem(options.storageKey!, JSON.stringify(q));
+      } catch { /* ignore quota */ }
+    }, { deep: true });
+  }
+
+  return { data, pagination, availableSorts, filtersApplied, loading, error, fetchData, updateQuery, clearStored };
 }

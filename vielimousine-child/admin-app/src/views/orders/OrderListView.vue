@@ -45,6 +45,7 @@ function rowClick(data: { id: number }) {
     <DataTablePanel
       endpoint="/orders"
       :defaults="{ sort: 'created_at', order: 'desc' }"
+      storage-key="orders.list.v1"
     >
       <template #filters="{ update }">
         <FilterBar :schema="filterSchema" @apply="update" />

@@ -65,6 +65,7 @@ function isOrderLink(row: ActivityLog): boolean {
     <DataTablePanel
       endpoint="/activity-log"
       :defaults="{ sort: 'created_at', order: 'desc' }"
+      storage-key="activity.list.v1"
     >
       <template #filters="{ update }">
         <FilterBar :schema="filterSchema" @apply="update" />

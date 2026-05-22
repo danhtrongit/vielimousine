@@ -97,6 +97,7 @@ async function exportAll() {
     <DataTablePanel
       endpoint="/payments"
       :defaults="{ sort: 'created_at', order: 'desc' }"
+      storage-key="payments.list.v1"
     >
       <template #filters="{ update }">
         <FilterBar :schema="filterSchema" @apply="update" />

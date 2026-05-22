@@ -12,7 +12,7 @@ import { useNotify } from '@/composables/useNotify';
 import { roomPricesApi } from '@/api/roomPrices.api';
 import { ymdLocal, formatVND, formatCompact } from '@/composables/useFormat';
 
-type Kind = 'room_price' | 'room_stock';
+type Kind = 'room_price' | 'extra_adult_price' | 'room_stock';
 
 const props = defineProps<{
   visible: boolean;
@@ -31,8 +31,9 @@ const lookup = useLookupStore();
 const notify = useNotify();
 
 const KIND_OPTIONS = [
-  { value: 'room_price' as Kind, label: 'Giá phòng', icon: 'pi pi-home', helper: 'Giá phòng theo phòng / ngày' },
-  { value: 'room_stock' as Kind, label: 'Tồn kho',   icon: 'pi pi-box',  helper: 'Số phòng còn bán theo ngày' },
+  { value: 'room_price' as Kind,        label: 'Giá phòng',         icon: 'pi pi-home',      helper: 'Giá phòng theo phòng / ngày' },
+  { value: 'extra_adult_price' as Kind, label: 'PT người lớn',      icon: 'pi pi-user-plus', helper: 'Phụ thu mỗi người lớn vượt định mức / ngày' },
+  { value: 'room_stock' as Kind,        label: 'Tồn kho',           icon: 'pi pi-box',       helper: 'Số phòng còn bán theo ngày' },
 ];
 
 const WEEKDAYS = [
@@ -134,9 +135,11 @@ const cellCount = computed(() => targetCount.value * dateCount.value);
 
 const targetLabel = computed(() => 'phòng');
 
-const valueLabel = computed(() =>
-  kind.value === 'room_stock' ? 'Số phòng tồn' : 'Giá phòng (VND)',
-);
+const valueLabel = computed(() => {
+  if (kind.value === 'room_stock') return 'Số phòng tồn';
+  if (kind.value === 'extra_adult_price') return 'Phụ thu người lớn (VND)';
+  return 'Giá phòng (VND)';
+});
 
 const valueIsCurrency = computed(() => kind.value !== 'room_stock');
 
@@ -194,12 +197,18 @@ async function doSubmit() {
     let totalCells = 0;
     let totalTargets = 0;
 
-    const isStock = kind.value === 'room_stock';
     const batches = chunk(effectiveRoomIds.value, ROOM_IDS_CHUNK);
     progress.value = { done: 0, total: batches.length };
-    const values = isStock
+    const values = kind.value === 'room_stock'
       ? { stock: value.value, is_active: true, source: 'manual' as const }
+      : kind.value === 'extra_adult_price'
+      ? { extra_adult_price: value.value, is_active: true, source: 'manual' as const }
       : { price: value.value, is_active: true, source: 'manual' as const };
+    const successMsg = kind.value === 'room_stock'
+      ? 'Đã cập nhật tồn kho'
+      : kind.value === 'extra_adult_price'
+      ? 'Đã cập nhật phụ thu người lớn'
+      : 'Đã cập nhật giá phòng';
     for (const ids of batches) {
       const resp = await roomPricesApi.bulk(
         { room_ids: ids, date_from: from, date_to: to, weekdays: wd },
@@ -210,7 +219,7 @@ async function doSubmit() {
       progress.value = { done: progress.value.done + 1, total: batches.length };
     }
     notify.success(
-      isStock ? 'Đã cập nhật tồn kho' : 'Đã cập nhật giá phòng',
+      successMsg,
       `${totalCells} ô · ${totalTargets} phòng × ${dateCount.value} ngày`,
     );
 
