@@ -14,6 +14,8 @@ const props = withDefaults(
     emptyTitle?: string;
     emptyDescription?: string;
     emptyIcon?: string;
+    /** localStorage key to persist filters/pagination across navigation */
+    storageKey?: string;
   }>(),
   {
     density: 'normal',
@@ -25,6 +27,7 @@ const props = withDefaults(
 const { data, pagination, loading, error, updateQuery } = useApiList<Record<string, unknown>>(
   props.endpoint,
   props.defaults ?? {},
+  { storageKey: props.storageKey },
 );
 
 function onPage(e: PageState) {

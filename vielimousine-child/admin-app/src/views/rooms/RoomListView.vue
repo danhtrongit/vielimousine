@@ -107,6 +107,7 @@ function hotelName(hotelId: number): string {
       :key="refreshKey"
       endpoint="/rooms"
       :defaults="{ sort: 'sort_order', order: 'asc' }"
+      storage-key="rooms.list.v1"
     >
       <template #filters="{ update }">
         <FilterBar :schema="filterSchema" @apply="update" />

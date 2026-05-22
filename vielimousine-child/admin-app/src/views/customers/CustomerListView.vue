@@ -27,6 +27,7 @@ onMounted(() => {
     <DataTablePanel
       endpoint="/customers"
       :defaults="{ sort: 'created_at', order: 'desc' }"
+      storage-key="customers.list.v1"
     >
       <template #filters="{ update }">
         <FilterBar :schema="filterSchema" @apply="update" />

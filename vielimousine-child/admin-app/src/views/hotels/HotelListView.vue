@@ -32,6 +32,7 @@ onMounted(() => {
     <DataTablePanel
       endpoint="/hotels"
       :defaults="{ sort: 'sort_order', order: 'asc' }"
+      storage-key="hotels.list.v1"
     >
       <template #filters="{ update }">
         <FilterBar :schema="filterSchema" @apply="update" />

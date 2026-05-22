@@ -43,6 +43,7 @@ function fmtValue(type: string, value: number): string {
     <DataTablePanel
       endpoint="/coupons"
       :defaults="{ sort: 'created_at', order: 'desc' }"
+      storage-key="coupons.list.v1"
     >
       <template #filters="{ update }">
         <FilterBar :schema="filterSchema" @apply="update" />
