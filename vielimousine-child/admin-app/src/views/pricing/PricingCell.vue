@@ -17,6 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'change', value: number): void;
+  (e: 'fill', value: number): void;
 }>();
 
 const editing = ref(false);
@@ -54,6 +55,18 @@ function onKeydown(e: KeyboardEvent) {
     (e.target as HTMLInputElement).blur();
   }
 }
+
+function onDblClick(e: MouseEvent) {
+  // Compute fill value before commit (commit emits change, which may re-render).
+  const fillValue = editing.value
+    ? (draft.value === '' ? 0 : Number(draft.value))
+    : props.modelValue;
+  // Commit any pending edit so the source cell ends up consistent with what we broadcast.
+  if (editing.value) {
+    (e.target as HTMLInputElement).blur();
+  }
+  emit('fill', fillValue);
+}
 </script>
 
 <template>
@@ -64,10 +77,12 @@ function onKeydown(e: KeyboardEvent) {
       :value="editing ? draft : displayText"
       :placeholder="placeholder !== undefined ? formatThousands(placeholder) : '0'"
       :style="{ width: (width ?? 100) + 'px' }"
+      title="Đúp chuột để áp giá trị này cho cả dòng"
       @focus="onFocus"
       @input="onInput"
       @blur="commit"
       @keydown="onKeydown"
+      @dblclick.prevent="onDblClick"
     />
     <span v-if="pending" class="ind ind-pending" title="Đang chờ lưu">●</span>
     <span v-else-if="error" class="ind ind-error" title="Lỗi lưu">!</span>
