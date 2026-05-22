@@ -416,6 +416,38 @@ function rowHeight(row: Row): number {
   return ROW_HEIGHT;
 }
 
+// Double-click on a cell → fan the value out to every other cell in the same row,
+// across the currently visible date range. Skip the source date to avoid noop queue churn.
+function fillRowFromCell(row: Row, sourceDate: string, value: number) {
+  if (dateRange.value.length === 0) return;
+  let applied = 0;
+  for (const d of dateRange.value) {
+    if (d === sourceDate) continue;
+    if (row.kind === 'ticket') {
+      if (getTicketPrice(row.hotel, d) === value) continue;
+      onTicketChange(row.hotel, d, value);
+    } else if (row.kind === 'room-price') {
+      if (getRoomPrice(row.room, d) === value) continue;
+      setRoomPriceField(row.room, d, 'price', value);
+    } else if (row.kind === 'extra-adult') {
+      if (getRoomExtraAdult(row.room, d) === value) continue;
+      setRoomPriceField(row.room, d, 'extra_adult_price', value);
+    } else if (row.kind === 'room-stock') {
+      if (getRoomStock(row.room, d) === value) continue;
+      setRoomPriceField(row.room, d, 'stock', value);
+    } else if (row.kind === 'surcharge') {
+      if (getSurchargeAmount(row.rule, d) === value) continue;
+      onSurchargeChange(row.rule, d, value);
+    } else {
+      return;
+    }
+    applied++;
+  }
+  if (applied > 0) {
+    notify.info('Đã áp giá trị cho cả dòng', `${applied} ô · sẽ tự lưu sau 600ms`);
+  }
+}
+
 const gridTemplateColumns = computed(
   () => `${LABEL_WIDTH}px repeat(${dateRange.value.length}, ${CELL_WIDTH}px)`,
 );
@@ -558,6 +590,7 @@ const pendingCount = computed(() => pendingMap.value.size);
                     :error="errorKeys.has(pendingKeyForTicket(item.hotel.id, d))"
                     :is-default="!hasTicketOverride(item.hotel, d)"
                     @change="(v: number) => onTicketChange(item.hotel, d, v)"
+                    @fill="(v: number) => fillRowFromCell(item, d, v)"
                   />
                 </div>
               </template>
@@ -576,6 +609,7 @@ const pendingCount = computed(() => pendingMap.value.size);
                     :error="errorKeys.has(pendingKeyForRoom(item.room.id, d))"
                     :is-default="!hasRoomPriceOverride(item.room, d)"
                     @change="(v: number) => setRoomPriceField(item.room, d, 'price', v)"
+                    @fill="(v: number) => fillRowFromCell(item, d, v)"
                   />
                 </div>
               </template>
@@ -594,6 +628,7 @@ const pendingCount = computed(() => pendingMap.value.size);
                     :error="errorKeys.has(pendingKeyForRoom(item.room.id, d))"
                     :is-default="!hasExtraAdultOverride(item.room, d)"
                     @change="(v: number) => setRoomPriceField(item.room, d, 'extra_adult_price', v)"
+                    @fill="(v: number) => fillRowFromCell(item, d, v)"
                   />
                 </div>
               </template>
@@ -612,6 +647,7 @@ const pendingCount = computed(() => pendingMap.value.size);
                     :error="errorKeys.has(pendingKeyForSur(item.rule.id, d))"
                     :is-default="!hasSurchargeOverride(item.rule, d)"
                     @change="(v: number) => onSurchargeChange(item.rule, d, v)"
+                    @fill="(v: number) => fillRowFromCell(item, d, v)"
                   />
                 </div>
               </template>
@@ -629,6 +665,7 @@ const pendingCount = computed(() => pendingMap.value.size);
                     :pending="pendingMap.has(pendingKeyForRoom(item.room.id, d))"
                     :is-default="!hasStockEntry(item.room, d)"
                     @change="(v: number) => setRoomPriceField(item.room, d, 'stock', v)"
+                    @fill="(v: number) => fillRowFromCell(item, d, v)"
                   />
                 </div>
               </template>
