@@ -92,7 +92,7 @@ $surchargeRepo->create([
     'sort_order'      => 3,
 ]);
 
-$policyA = new \Vie\Service\Pricing\ChildPolicy([3, 3], [], 0);
+$policyA = new \Vie\Service\Pricing\ChildPolicy([3, 3], 0);
 $nightsA = ['2099-01-01'];
 $calcA = new \Vie\Service\Pricing\SurchargeCalculator(
     roomId:             $roomId,
@@ -110,7 +110,7 @@ $assert('A: amounts [500000, 600000]', $amounts === [500000, 600000], 'got ' . j
 
 // --- Scenario B: 3rd child triggers (3, NULL) rule ---
 echo "\nScenario B: 3 children age 3 → 500K + 600K + 700K\n";
-$policyB = new \Vie\Service\Pricing\ChildPolicy([3, 3, 3], [], 0);
+$policyB = new \Vie\Service\Pricing\ChildPolicy([3, 3, 3], 0);
 $calcB = new \Vie\Service\Pricing\SurchargeCalculator(
     roomId:             $roomId,
     nights:             ['2099-01-01'],
@@ -146,7 +146,7 @@ $surchargeRepo->create([
     'is_active'       => 1,
     'sort_order'      => 1,
 ]);
-$policyC = new \Vie\Service\Pricing\ChildPolicy([5, 5], [], 0);
+$policyC = new \Vie\Service\Pricing\ChildPolicy([5, 5], 0);
 $calcC = new \Vie\Service\Pricing\SurchargeCalculator(
     roomId:             $roomId,
     nights:             ['2099-01-01'],

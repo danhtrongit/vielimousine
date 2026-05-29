@@ -10,36 +10,27 @@ final class ChildPolicy
     private array $assessments = [];
     private int   $freeCount   = 0;
     private int   $policyFreeCount = 0;
-    private int   $spareSlotFreeCount = 0;
 
     /**
-     * @param int[] $childAges          All child ages (đã được GuestComposition lọc < adult threshold).
-     * @param int   $freeQuota          Number of age-restricted free children (room.free_children_count × numRooms).
-     * @param int   $freeAgeCap         Inclusive max age eligible for room-policy free quota.
-     * @param int   $spareAdultSlots    Extra free spots from unused adult-included slots; no age restriction.
+     * @param int[] $childAges  All child ages (đã lọc < adult threshold bởi GuestComposition).
+     * @param int   $freeQuota  Số bé được miễn theo chính sách phòng (free_children_count × numRooms).
+     * @param int   $freeAgeCap Tuổi tối đa (inclusive) đủ điều kiện miễn theo chính sách.
      */
     public function __construct(
         array $childAges,
         int $freeQuota = 0,
         int $freeAgeCap = 99,
-        int $spareAdultSlots = 0,
     ) {
         $ages = array_map('intval', $childAges);
-        // Sort DESC: oldest first. Bé lớn nhất tiêu thụ free-quota trước → bé nhỏ
-        // (thường free theo rule "dưới X tuổi" của surcharge table) ra rule phụ thu.
-        // Đồng bộ với business rule §3.4.
+        // Sort DESC: bé lớn nhất tiêu thụ free-quota trước (đồng bộ business rule §3.4).
         rsort($ages);
 
         $usedPolicyFree = 0;
-        $usedSpareSlot  = 0;
         $payableIndex   = 0;
         foreach ($ages as $age) {
             $isFree = false;
             if ($age <= $freeAgeCap && $usedPolicyFree < $freeQuota) {
                 $usedPolicyFree++;
-                $isFree = true;
-            } elseif ($usedSpareSlot < $spareAdultSlots) {
-                $usedSpareSlot++;
                 $isFree = true;
             }
             if ($isFree) {
@@ -57,26 +48,9 @@ final class ChildPolicy
             );
         }
         $this->policyFreeCount = $usedPolicyFree;
-        $this->spareSlotFreeCount = $usedSpareSlot;
     }
 
-    public function assessments(): array
-    {
-        return $this->assessments;
-    }
-
-    public function freeChildrenCount(): int
-    {
-        return $this->freeCount;
-    }
-
-    public function policyFreeCount(): int
-    {
-        return $this->policyFreeCount;
-    }
-
-    public function spareSlotFreeCount(): int
-    {
-        return $this->spareSlotFreeCount;
-    }
+    public function assessments(): array      { return $this->assessments; }
+    public function freeChildrenCount(): int  { return $this->freeCount; }
+    public function policyFreeCount(): int    { return $this->policyFreeCount; }
 }
