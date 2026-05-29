@@ -39,7 +39,7 @@ if ($hotelId > 0) {
     $roomsResult = $roomRepo->all([
         'hotel_id'  => $hotelId,
         'is_active' => 1,
-        'sort'      => 'base_price',
+        'sort'      => 'sort_order',
         'order'     => 'asc',
         'per_page'  => 100,
     ]);
