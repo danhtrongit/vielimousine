@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import DatePicker from 'primevue/datepicker';
 import Button from 'primevue/button';
 import MultiSelect from 'primevue/multiselect';
@@ -60,11 +61,10 @@ watch(selectedHotelIds, (ids) => {
   try { localStorage.setItem(HOTEL_FILTER_STORAGE_KEY, JSON.stringify(ids)); } catch { /* ignore quota */ }
 }, { deep: true });
 
-// Save queue: key = `${kind}_${entityId}_${date}`, value = pending CellChange
+// Save queue: key = `${kind}_${entityId}_${date}`, value = pending CellChange.
+// Changes accumulate here and are saved only when the user clicks "Cập nhật".
 const pendingMap = ref<Map<string, CellChange>>(new Map());
 const errorKeys = ref<Set<string>>(new Set());
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-const DEBOUNCE_MS = 600;
 
 const LABEL_WIDTH = 240;
 const CELL_WIDTH = 110;
@@ -163,8 +163,24 @@ async function loadAll() {
   }
 }
 
+// ── Unsaved-changes guards ──
+function beforeUnloadHandler(e: BeforeUnloadEvent) {
+  if (pendingMap.value.size > 0) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+}
+
+onBeforeRouteLeave(() => {
+  if (pendingMap.value.size > 0) {
+    return window.confirm('Còn thay đổi chưa lưu. Rời trang và bỏ thay đổi?');
+  }
+  return true;
+});
+
 watch([dateFrom, dateTo], loadAll);
 onMounted(async () => {
+  window.addEventListener('beforeunload', beforeUnloadHandler);
   await lookup.ensureLoaded();
   if (selectedHotelIds.value.length > 0) {
     const validIds = new Set(lookup.hotels.map((h) => h.id));
@@ -175,10 +191,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    if (pendingMap.value.size > 0) void flush();
-  }
+  window.removeEventListener('beforeunload', beforeUnloadHandler);
 });
 
 // ── Getters ──
@@ -215,13 +228,11 @@ function hasSurchargeOverride(rule: Surcharge, date: string): boolean {
   return surchargePriceMap.value.has(surKey(rule.id, date));
 }
 
-// ── Queue change + debounced flush ──
+// ── Queue change (saved on explicit "Cập nhật") ──
 function enqueueChange(key: string, change: CellChange) {
   pendingMap.value.set(key, change);
   pendingMap.value = new Map(pendingMap.value);
   errorKeys.value.delete(key);
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(flush, DEBOUNCE_MS);
 }
 
 async function flush() {
@@ -496,8 +507,8 @@ const pendingCount = computed(() => pendingMap.value.size);
       <span class="spacer" />
       <span v-if="pendingCount > 0" class="pending-badge">
         <i class="pi pi-clock" />
-        {{ pendingCount }} thay đổi đang chờ
-        <Button label="Lưu ngay" size="small" severity="warn" :loading="flushing" @click="flush" />
+        {{ pendingCount }} thay đổi chưa lưu
+        <Button label="Cập nhật" icon="pi pi-save" size="small" severity="warn" :loading="flushing" @click="flush" />
       </span>
       <span v-else-if="flushing" class="pending-badge"><i class="pi pi-spin pi-spinner" /> Đang lưu…</span>
     </div>
