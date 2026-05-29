@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { onMounted, onBeforeUnmount, computed } from 'vue';
 import SearchBar from './SearchBar.vue';
 import RoomCard from './RoomCard.vue';
 import InlineCheckout from './InlineCheckout.vue';
 import MobileCta from './MobileCta.vue';
-import { prefillFromQuery, setSelection, getQuote, priceChecked } from '@/composables/useBookingState';
+import { prefillFromQuery, setSelection, getQuote, priceChecked, handleBackToRooms } from '@/composables/useBookingState';
 import { registerRooms } from '@/composables/useQuotes';
 
 interface RoomData {
@@ -53,9 +53,18 @@ const sortedRooms = computed(() => {
   return decorated.map((d) => d.room);
 });
 
+function onPopState() {
+  if (handleBackToRooms()) {
+    setTimeout(() => {
+      document.querySelector('.vh-rooms')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }
+}
+
 onMounted(() => {
   prefillFromQuery();
   registerRooms(props.rooms.map((r) => r.id));
+  window.addEventListener('popstate', onPopState);
 
   // Auto-pick room from query
   const sp = new URLSearchParams(window.location.search);
@@ -67,6 +76,10 @@ onMounted(() => {
       setTimeout(() => setSelection(id, bt), 700);
     }
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('popstate', onPopState);
 });
 </script>
 

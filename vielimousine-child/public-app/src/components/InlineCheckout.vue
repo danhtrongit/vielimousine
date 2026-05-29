@@ -12,7 +12,7 @@ import type {
   QuoteInquiryRequest,
   QuoteInquiryResponse,
 } from '@/api/types';
-import { search, selection, getQuote, setSelection } from '@/composables/useBookingState';
+import { search, selection, getQuote, clearSelectionBack } from '@/composables/useBookingState';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const props = defineProps<{ rooms: Array<{ id: number; name: string }> }>();
@@ -61,7 +61,7 @@ async function applyCoupon() {
 }
 
 function changeRoom() {
-  setSelection(null);
+  clearSelectionBack();
   document.querySelector('.vh-rooms')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

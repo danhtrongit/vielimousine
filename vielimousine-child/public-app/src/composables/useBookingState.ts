@@ -46,9 +46,38 @@ export const selection = reactive<{ roomId: number | null; bookingType: BookingT
   bookingType: 'room',
 });
 
+let pushedBookingState = false;
+
 export function setSelection(roomId: number | null, type: BookingType = 'room') {
+  const wasEmpty = selection.roomId === null;
   selection.roomId = roomId;
   selection.bookingType = type;
+  // Push a history entry the first time a room is selected so the browser
+  // Back button returns to the room list instead of leaving the hotel page.
+  if (roomId !== null && wasEmpty && typeof history !== 'undefined') {
+    history.pushState({ vhBooking: true }, '');
+    pushedBookingState = true;
+  }
+}
+
+// Clear selection, returning the browser to the room list without leaving the page.
+export function clearSelectionBack() {
+  if (pushedBookingState && typeof history !== 'undefined') {
+    history.back(); // triggers popstate → handleBackToRooms
+  } else {
+    setSelection(null);
+  }
+}
+
+// Called from the popstate handler when the user presses browser Back.
+// Returns true if it consumed the event (i.e. there was a selection to clear).
+export function handleBackToRooms(): boolean {
+  pushedBookingState = false;
+  if (selection.roomId !== null) {
+    selection.roomId = null;
+    return true;
+  }
+  return false;
 }
 
 export function getQuote(roomId: number, type: BookingType): Quote | undefined {
