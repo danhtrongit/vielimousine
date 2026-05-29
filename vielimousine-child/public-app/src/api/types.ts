@@ -38,11 +38,13 @@ export interface Quote {
   extra_adult_subtotal: number;
   child_surcharge_total: number;
   ticket_subtotal: number;
+  child_ticket_subtotal: number;
   subtotal: number;
   discount: number;
   total: number;
   cost_total: number;
   requires_quote: boolean;
+  rooms_expanded: boolean;
   messages: string[];
   unavailable_date: string | null;
 }
