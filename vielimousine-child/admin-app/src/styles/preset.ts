@@ -3,23 +3,23 @@ import Aura from '@primeuix/themes/aura';
 
 /**
  * VieLimo Admin theme preset.
- * Extends Aura with brand orange (#fa541c) scale + slate neutrals.
+ * Extends Aura with brand green (#00a651) scale + slate neutrals.
  * Single source of truth for all PrimeVue token resolution.
  */
 export const VieLimoPreset = definePreset(Aura, {
   primitive: {
     vielimo: {
-      50: '#fff2eb',
-      100: '#ffe0cd',
-      200: '#ffc09a',
-      300: '#ff9a64',
-      400: '#ff7237',
-      500: '#fa541c',
-      600: '#e34112',
-      700: '#bd3210',
-      800: '#962812',
-      900: '#7a2212',
-      950: '#420f06',
+      50: '#e8f8ef',
+      100: '#c6ecd5',
+      200: '#93dcb0',
+      300: '#57c987',
+      400: '#1eb568',
+      500: '#00a651',
+      600: '#009247',
+      700: '#00793a',
+      800: '#00602f',
+      900: '#004f28',
+      950: '#002c16',
     },
   },
   semantic: {
@@ -41,7 +41,7 @@ export const VieLimoPreset = definePreset(Aura, {
       style: 'solid',
       color: '{primary.500}',
       offset: '2px',
-      shadow: '0 0 0 4px rgba(250, 84, 28, 0.15)',
+      shadow: '0 0 0 4px rgba(0, 166, 81, 0.15)',
     },
     formField: {
       borderRadius: '8px',

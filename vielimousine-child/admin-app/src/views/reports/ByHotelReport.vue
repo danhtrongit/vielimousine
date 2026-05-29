@@ -54,12 +54,12 @@ const chartData = (() => ({
         {
           label: 'Doanh thu',
           data: rows.value.slice(0, 10).map((r) => r.revenue),
-          backgroundColor: '#fa541c',
+          backgroundColor: '#00a651',
         },
         {
           label: 'Lợi nhuận',
           data: rows.value.slice(0, 10).map((r) => r.profit),
-          backgroundColor: '#20af48',
+          backgroundColor: '#3b82f6',
         },
       ],
     };

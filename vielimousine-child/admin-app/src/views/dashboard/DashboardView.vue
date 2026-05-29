@@ -79,7 +79,7 @@ const chartData = computed(() => {
   }
   const labels = Object.keys(buckets).map((d) => d.slice(5));
 
-  const primary = readToken('--p-primary-500', '#fa541c');
+  const primary = readToken('--p-primary-500', '#00a651');
   const primarySoft = `${primary}1a`;
 
   return {

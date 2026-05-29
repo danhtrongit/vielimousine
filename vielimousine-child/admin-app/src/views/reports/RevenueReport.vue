@@ -45,8 +45,8 @@ const chartData = computed(() => {
       {
         label: 'Doanh thu (VND)',
         data: labels.map((l) => buckets.get(l) ?? 0),
-        borderColor: '#fa541c',
-        backgroundColor: 'rgba(250, 84, 28, 0.1)',
+        borderColor: '#00a651',
+        backgroundColor: 'rgba(0, 166, 81, 0.1)',
         fill: true,
         tension: 0.3,
       },
