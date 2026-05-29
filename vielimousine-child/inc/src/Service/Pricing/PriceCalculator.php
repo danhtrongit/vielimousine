@@ -40,7 +40,6 @@ final class PriceCalculator
             $guest->childrenUnderFloor(),
             (int) $room['free_children_count'] * $allocation->numRooms(),
             $freeAgeCap,
-            $allocation->spareAdultSlots(),
         );
 
         $isCombo = $req->bookingType === 'combo';
@@ -53,13 +52,16 @@ final class PriceCalculator
             $this->ticketPriceRepo,
         );
 
+        // Vé xe của trẻ em (combo): phần ghế tính phí ngoài số người lớn.
+        // Được gom vào "phụ thu trẻ em" khi hiển thị (tổng tiền không đổi).
+        $childTicketSubtotal = $isCombo
+            ? max(0, $ticket->billableSeats() - $req->adults) * $ticket->ticketPrice()
+            : 0;
+
         $messages = $allocation->messages();
         if ($childPolicy->policyFreeCount() > 0) {
             $cap1 = $freeAgeCap + 1; // Vietnamese convention: "dưới N tuổi" = age < N (so cap 5 → "dưới 6 tuổi")
             $messages[] = "Miễn phí {$childPolicy->policyFreeCount()} bé dưới {$cap1} tuổi (theo chính sách phòng)";
-        }
-        if ($childPolicy->spareSlotFreeCount() > 0) {
-            $messages[] = "{$childPolicy->spareSlotFreeCount()} bé ngồi vào chỗ người lớn còn trống — không tính phụ thu";
         }
 
         if ($allocation->requiresQuote()) {
@@ -158,11 +160,13 @@ final class PriceCalculator
             extraAdultSubtotal:  $extraAdultSubtotal,
             childSurchargeTotal: $childSurchargeTotal,
             ticketSubtotal:      $ticketSubtotal,
+            childTicketSubtotal: $childTicketSubtotal,
             subtotal:            $subtotal,
             discount:            $discount,
             total:               $total,
             costTotal:           0,
             requiresQuote:       false,
+            roomsExpanded:       $allocation->roomsExpanded(),
             messages:            $messages,
             unavailableDate:     null,
         );
@@ -207,11 +211,13 @@ final class PriceCalculator
             extraAdultSubtotal:  0,
             childSurchargeTotal: 0,
             ticketSubtotal:      0,
+            childTicketSubtotal: 0,
             subtotal:            0,
             discount:            0,
             total:               0,
             costTotal:           0,
             requiresQuote:       true,
+            roomsExpanded:       $allocation->roomsExpanded(),
             messages:            $messages,
             unavailableDate:     $unavailableDate,
         );

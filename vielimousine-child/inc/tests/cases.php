@@ -264,4 +264,39 @@ return [
         ],
         'assert_ticket_positive' => true,
     ],
+    [
+        'name'     => 'Case 12: 1NL + 2 bé (5,4), Premier 1 phòng — bé thứ 2 KHÔNG free (#1)',
+        'request'  => [
+            'room_id'      => $premierRoom,
+            'checkin'      => $today,
+            'checkout'     => $tomorrow,
+            'adults'       => 1,
+            'child_ages'   => [5, 4],
+            'user_rooms'   => 1,
+            'booking_type' => 'room',
+        ],
+        'expected' => [
+            'num_rooms'      => 1,
+            'requires_quote' => false,
+            'rooms_expanded' => false,
+        ],
+        'extra_check' => 'one_free_one_charged',
+    ],
+    [
+        'name'     => 'Case 13: 4NL + 0 bé, Premier user_rooms=1 — auto tách 2 phòng (#6)',
+        'request'  => [
+            'room_id'      => $premierRoom,
+            'checkin'      => $today,
+            'checkout'     => $tomorrow,
+            'adults'       => 4,
+            'child_ages'   => [],
+            'user_rooms'   => 1,
+            'booking_type' => 'room',
+        ],
+        'expected' => [
+            'num_rooms'      => 2,
+            'requires_quote' => false,
+            'rooms_expanded' => true,
+        ],
+    ],
 ];
