@@ -489,6 +489,7 @@ final class OrderService
         if ($order === null) {
             throw new OrderNotFoundException("Đơn hàng #{$orderId} không tồn tại");
         }
+        $order = $this->orderRepo->attachItemAggregates([$order])[0];
         $order['items']    = $this->loadItems($orderId);
         $order['payments'] = $this->loadPayments($orderId);
         $order['customer'] = $this->customerRepo->find((int) $order['customer_id']);

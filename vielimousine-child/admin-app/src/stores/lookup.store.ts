@@ -1,6 +1,8 @@
+import { reactive } from 'vue';
 import { defineStore } from 'pinia';
 import { hotelsApi } from '@/api/hotels.api';
 import { roomsApi } from '@/api/rooms.api';
+import { settingsApi } from '@/api/settings.api';
 import { surchargesApi, type Surcharge } from '@/api/surcharges.api';
 import { usersApi, type VieUser } from '@/api/users.api';
 import type { Hotel, Room } from '@/types/hotel';
@@ -65,6 +67,7 @@ export const useLookupStore = defineStore('lookup', {
           fetchAllPages(roomsApi.list, { is_active: 1 }),
           fetchAllPages(surchargesApi.list, { is_active: 1 }),
           usersApi.list().catch(() => ({ data: [] as VieUser[] })),
+          loadOrderSources(),
         ]);
         this.hotels = hotelsAll.map((h) => ({ ...h, name: decodeEntities(h.name) }));
         this.rooms = roomsAll.map((r) => ({ ...r, name: decodeEntities(r.name) }));
@@ -82,12 +85,34 @@ export const useLookupStore = defineStore('lookup', {
   },
 });
 
-export const ORDER_SOURCES = [
+// Fallback khi chưa load được cấu hình từ server (Thiết lập → Nguồn đơn).
+const DEFAULT_ORDER_SOURCES = [
   { label: 'Website', value: 'website' },
   { label: 'Admin', value: 'admin' },
   { label: 'Phone', value: 'phone' },
   { label: 'Walk-in', value: 'walkin' },
 ];
+
+export const ORDER_SOURCES = reactive([...DEFAULT_ORDER_SOURCES]);
+
+let orderSourcesLoaded = false;
+export async function loadOrderSources(force = false): Promise<void> {
+  if (orderSourcesLoaded && !force) return;
+  try {
+    const resp = await settingsApi.getOrderSources();
+    const list = resp.data?.sources;
+    if (Array.isArray(list) && list.length > 0) {
+      ORDER_SOURCES.splice(
+        0,
+        ORDER_SOURCES.length,
+        ...list.map((s) => ({ value: s.value, label: decodeEntities(s.label) })),
+      );
+    }
+    orderSourcesLoaded = true;
+  } catch {
+    // giữ danh sách mặc định
+  }
+}
 
 export const PAYMENT_METHODS = [
   { label: 'Chuyển khoản', value: 'bank_transfer' },

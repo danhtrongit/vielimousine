@@ -16,6 +16,8 @@ const props = withDefaults(
     emptyIcon?: string;
     /** localStorage key to persist filters/pagination across navigation */
     storageKey?: string;
+    /** inline style for the inner table, e.g. 'min-width: 1900px' for wide scrollable tables */
+    tableStyle?: string;
   }>(),
   {
     density: 'normal',
@@ -64,6 +66,7 @@ function onSort(e: { sortField?: unknown; sortOrder?: number | null }) {
         striped-rows
         scrollable
         scroll-height="flex"
+        :table-style="tableStyle"
       >
         <template #empty>
           <LoadingState v-if="loading" variant="skeleton-table" :rows="6" />

@@ -34,6 +34,9 @@ export interface Order {
   pickup: Record<string, unknown> | null;
   dropoff: Record<string, unknown> | null;
   created_at: string;
+  hotel_names: string;
+  hotel_subtotal: number;
+  ticket_subtotal: number;
 }
 
 export interface OrderItem {

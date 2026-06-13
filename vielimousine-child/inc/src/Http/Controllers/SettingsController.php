@@ -9,6 +9,7 @@ use Vie\Email\OrderEmailService;
 use Vie\Service\Hotel\HotelSyncService;
 use Vie\Service\Settings\EmailSettings;
 use Vie\Service\Settings\SepaySettings;
+use Vie\Service\Settings\SourceSettings;
 use Vie\Support\ResponseEnvelope;
 
 final class SettingsController
@@ -132,6 +133,65 @@ final class SettingsController
         $s->update($clean);
 
         return self::getSepay($request);
+    }
+
+    // ---------- Order sources ----------
+
+    public static function getSources(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $settings = Container::get(SourceSettings::class);
+        return ResponseEnvelope::success([
+            'sources' => $settings->all(),
+        ]);
+    }
+
+    public static function updateSources(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $data = $request->get_json_params();
+        if (!is_array($data) || !isset($data['sources']) || !is_array($data['sources'])) {
+            return ResponseEnvelope::error([
+                ['code' => 'validation_error', 'field' => 'sources', 'message' => 'Body phải có mảng sources'],
+            ], 422);
+        }
+
+        $errors = [];
+        $clean  = [];
+        $seen   = [];
+        foreach (array_values($data['sources']) as $i => $entry) {
+            if (!is_array($entry)) {
+                $errors[] = ['code' => 'validation_error', 'field' => "sources.{$i}", 'message' => 'Mỗi nguồn phải là object {value, label}'];
+                continue;
+            }
+            $value = sanitize_key((string) ($entry['value'] ?? ''));
+            $label = sanitize_text_field((string) ($entry['label'] ?? ''));
+            if ($value === '' || strlen($value) > 50) {
+                $errors[] = ['code' => 'validation_error', 'field' => "sources.{$i}.value", 'message' => 'Mã nguồn bắt buộc, tối đa 50 ký tự (a-z, 0-9, _, -)'];
+                continue;
+            }
+            if ($label === '') {
+                $errors[] = ['code' => 'validation_error', 'field' => "sources.{$i}.label", 'message' => 'Tên hiển thị bắt buộc'];
+                continue;
+            }
+            if (isset($seen[$value])) {
+                $errors[] = ['code' => 'validation_error', 'field' => "sources.{$i}.value", 'message' => "Mã nguồn bị trùng: {$value}"];
+                continue;
+            }
+            $seen[$value] = true;
+            $clean[] = ['value' => $value, 'label' => $label];
+        }
+        if ($errors !== []) {
+            return ResponseEnvelope::error($errors, 422);
+        }
+        if ($clean === []) {
+            return ResponseEnvelope::error([
+                ['code' => 'validation_error', 'field' => 'sources', 'message' => 'Cần ít nhất một nguồn đơn'],
+            ], 422);
+        }
+
+        $settings = Container::get(SourceSettings::class);
+        return ResponseEnvelope::success([
+            'sources' => $settings->update($clean),
+        ]);
     }
 
     // ---------- Hotel sync (Phase 13) ----------

@@ -11,6 +11,7 @@ use Vie\Repository\RoomRepository;
 use Vie\Service\HookRegistry;
 use Vie\Service\Order\OrderService;
 use Vie\Service\Settings\EmailSettings;
+use Vie\Service\Settings\SourceSettings;
 use Vie\Support\Money;
 
 final class OrderEmailService
@@ -47,6 +48,7 @@ final class OrderEmailService
         private readonly HotelRepository $hotelRepo,
         private readonly RoomRepository $roomRepo,
         private readonly \Vie\Repository\OrderRepository $orderRepo,
+        private readonly SourceSettings $sourceSettings,
     ) {
     }
 
@@ -392,13 +394,10 @@ final class OrderEmailService
 
     private function labelSource(string $src): string
     {
-        return match ($src) {
-            'website' => 'Website',
-            'admin'   => 'Admin tạo',
-            'manual'  => 'Thủ công',
-            ''        => '—',
-            default   => $src,
-        };
+        if ($src === '') {
+            return '—';
+        }
+        return $this->sourceSettings->labelFor($src);
     }
 
     private function labelBookingType(string $type): string

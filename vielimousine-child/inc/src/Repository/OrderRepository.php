@@ -57,6 +57,8 @@ final class OrderRepository extends AbstractRepository
             'total'           => 'float',
             'cost_total'      => 'float',
             'profit_total'    => 'float',
+            'hotel_subtotal'  => 'float',
+            'ticket_subtotal' => 'float',
             'coupon_id'       => 'int',
             'paid_amount'     => 'float',
             'created_by'      => 'int',
@@ -111,7 +113,60 @@ final class OrderRepository extends AbstractRepository
             ];
         }
         unset($params['__force_empty']);
-        return parent::all($params);
+        $result = parent::all($params);
+        $result['data'] = $this->attachItemAggregates($result['data']);
+        return $result;
+    }
+
+    /**
+     * Gắn cột tổng hợp từ vie_order_item cho mỗi order row:
+     * hotel_names, hotel_subtotal, ticket_subtotal — 1 grouped query cho cả page.
+     */
+    public function attachItemAggregates(array $rows): array
+    {
+        $orderIds = [];
+        foreach ($rows as $row) {
+            if (isset($row['id'])) {
+                $orderIds[] = (int) $row['id'];
+            }
+        }
+
+        $aggregates = [];
+        if ($orderIds !== []) {
+            global $wpdb;
+            $itemTbl  = $wpdb->prefix . 'vie_order_item';
+            $hotelTbl = $wpdb->prefix . 'vie_hotel';
+            $place    = implode(',', array_fill(0, count($orderIds), '%d'));
+            $sql = "
+                SELECT
+                    i.order_id,
+                    GROUP_CONCAT(DISTINCT h.name ORDER BY h.name SEPARATOR ', ') AS hotel_names,
+                    SUM(i.room_subtotal + i.extra_adult_total + i.child_surcharge_total) AS hotel_subtotal,
+                    SUM(i.ticket_subtotal) AS ticket_subtotal
+                FROM {$itemTbl} i
+                LEFT JOIN {$hotelTbl} h ON h.id = i.hotel_id
+                WHERE i.order_id IN ({$place})
+                GROUP BY i.order_id
+            ";
+            $aggRows = $wpdb->get_results($wpdb->prepare($sql, ...$orderIds), ARRAY_A) ?: [];
+            foreach ($aggRows as $ar) {
+                $aggregates[(int) $ar['order_id']] = [
+                    'hotel_names'     => (string) ($ar['hotel_names'] ?? ''),
+                    'hotel_subtotal'  => (float) $ar['hotel_subtotal'],
+                    'ticket_subtotal' => (float) $ar['ticket_subtotal'],
+                ];
+            }
+        }
+
+        foreach ($rows as &$row) {
+            $agg = $aggregates[(int) ($row['id'] ?? 0)] ?? null;
+            $row['hotel_names']     = $agg['hotel_names'] ?? '';
+            $row['hotel_subtotal']  = $agg['hotel_subtotal'] ?? 0.0;
+            $row['ticket_subtotal'] = $agg['ticket_subtotal'] ?? 0.0;
+        }
+        unset($row);
+
+        return $rows;
     }
 
     public function canUserViewOrder(int $userId, array $order): bool

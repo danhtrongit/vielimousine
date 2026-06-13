@@ -208,9 +208,33 @@ final class RestRouter
 
         // Phase 18: reports + users lookup
         register_rest_route(VIE_API_NAMESPACE, '/users', [
-            'methods'             => 'GET',
-            'callback'            => [UserController::class, 'index'],
-            'permission_callback' => AuthMiddleware::requireCap('vie_view_reports'),
+            [
+                'methods'             => 'GET',
+                'callback'            => [UserController::class, 'index'],
+                'permission_callback' => AuthMiddleware::requireCap('vie_view_reports'),
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [UserController::class, 'store'],
+                'permission_callback' => AuthMiddleware::requireCap('vie_manage_users'),
+            ],
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/users/(?P<id>\\d+)', [
+            [
+                'methods'             => 'GET',
+                'callback'            => [UserController::class, 'show'],
+                'permission_callback' => AuthMiddleware::requireCap('vie_manage_users'),
+            ],
+            [
+                'methods'             => 'PUT,PATCH',
+                'callback'            => [UserController::class, 'update'],
+                'permission_callback' => AuthMiddleware::requireCap('vie_manage_users'),
+            ],
+            [
+                'methods'             => 'DELETE',
+                'callback'            => [UserController::class, 'destroy'],
+                'permission_callback' => AuthMiddleware::requireCap('vie_manage_users'),
+            ],
         ]);
         register_rest_route(VIE_API_NAMESPACE, '/reports/by-hotel', [
             'methods'             => 'GET',
@@ -245,6 +269,10 @@ final class RestRouter
         register_rest_route(VIE_API_NAMESPACE, '/settings/invoice', [
             ['methods' => 'GET', 'callback' => [InvoiceController::class, 'getSettings'],   'permission_callback' => $manageSettings],
             ['methods' => 'PUT', 'callback' => [InvoiceController::class, 'updateSettings'],'permission_callback' => $manageSettings],
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/settings/order-sources', [
+            ['methods' => 'GET', 'callback' => [SettingsController::class, 'getSources'],   'permission_callback' => AuthMiddleware::requireLogin()],
+            ['methods' => 'PUT', 'callback' => [SettingsController::class, 'updateSources'],'permission_callback' => $manageSettings],
         ]);
         register_rest_route(VIE_API_NAMESPACE, '/settings/hotel-sync/run', [
             'methods'             => 'POST',

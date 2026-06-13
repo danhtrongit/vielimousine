@@ -60,6 +60,11 @@ export interface InvoiceSettingsResponse {
   config: InvoiceConfig;
 }
 
+export interface OrderSourceItem {
+  value: string;
+  label: string;
+}
+
 export const settingsApi = {
   getGeneral: () =>
     api.get<Envelope<GeneralConfig>>('/settings/general').then((r) => r.data),
@@ -81,6 +86,12 @@ export const settingsApi = {
 
   getInvoice: () =>
     api.get<Envelope<InvoiceSettingsResponse>>('/settings/invoice').then((r) => r.data),
+
+  getOrderSources: () =>
+    api.get<Envelope<{ sources: OrderSourceItem[] }>>('/settings/order-sources').then((r) => r.data),
+
+  updateOrderSources: (sources: OrderSourceItem[]) =>
+    api.put<Envelope<{ sources: OrderSourceItem[] }>>('/settings/order-sources', { sources }).then((r) => r.data),
 
   updateInvoice: (body: Partial<InvoiceConfig>) =>
     api.put<Envelope<InvoiceSettingsResponse>>('/settings/invoice', body).then((r) => r.data),

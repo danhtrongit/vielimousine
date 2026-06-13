@@ -48,6 +48,8 @@ const navItems = computed<NavItem[]>(() => [
     show: auth.can('vie_view_reports'), group: 'finance' },
   { label: 'Nhật ký', icon: 'pi pi-history', to: '/activity-log',
     show: auth.can('vie_view_audit'), group: 'system' },
+  { label: 'Thiết lập', icon: 'pi pi-sliders-h', to: '/setup',
+    show: auth.can('vie_manage_users'), group: 'system' },
   { label: 'Cài đặt', icon: 'pi pi-cog', to: '/settings',
     show: auth.can('vie_manage_settings'), group: 'system' },
 ].filter((m) => m.show));
