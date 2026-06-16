@@ -64,7 +64,8 @@ async function exportAll() {
   exporting.value = true;
   try {
     const resp = await ordersApi.list({ per_page: 5000 });
-    const rows = resp.data.map((o) => [
+    // Nháp là đơn chưa hoàn thiện — không đưa vào CSV xuất (đồng nhất với việc loại nháp khỏi báo cáo).
+    const rows = resp.data.filter((o) => o.status !== 'draft').map((o) => [
       o.code,
       o.customer_name,
       formatDate(o.checkin),
