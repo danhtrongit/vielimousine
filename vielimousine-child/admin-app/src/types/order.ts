@@ -1,14 +1,14 @@
 export interface Order {
   id: number;
-  code: string;
+  code: string | null;
   customer_id: number;
   customer_phone: string;
   customer_name: string;
   customer_email: string | null;
   sales_user_id: number | null;
   source: string;
-  checkin: string;
-  checkout: string;
+  checkin: string | null;
+  checkout: string | null;
   nights: number;
   adults: number;
   children: number;
@@ -22,7 +22,7 @@ export interface Order {
   currency: string;
   coupon_code: string | null;
   payment_status: 'pending' | 'partial' | 'paid' | 'refunded';
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+  status: 'draft' | 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
   invoice_number: string | null;
   checkin_code: string | null;
   checkin_code_sent_at: string | null;
@@ -33,6 +33,7 @@ export interface Order {
   internal_note: string | null;
   pickup: Record<string, unknown> | null;
   dropoff: Record<string, unknown> | null;
+  draft_payload: Record<string, unknown> | null;
   created_at: string;
   hotel_names: string;
   hotel_subtotal: number;
