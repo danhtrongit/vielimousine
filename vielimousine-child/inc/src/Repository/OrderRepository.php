@@ -34,7 +34,7 @@ final class OrderRepository extends AbstractRepository
             'invoice_number', 'voucher_code',
             'checkin_code', 'checkin_code_sent_at',
             'status', 'confirmed_at', 'cancelled_at', 'cancel_reason', 'completed_at',
-            'created_by', 'ip', 'user_agent',
+            'created_by', 'ip', 'user_agent', 'draft_payload',
         ];
     }
 
@@ -62,6 +62,7 @@ final class OrderRepository extends AbstractRepository
             'coupon_id'       => 'int',
             'paid_amount'     => 'float',
             'created_by'      => 'int',
+            'draft_payload'   => 'json',
         ];
     }
 
