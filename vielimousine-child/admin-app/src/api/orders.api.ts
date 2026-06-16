@@ -11,6 +11,14 @@ export const ordersApi = {
     api.post<Envelope<OrderDetail>>('/orders', body, {
       headers: idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : undefined,
     }).then(r => r.data),
+  saveDraft: (body: unknown) =>
+    api.post<Envelope<OrderDetail>>('/orders/draft', body).then(r => r.data),
+  updateDraft: (id: number, body: unknown) =>
+    api.put<Envelope<OrderDetail>>(`/orders/draft/${id}`, body).then(r => r.data),
+  getDraft: (id: number) =>
+    api.get<Envelope<OrderDetail>>(`/orders/draft/${id}`).then(r => r.data),
+  deleteDraft: (id: number) =>
+    api.delete<void>(`/orders/draft/${id}`).then(r => r.data),
   update: (id: number, body: Partial<Order>) =>
     api.put<Envelope<OrderDetail>>(`/orders/${id}`, body).then(r => r.data),
   cancel: (id: number, reason: string, refundAmount = 0) =>
