@@ -129,6 +129,31 @@ final class RestRouter
         // Orders — viewable by sales (filtered via queryScope); creatable by sales+
         self::crudWithCaps('orders', OrderController::class, 'vie_create_orders', 'vie_view_own_orders');
 
+        // Order drafts — lưu nháp đơn (status='draft'); cùng cap với tạo đơn.
+        // 'draft' không khớp regex \d+ nên không đụng route '/orders/{id}'.
+        register_rest_route(VIE_API_NAMESPACE, '/orders/draft', [
+            'methods'             => 'POST',
+            'callback'            => [OrderController::class, 'storeDraft'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_create_orders'),
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/orders/draft/(?P<id>\\d+)', [
+            [
+                'methods'             => 'GET',
+                'callback'            => [OrderController::class, 'showDraft'],
+                'permission_callback' => AuthMiddleware::requireCap('vie_create_orders'),
+            ],
+            [
+                'methods'             => 'PUT,PATCH',
+                'callback'            => [OrderController::class, 'updateDraft'],
+                'permission_callback' => AuthMiddleware::requireCap('vie_create_orders'),
+            ],
+            [
+                'methods'             => 'DELETE',
+                'callback'            => [OrderController::class, 'destroyDraft'],
+                'permission_callback' => AuthMiddleware::requireCap('vie_create_orders'),
+            ],
+        ]);
+
         // Order items
         self::crudWithCaps('order-items', OrderItemController::class, 'vie_manage_orders', 'vie_view_own_orders');
 

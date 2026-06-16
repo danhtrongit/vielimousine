@@ -15,6 +15,8 @@ use Vie\Service\Payment\SepayCheckout;
 use Vie\Support\ResponseEnvelope;
 use Vie\Support\Validator;
 use Vie\Validation\Schemas\OrderCreateValidation;
+use Vie\Service\Order\OrderDraftService;
+use Vie\Validation\Schemas\OrderDraftValidation;
 
 final class OrderController
 {
@@ -175,6 +177,99 @@ final class OrderController
             ], 409);
         }
 
+        return new \WP_REST_Response(null, 204);
+    }
+
+    /**
+     * Object-level guard cho thao tác đơn NHÁP: phải tồn tại, đúng status='draft'
+     * và thuộc quyền xem của user (sales chỉ thấy nháp của mình).
+     */
+    private static function ensureCanAccessDraft(int $orderId): ?\WP_REST_Response
+    {
+        $repo  = Container::get(OrderRepository::class);
+        $order = $repo->find($orderId);
+        if ($order === null || ($order['status'] ?? '') !== 'draft') {
+            return ResponseEnvelope::notFound('Đơn nháp');
+        }
+        $userId = (int) get_current_user_id();
+        if (!$repo->canUserViewOrder($userId, $order)) {
+            return ResponseEnvelope::error([
+                ['code' => 'forbidden', 'field' => null, 'message' => 'Bạn không có quyền thao tác với đơn nháp này'],
+            ], 403);
+        }
+        return null;
+    }
+
+    public static function storeDraft(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $data = $request->get_json_params() ?? [];
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $v = Validator::validate($data, OrderDraftValidation::rules());
+        if ($v->fails()) {
+            return ResponseEnvelope::error($v->errors(), 422);
+        }
+
+        $svc   = Container::get(OrderDraftService::class);
+        $draft = $svc->save($v->validated(), (int) get_current_user_id());
+        return ResponseEnvelope::success($draft, [], 201);
+    }
+
+    public static function updateDraft(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $id = (int) $request->get_param('id');
+        if ($denied = self::ensureCanAccessDraft($id)) {
+            return $denied;
+        }
+
+        $data = $request->get_json_params() ?? [];
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $v = Validator::validate($data, OrderDraftValidation::rules());
+        if ($v->fails()) {
+            return ResponseEnvelope::error($v->errors(), 422);
+        }
+
+        try {
+            $svc   = Container::get(OrderDraftService::class);
+            $draft = $svc->update($id, $v->validated(), (int) get_current_user_id());
+            return ResponseEnvelope::success($draft);
+        } catch (OrderNotFoundException $e) {
+            return ResponseEnvelope::notFound('Đơn nháp');
+        }
+    }
+
+    public static function showDraft(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $id = (int) $request->get_param('id');
+        if ($denied = self::ensureCanAccessDraft($id)) {
+            return $denied;
+        }
+
+        try {
+            $svc = Container::get(OrderDraftService::class);
+            return ResponseEnvelope::success($svc->get($id, (int) get_current_user_id()));
+        } catch (OrderNotFoundException $e) {
+            return ResponseEnvelope::notFound('Đơn nháp');
+        }
+    }
+
+    public static function destroyDraft(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $id = (int) $request->get_param('id');
+        if ($denied = self::ensureCanAccessDraft($id)) {
+            return $denied;
+        }
+
+        try {
+            Container::get(OrderDraftService::class)->delete($id);
+        } catch (OrderNotFoundException $e) {
+            return ResponseEnvelope::notFound('Đơn nháp');
+        }
         return new \WP_REST_Response(null, 204);
     }
 }
