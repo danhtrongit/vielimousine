@@ -124,4 +124,15 @@ $leak = (int) $wpdb->get_var($wpdb->prepare(
 $assert('draft contributes 0 rows to item-joined report', $leak === 0);
 $draftSvc->delete((int) $dRep['id']);
 
+
+// --- Scenario 7: Update KHÔNG đổi chủ sở hữu (sales_user_id) ---
+echo "\nScenario 7: Update preserves draft ownership\n";
+$dOwn = $draftSvc->save(['customer_phone' => '0922000007', 'customer_name' => 'Owner A', 'source' => 'admin'], 101);
+$dOwnId = (int) $dOwn['id'];
+$assert('saved with owner 101', (int) ($dOwn['sales_user_id'] ?? 0) === 101);
+$draftSvc->update($dOwnId, ['customer_phone' => '0922000007', 'customer_name' => 'Owner A edited by 202', 'source' => 'admin'], 202);
+$afterOwn = $orderRepo->find($dOwnId);
+$assert('owner UNCHANGED after edit by another user', (int) ($afterOwn['sales_user_id'] ?? 0) === 101);
+$draftSvc->delete($dOwnId);
+
 echo "\n--- Draft E2E done ---\n";

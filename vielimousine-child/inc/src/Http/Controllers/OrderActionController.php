@@ -36,11 +36,29 @@ final class OrderActionController
         return null;
     }
 
+    /**
+     * Đơn nháp (status='draft') không đi qua state machine. Trả lỗi rõ ràng
+     * thay vì IllegalTransitionException khó hiểu khi gọi cancel/transition lên nháp.
+     */
+    private static function rejectIfDraft(int $orderId): ?\WP_REST_Response
+    {
+        $order = Container::get(OrderRepository::class)->find($orderId);
+        if ($order !== null && ($order['status'] ?? '') === 'draft') {
+            return ResponseEnvelope::error([
+                ['code' => 'draft_not_supported', 'field' => null, 'message' => 'Đơn nháp không hỗ trợ thao tác này — dùng "Xóa nháp" để bỏ nháp.'],
+            ], 409);
+        }
+        return null;
+    }
+
     public static function transition(\WP_REST_Request $request): \WP_REST_Response
     {
         $id = (int) $request->get_param('id');
         if ($denied = self::ensureCanAccess($id)) {
             return $denied;
+        }
+        if ($draftDenied = self::rejectIfDraft($id)) {
+            return $draftDenied;
         }
 
         $body = $request->get_json_params();
@@ -168,6 +186,9 @@ final class OrderActionController
         $id = (int) $request->get_param('id');
         if ($denied = self::ensureCanAccess($id)) {
             return $denied;
+        }
+        if ($draftDenied = self::rejectIfDraft($id)) {
+            return $draftDenied;
         }
 
         $body = $request->get_json_params();

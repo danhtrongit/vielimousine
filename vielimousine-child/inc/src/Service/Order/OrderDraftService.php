@@ -20,9 +20,10 @@ final class OrderDraftService
      */
     public function save(array $data, int $userId): array
     {
-        $row = $this->buildRow($data, $userId);
-        $row['status']     = 'draft';
-        $row['created_by'] = $userId ?: null;
+        $row = $this->buildRow($data);
+        $row['status']        = 'draft';
+        $row['sales_user_id'] = $userId ?: null;
+        $row['created_by']    = $userId ?: null;
 
         $order = $this->orderRepo->create($row);
 
@@ -43,8 +44,12 @@ final class OrderDraftService
     /** Cập nhật nháp đang có; chỉ cho phép khi status vẫn là 'draft'. */
     public function update(int $id, array $data, int $userId): array
     {
+        // Ownership (sales_user_id/created_by) is set once at save() and NEVER
+        // reassigned on edit — tránh quản lý sửa nháp rồi vô tình "chiếm" nháp của sale.
+        // Lưu ý: update là FULL-REPLACE các cột preview — frontend luôn gửi nguyên
+        // state wizard mỗi lần lưu, nên nháp phản ánh đúng wizard (kể cả field đã xóa).
         $this->assertDraft($id);
-        $this->orderRepo->update($id, $this->buildRow($data, $userId));
+        $this->orderRepo->update($id, $this->buildRow($data));
         return $this->orderRepo->findOrFail($id);
     }
 
@@ -71,7 +76,7 @@ final class OrderDraftService
     }
 
     /** Map payload từ wizard sang các cột preview + draft_payload JSON. */
-    private function buildRow(array $data, int $userId): array
+    private function buildRow(array $data): array
     {
         return [
             'customer_phone' => (string) ($data['customer_phone'] ?? ''),
@@ -89,7 +94,6 @@ final class OrderDraftService
             'subtotal'       => isset($data['subtotal']) ? (int) $data['subtotal'] : 0,
             'discount'       => isset($data['discount']) ? (int) $data['discount'] : 0,
             'total'          => isset($data['total'])    ? (int) $data['total']    : 0,
-            'sales_user_id'  => $userId ?: null,
             'draft_payload'  => $data['draft_payload'] ?? null,
         ];
     }
