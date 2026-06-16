@@ -122,6 +122,7 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ORDER_STATUSES = [
+  { label: 'Nháp', value: 'draft', severity: 'secondary' },
   { label: 'Chờ thanh toán', value: 'pending', severity: 'warning' },
   { label: 'Đã xác nhận', value: 'confirmed', severity: 'info' },
   { label: 'Hoàn tất', value: 'completed', severity: 'success' },
