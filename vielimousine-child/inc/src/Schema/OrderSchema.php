@@ -5,7 +5,7 @@ namespace Vie\Schema;
 
 final class OrderSchema
 {
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.2.0';
 
     public static function install(\wpdb $wpdb): void
     {
@@ -14,18 +14,18 @@ final class OrderSchema
 
         $sql = "CREATE TABLE {$table} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            code VARCHAR(20) NOT NULL,
+            code VARCHAR(20) DEFAULT NULL,
             idempotency_key VARCHAR(64) DEFAULT NULL,
-            customer_id BIGINT UNSIGNED NOT NULL,
+            customer_id BIGINT UNSIGNED DEFAULT NULL,
             customer_phone VARCHAR(50) NOT NULL,
             customer_name VARCHAR(255) NOT NULL,
             customer_email VARCHAR(255) DEFAULT NULL,
             customer_vat LONGTEXT DEFAULT NULL,
             sales_user_id BIGINT UNSIGNED DEFAULT NULL,
             source VARCHAR(50) NOT NULL,
-            checkin DATE NOT NULL,
-            checkout DATE NOT NULL,
-            nights TINYINT UNSIGNED NOT NULL,
+            checkin DATE DEFAULT NULL,
+            checkout DATE DEFAULT NULL,
+            nights TINYINT UNSIGNED DEFAULT NULL,
             adults TINYINT UNSIGNED NOT NULL,
             children TINYINT UNSIGNED NOT NULL DEFAULT 0,
             child_ages LONGTEXT DEFAULT NULL,
@@ -58,6 +58,7 @@ final class OrderSchema
             created_by BIGINT UNSIGNED DEFAULT NULL,
             ip VARCHAR(45) DEFAULT NULL,
             user_agent VARCHAR(500) DEFAULT NULL,
+            draft_payload LONGTEXT DEFAULT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),

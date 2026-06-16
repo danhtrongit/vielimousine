@@ -60,6 +60,7 @@ final class SchemaManager
 
         self::dropProductCode();
         self::backfillCustomerBookingCount();
+        self::migrateOrderDraftColumns();
     }
 
     /**
@@ -127,5 +128,37 @@ final class SchemaManager
         }
 
         update_option('vie_drop_product_code_v1', 'done', false);
+    }
+
+    /**
+     * One-shot migration: thêm cột draft_payload + nới NOT NULL cho các cột
+     * phục vụ đơn nháp dở dang (code/customer_id/checkin/checkout/nights).
+     * dbDelta không đáng tin khi đổi NULL-ability → dùng ALTER tường minh, idempotent.
+     */
+    private static function migrateOrderDraftColumns(): void
+    {
+        if (get_option('vie_order_draft_columns_v1') === 'done') {
+            return;
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . 'vie_order';
+
+        $hasDraftPayload = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'draft_payload'",
+            DB_NAME,
+            $table
+        ));
+        if ($hasDraftPayload === 0) {
+            $wpdb->query("ALTER TABLE {$table} ADD COLUMN draft_payload LONGTEXT DEFAULT NULL AFTER user_agent");
+        }
+
+        $wpdb->query("ALTER TABLE {$table} MODIFY code VARCHAR(20) DEFAULT NULL");
+        $wpdb->query("ALTER TABLE {$table} MODIFY customer_id BIGINT UNSIGNED DEFAULT NULL");
+        $wpdb->query("ALTER TABLE {$table} MODIFY checkin DATE DEFAULT NULL");
+        $wpdb->query("ALTER TABLE {$table} MODIFY checkout DATE DEFAULT NULL");
+        $wpdb->query("ALTER TABLE {$table} MODIFY nights TINYINT UNSIGNED DEFAULT NULL");
+
+        update_option('vie_order_draft_columns_v1', 'done', false);
     }
 }
