@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import Card from 'primevue/card';
 import Steps from 'primevue/steps';
 import Button from 'primevue/button';
@@ -23,6 +23,7 @@ import { customersApi } from '@/api/customers.api';
 import type { CustomerListItem } from '@/types/customer';
 
 const router = useRouter();
+const route = useRoute();
 const ui = useUIStore();
 const lookup = useLookupStore();
 const notify = useNotify();
@@ -63,6 +64,8 @@ const couponValid = ref<boolean | null>(null);
 const couponMessages = ref<string[]>([]);
 const submitting = ref(false);
 const quoting = ref(false);
+const draftId = ref<number | null>(null);
+const savingDraft = ref(false);
 const idempotencyKey = ref(generateUuid());
 
 // UUID v4 thủ công — crypto.randomUUID() chỉ work trong secure context (HTTPS/localhost),
@@ -195,6 +198,46 @@ const totalAfterCoupon = computed(() => {
   return Math.max(0, quote.value.subtotal - couponDiscount.value);
 });
 
+function buildDraftBody() {
+  const w = wizard.value;
+  return {
+    customer_phone: w.customer.phone,
+    customer_name: w.customer.name,
+    customer_email: w.customer.email || null,
+    source: w.source,
+    customer_note: w.customerNote || null,
+    coupon_code: w.couponCode.trim() || null,
+    checkin: w.item.checkin ? toDateStr(w.item.checkin) : null,
+    checkout: w.item.checkout ? toDateStr(w.item.checkout) : null,
+    nights: quote.value?.nights ?? null,
+    adults: w.item.adults,
+    children: w.item.child_ages.length,
+    child_ages: w.item.child_ages,
+    subtotal: quote.value?.subtotal ?? 0,
+    discount: couponDiscount.value,
+    total: totalAfterCoupon.value,
+    draft_payload: { wizard: w, stepIndex: stepIndex.value },
+  };
+}
+
+async function saveDraft() {
+  savingDraft.value = true;
+  try {
+    const body = buildDraftBody();
+    if (draftId.value) {
+      await ordersApi.updateDraft(draftId.value, body);
+    } else {
+      const resp = await ordersApi.saveDraft(body);
+      draftId.value = resp.data.id;
+    }
+    notify.success('Đã lưu nháp', 'Có thể tiếp tục sau trong danh sách đơn');
+  } catch (e) {
+    notify.apiError(e, 'Không lưu được nháp');
+  } finally {
+    savingDraft.value = false;
+  }
+}
+
 // --- Step 5: Submit ---
 async function submit() {
   if (!quote.value) return;
@@ -220,7 +263,10 @@ async function submit() {
       coupon_code: wizard.value.couponCode.trim() || null,
     };
     const resp = await ordersApi.create(body, idempotencyKey.value);
-    notify.success('Đã tạo đơn', resp.data.code);
+    if (draftId.value) {
+      try { await ordersApi.deleteDraft(draftId.value); } catch { /* nháp mồ côi — xóa tay sau, không chặn */ }
+    }
+    notify.success('Đã tạo đơn', resp.data.code ?? '');
     router.push(`/orders/${resp.data.id}`);
   } catch (e) {
     notify.apiError(e, 'Không tạo được đơn');
@@ -229,7 +275,33 @@ async function submit() {
   }
 }
 
-onMounted(() => { lookup.ensureLoaded(); });
+onMounted(async () => {
+  lookup.ensureLoaded();
+  const draftQ = route.query.draft;
+  if (!draftQ) return;
+  const id = Number(draftQ);
+  if (!Number.isFinite(id) || id <= 0) return;
+  try {
+    const resp = await ordersApi.getDraft(id);
+    const payload = resp.data.draft_payload as { wizard?: typeof wizard.value; stepIndex?: number } | null;
+    if (payload?.wizard) {
+      wizard.value = payload.wizard;
+      stepIndex.value = payload.stepIndex ?? 0;
+    }
+    draftId.value = id;
+    ui.setBreadcrumb([
+      { label: 'Đơn hàng', to: '/orders' },
+      { label: 'Tiếp tục nháp' },
+    ]);
+    const it = wizard.value.item;
+    if (it.room_id && it.checkin && it.checkout) {
+      await runQuote();
+      if (wizard.value.couponCode.trim()) await validateCoupon();
+    }
+  } catch (e) {
+    notify.apiError(e, 'Không tải được nháp');
+  }
+});
 </script>
 
 <template>
@@ -432,7 +504,10 @@ onMounted(() => { lookup.ensureLoaded(); });
 
       <template #footer>
         <div class="wizard-footer">
-          <Button label="Quay lại" severity="secondary" outlined :disabled="stepIndex === 0 || submitting" @click="prevStep" />
+          <div class="wizard-footer-left">
+            <Button label="Quay lại" severity="secondary" outlined :disabled="stepIndex === 0 || submitting" @click="prevStep" />
+            <Button label="Lưu nháp" icon="pi pi-save" severity="secondary" text :loading="savingDraft" :disabled="submitting" @click="saveDraft" />
+          </div>
           <Button
             v-if="stepIndex < steps.length - 1"
             label="Tiếp"
@@ -482,4 +557,5 @@ onMounted(() => { lookup.ensureLoaded(); });
 .confirm-total { border-top: 2px solid var(--p-surface-300); padding-top: 0.75rem; margin-top: 0.5rem; font-size: 1.05rem; }
 .confirm-total strong { color: var(--p-primary-700); font-size: 1.2rem; }
 .wizard-footer { display: flex; justify-content: space-between; padding: 1rem 1.5rem; background: var(--p-surface-50); border-top: 1px solid var(--p-surface-200); }
+.wizard-footer-left { display: flex; gap: 0.5rem; }
 </style>
