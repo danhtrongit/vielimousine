@@ -73,7 +73,7 @@ async function load() {
     checkinCodeInput.value = resp.data.checkin_code ?? '';
     ui.setBreadcrumb([
       { label: 'Đơn hàng', to: '/orders' },
-      { label: order.value.code },
+      { label: order.value.code ?? '' },
     ]);
   } catch (e) {
     notify.apiError(e, 'Không tải được đơn hàng');
@@ -284,7 +284,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
     <ProgressSpinner />
   </div>
   <div v-else-if="order">
-    <PageHeader :title="order.code" subtitle="Chi tiết đơn hàng" icon="pi pi-shopping-cart">
+    <PageHeader :title="order.code ?? ''" subtitle="Chi tiết đơn hàng" icon="pi pi-shopping-cart">
       <Can cap="vie_manage_orders">
         <Button
           v-for="t in allowedTransitions"
@@ -610,7 +610,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
     <InvoiceDialog
       v-if="order"
       v-model:visible="invoiceDialog"
-      :order="{ id: order.id, code: order.code, invoice_number: order.invoice_number, status: order.status }"
+      :order="{ id: order.id, code: order.code ?? '', invoice_number: order.invoice_number, status: order.status }"
       @assigned="onInvoiceAssigned"
     />
   </div>

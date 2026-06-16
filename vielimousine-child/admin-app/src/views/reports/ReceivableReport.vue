@@ -15,13 +15,13 @@ const csv = useCsvExport();
 const receivables = computed(() => {
   return props.orders
     .filter((o) =>
-      ['cancelled', 'no_show'].indexOf(o.status) === -1 &&
+      ['cancelled', 'no_show', 'draft'].indexOf(o.status) === -1 &&
       (o.paid_amount ?? 0) < (o.total ?? 0)
     )
     .map((o) => ({
       ...o,
       remaining: (o.total ?? 0) - (o.paid_amount ?? 0),
-      is_overdue: new Date(o.checkin) < new Date(),
+      is_overdue: o.checkin ? new Date(o.checkin) < new Date() : false,
     }))
     .sort((a, b) => b.remaining - a.remaining);
 });
