@@ -41,7 +41,7 @@ final class HotelDeleteService
             "SELECT COUNT(*) FROM {$wpdb->prefix}vie_order_item oi
              INNER JOIN {$wpdb->prefix}vie_order o ON o.id = oi.order_id
              WHERE oi.hotel_id = %d
-               AND o.status NOT IN ('cancelled', 'no_show')
+               AND o.status NOT IN ('cancelled', 'no_show', 'draft')
                AND oi.status = 'active'",
             $hotelId
         ));

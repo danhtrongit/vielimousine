@@ -110,7 +110,7 @@ final class CustomerRepository extends AbstractRepository
         $orderTbl = $wpdb->prefix . 'vie_order';
         $count = (int) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$orderTbl} WHERE customer_id = %d AND status <> 'cancelled'",
+                "SELECT COUNT(*) FROM {$orderTbl} WHERE customer_id = %d AND status NOT IN ('cancelled', 'draft')",
                 $customerId
             )
         );
@@ -137,7 +137,7 @@ final class CustomerRepository extends AbstractRepository
                 LEFT JOIN (
                     SELECT customer_id, COUNT(*) AS cnt
                       FROM {$orderTbl}
-                     WHERE status <> 'cancelled'
+                     WHERE status NOT IN ('cancelled', 'draft')
                      GROUP BY customer_id
                 ) AS o ON o.customer_id = c.id
                    SET c.booking_count = COALESCE(o.cnt, 0)";

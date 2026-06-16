@@ -57,7 +57,7 @@ final class ReportsController
         $salesUserIds    = array_slice((array) $request->get_param('sales_user_ids'), 0, self::MAX_FILTER_LEN);
         $hotelIds        = array_slice((array) $request->get_param('hotel_ids'),      0, self::MAX_FILTER_LEN);
 
-        $where  = ["o.status != 'cancelled'", "i.status = 'active'", 'o.checkin >= %s', 'o.checkin <= %s'];
+        $where  = ["o.status NOT IN ('cancelled', 'draft')", "i.status = 'active'", 'o.checkin >= %s', 'o.checkin <= %s'];
         $params = [$dateFrom, $dateTo];
 
         if ($sources !== []) {
@@ -158,7 +158,7 @@ final class ReportsController
         $salesUserIds = array_slice((array) $request->get_param('sales_user_ids'), 0, self::MAX_FILTER_LEN);
         $hotelIds     = array_slice((array) $request->get_param('hotel_ids'),      0, self::MAX_FILTER_LEN);
 
-        $where  = ["o.status != 'cancelled'", "i.status = 'active'", 'o.created_at >= %s', 'o.created_at <= %s'];
+        $where  = ["o.status NOT IN ('cancelled', 'draft')", "i.status = 'active'", 'o.created_at >= %s', 'o.created_at <= %s'];
         $params = [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'];
 
         if ($sources !== []) {
