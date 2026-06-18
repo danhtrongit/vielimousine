@@ -64,6 +64,16 @@ $assert('items[0].qty preserved', ($so['items'][0]['qty'] ?? null) === 1);
 
 $si = CostVisibility::stripItemRows($sample['items']);
 $assert('stripItemRows removes cost_total', !array_key_exists('cost_total', $si[0]));
+$assert('stripItemRows removes profit_total', !array_key_exists('profit_total', $si[0]));
+
+$sos = CostVisibility::stripOrders([$sample]);
+$assert('stripOrders removes cost_total', !array_key_exists('cost_total', $sos[0]));
+$assert('stripOrders strips nested items', !array_key_exists('cost_total', $sos[0]['items'][0]));
+
+$sr = CostVisibility::stripItemRow(['cost_total' => 7, 'profit_total' => 3, 'qty' => 2]);
+$assert('stripItemRow removes cost_total', !array_key_exists('cost_total', $sr));
+$assert('stripItemRow removes profit_total', !array_key_exists('profit_total', $sr));
+$assert('stripItemRow keeps qty', ($sr['qty'] ?? null) === 2);
 
 $sw = CostVisibility::stripWritable(['customer_name' => 'X', 'cost_total' => 5, 'profit_total' => 3]);
 $assert('stripWritable removes cost_total', !array_key_exists('cost_total', $sw));
@@ -77,6 +87,8 @@ $ko = CostVisibility::stripOrder($sample);
 $assert('order.cost_total preserved', ($ko['cost_total'] ?? null) === 60);
 $assert('order.profit_total preserved', ($ko['profit_total'] ?? null) === 40);
 $assert('items[0].cost_total preserved', ($ko['items'][0]['cost_total'] ?? null) === 30);
+$kos = CostVisibility::stripOrders([$sample]);
+$assert('stripOrders keeps cost_total for admin', ($kos[0]['cost_total'] ?? null) === 60);
 $kw = CostVisibility::stripWritable(['cost_total' => 5]);
 $assert('stripWritable keeps cost_total for admin', ($kw['cost_total'] ?? null) === 5);
 
