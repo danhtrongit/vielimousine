@@ -135,11 +135,14 @@ if ($itemId > 0) {
     $sreq->set_param('id', $itemId);
     $one = OrderItemController::show($sreq)->get_data()['data'] ?? [];
     $assert('sales order-items show has no cost_total', is_array($one) && !array_key_exists('cost_total', $one));
+    $assert('sales order-items show has no profit_total', is_array($one) && !array_key_exists('profit_total', $one));
 
     // Authorized path unchanged.
     wp_set_current_user($mgrId);
     $mrows = OrderItemController::index($req)->get_data()['data'] ?? [];
     $assert('admin order-items index keeps cost_total', !empty($mrows) && array_key_exists('cost_total', $mrows[0]));
+    $mone = OrderItemController::show($sreq)->get_data()['data'] ?? [];
+    $assert('admin order-items show keeps cost_total', is_array($mone) && array_key_exists('cost_total', $mone));
 } else {
     echo "  • skip Scenario D — no order_item rows (run full suite for integration)\n";
 }
