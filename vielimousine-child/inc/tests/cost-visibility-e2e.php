@@ -191,4 +191,14 @@ if ($cancelId > 0) {
     echo "  • skip cancel — no cancellable order\n";
 }
 
+echo "Scenario F: draft endpoints strip cost/profit for sales\n";
+wp_set_current_user($salesId);
+$dreq = new \WP_REST_Request('POST', '/orders/draft');
+$dreq->set_header('Content-Type', 'application/json');
+$dreq->set_body(json_encode(['customer_name' => 'F2E Draft Test']));
+$dresp = \Vie\Http\Controllers\OrderController::storeDraft($dreq)->get_data();
+$ddata = $dresp['data'] ?? null;
+$assert('sales storeDraft has no cost_total', is_array($ddata) && !array_key_exists('cost_total', $ddata));
+$assert('sales storeDraft has no profit_total', is_array($ddata) && !array_key_exists('profit_total', $ddata));
+
 wp_set_current_user(0);

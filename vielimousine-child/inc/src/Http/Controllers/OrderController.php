@@ -215,7 +215,7 @@ final class OrderController
 
         $svc   = Container::get(OrderDraftService::class);
         $draft = $svc->save($v->validated(), (int) get_current_user_id());
-        return ResponseEnvelope::success($draft, [], 201);
+        return ResponseEnvelope::success(CostVisibility::stripOrder($draft), [], 201);
     }
 
     public static function updateDraft(\WP_REST_Request $request): \WP_REST_Response
@@ -238,7 +238,7 @@ final class OrderController
         try {
             $svc   = Container::get(OrderDraftService::class);
             $draft = $svc->update($id, $v->validated(), (int) get_current_user_id());
-            return ResponseEnvelope::success($draft);
+            return ResponseEnvelope::success(CostVisibility::stripOrder($draft));
         } catch (OrderNotFoundException $e) {
             return ResponseEnvelope::notFound('Đơn nháp');
         }
@@ -253,7 +253,7 @@ final class OrderController
 
         try {
             $svc = Container::get(OrderDraftService::class);
-            return ResponseEnvelope::success($svc->get($id, (int) get_current_user_id()));
+            return ResponseEnvelope::success(CostVisibility::stripOrder($svc->get($id, (int) get_current_user_id())));
         } catch (OrderNotFoundException $e) {
             return ResponseEnvelope::notFound('Đơn nháp');
         }
