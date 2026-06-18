@@ -52,6 +52,8 @@ const navItems = computed<NavItem[]>(() => [
     show: auth.can('vie_manage_users'), group: 'system' },
   { label: 'Cài đặt', icon: 'pi pi-cog', to: '/settings',
     show: auth.can('vie_manage_settings'), group: 'system' },
+  { label: 'Sao lưu', icon: 'pi pi-database', to: '/backup',
+    show: auth.can('vie_manage_backup'), group: 'system' },
 ].filter((m) => m.show));
 
 interface NavGroup { key: string; label: string; items: NavItem[] }
