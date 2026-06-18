@@ -25,9 +25,9 @@ final class BackupService
     {
         global $wpdb;
         $like = $wpdb->esc_like(self::allowPrefix()) . '%';
-        $rows = $wpdb->get_results(
+        $names = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT table_name AS n, table_rows AS r, ROUND((data_length+index_length)/1024/1024,2) AS mb
+                "SELECT table_name AS n, ROUND((data_length+index_length)/1024/1024,2) AS mb
                  FROM information_schema.tables
                  WHERE table_schema = DATABASE() AND table_name LIKE %s
                  ORDER BY table_name",
@@ -36,8 +36,16 @@ final class BackupService
             ARRAY_A
         );
         $out = [];
-        foreach ((array) $rows as $r) {
-            $out[] = ['name' => (string) $r['n'], 'rows' => (int) $r['r'], 'size_mb' => (float) $r['mb']];
+        foreach ((array) $names as $r) {
+            $name = (string) $r['n'];
+            if (!self::isAllowed($name) || !preg_match('/^[A-Za-z0-9_]+$/', $name)) {
+                continue;
+            }
+            $out[] = [
+                'name'    => $name,
+                'rows'    => (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$name}`"),
+                'size_mb' => (float) $r['mb'],
+            ];
         }
         return $out;
     }
@@ -46,14 +54,18 @@ final class BackupService
     public static function export(array $tables): string
     {
         global $wpdb;
+        $valid = array_values(array_filter($tables, static fn($t) => self::isAllowed((string) $t) && preg_match('/^[A-Za-z0-9_]+$/', (string) $t)));
         $out  = "-- Vielimousine backup " . gmdate('Y-m-d H:i:s') . " UTC\n";
-        $out .= "-- tables: " . implode(', ', $tables) . "\n";
+        $out .= "-- tables: " . implode(', ', $valid) . "\n";
         $out .= "SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\n\n";
 
         foreach ($tables as $t) {
             $t = (string) $t;
             if (!self::isAllowed($t)) {
                 continue;
+            }
+            if (!preg_match('/^[A-Za-z0-9_]+$/', $t)) {
+                continue; // tên bảng không hợp lệ — chặn injection qua identifier
             }
             $create = $wpdb->get_row("SHOW CREATE TABLE `{$t}`", ARRAY_N);
             if (!$create || !isset($create[1])) {
