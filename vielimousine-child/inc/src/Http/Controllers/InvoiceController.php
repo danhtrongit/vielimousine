@@ -30,6 +30,11 @@ final class InvoiceController
             ], 422);
         }
 
+        // Kiểm tra quyền sở hữu đơn TRƯỚC mọi xử lý (chống IDOR — vie_sales chỉ in được đơn của mình).
+        if ($denied = self::ensureOrderAccessible($orderId)) {
+            return $denied;
+        }
+
         $settings = Container::get(InvoiceSettings::class);
         if (!$settings->isConfigured()) {
             return ResponseEnvelope::error([
@@ -110,6 +115,11 @@ final class InvoiceController
             ], 422);
         }
 
+        // Kiểm tra quyền sở hữu đơn TRƯỚC khi render (chống IDOR — vie_sales chỉ in được đơn của mình).
+        if ($denied = self::ensureOrderAccessible($orderId)) {
+            return $denied;
+        }
+
         $settings = Container::get(InvoiceSettings::class);
         if (!$settings->isConfigured()) {
             return ResponseEnvelope::error([
@@ -159,6 +169,27 @@ final class InvoiceController
         $resp = new \WP_REST_Response('', 200);
         $resp->header('Content-Type', 'application/pdf');
         return $resp;
+    }
+
+    /**
+     * Chặn nếu đơn không tồn tại (404) hoặc user không có quyền xem đơn (403).
+     * vie_view_all_orders xem mọi đơn; vie_view_own_orders chỉ xem đơn của mình.
+     */
+    private static function ensureOrderAccessible(int $orderId): ?\WP_REST_Response
+    {
+        $orderRepo = Container::get(OrderRepository::class);
+        $order = $orderRepo->find($orderId);
+        if ($order === null) {
+            return ResponseEnvelope::error([
+                ['code' => 'not_found', 'field' => null, 'message' => 'Không tìm thấy đơn hàng'],
+            ], 404);
+        }
+        if (!$orderRepo->canUserViewOrder((int) get_current_user_id(), $order)) {
+            return ResponseEnvelope::error([
+                ['code' => 'forbidden', 'field' => null, 'message' => 'Bạn không có quyền xem hoá đơn của đơn này'],
+            ], 403);
+        }
+        return null;
     }
 
     /**

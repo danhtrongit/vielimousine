@@ -155,8 +155,8 @@ final class RestRouter
             ],
         ]);
 
-        // Order items
-        self::crudWithCaps('order-items', OrderItemController::class, 'vie_manage_orders', 'vie_view_own_orders');
+        // Order items — READ-ONLY. Tạo/sửa/xoá phải đi qua OrderService (tồn kho + tổng tiền).
+        self::readOnlyWithCaps('order-items', OrderItemController::class, 'vie_view_own_orders');
 
         // Coupons
         self::crudWithCaps('coupons', CouponController::class, 'vie_manage_coupons', 'vie_manage_coupons');

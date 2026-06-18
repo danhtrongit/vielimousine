@@ -120,11 +120,21 @@ if ($orderId > 0) {
     echo "  • skip Scenario C — no order rows (run full suite for integration)\n";
 }
 
-echo "Scenario D: OrderItemController::index strips cost/profit for sales\n";
-$itemId = (int) $GLOBALS['wpdb']->get_var("SELECT id FROM {$GLOBALS['wpdb']->prefix}vie_order_item ORDER BY id DESC LIMIT 1");
-if ($itemId > 0) {
+echo "Scenario D: OrderItemController index/show strips cost/profit for sales (on OWN order)\n";
+$itemRow = $GLOBALS['wpdb']->get_row(
+    "SELECT id, order_id FROM {$GLOBALS['wpdb']->prefix}vie_order_item ORDER BY id DESC LIMIT 1",
+    ARRAY_A
+);
+if ($itemRow) {
+    $itemId     = (int) $itemRow['id'];
+    $ownOrderId = (int) $itemRow['order_id'];
+    // Make the sales user the OWNER so they can legitimately read it; then verify stripping.
+    // (Reading another seller's order-items is an IDOR — covered by authz-idor-e2e.php.)
+    $GLOBALS['wpdb']->update("{$GLOBALS['wpdb']->prefix}vie_order", ['sales_user_id' => $salesId], ['id' => $ownOrderId]);
+
     wp_set_current_user($salesId);
     $req = new \WP_REST_Request('GET', '/order-items');
+    $req->set_param('order_id', $ownOrderId);
     $req->set_param('per_page', 5);
     $rows = OrderItemController::index($req)->get_data()['data'] ?? [];
     $assert('order-items index returns rows', is_array($rows) && count($rows) > 0);
@@ -152,9 +162,10 @@ if ($itemId > 0) {
 echo "Scenario E: cancel + invoice/data strip cost/profit for sales\n";
 $wpdb = $GLOBALS['wpdb'];
 
-// --- invoice/data (gated by vie_print_order which sales HAS; no IDOR) ---
+// --- invoice/data (gated by vie_print_order + order ownership; force sales ownership) ---
 $invOrderId = (int) $wpdb->get_var("SELECT id FROM {$wpdb->prefix}vie_order ORDER BY id DESC LIMIT 1");
 if ($invOrderId > 0) {
+    $wpdb->update("{$wpdb->prefix}vie_order", ['sales_user_id' => $salesId], ['id' => $invOrderId]); // sales owns it
     \Vie\Container::get(\Vie\Service\Settings\InvoiceSettings::class)->update(['company_name' => 'E2E Test Co']);
     $ireq = new \WP_REST_Request('GET', '/orders/' . $invOrderId . '/invoice/data');
     $ireq->set_param('id', $invOrderId);
