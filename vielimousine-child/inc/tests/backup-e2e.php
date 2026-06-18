@@ -62,4 +62,16 @@ catch (\RuntimeException $e) { $rejected = true; }
 $assert('restore rejects non-allowlisted table', $rejected);
 $assert('users table untouched', (int)$wpdb->get_var("SELECT COUNT(*) FROM `{$wpdb->prefix}users` WHERE ID=999") === 0);
 
+$rejDrop = false;
+try { BackupService::restore("DROP TABLE `{$wpdb->prefix}users`;"); } catch (\RuntimeException $e) { $rejDrop = true; }
+$assert('restore rejects DROP TABLE (no IF EXISTS) on users', $rejDrop);
+
+$rejUpd = false;
+try { BackupService::restore("UPDATE `{$wpdb->prefix}options` SET option_value='x' WHERE option_id=1;"); } catch (\RuntimeException $e) { $rejUpd = true; }
+$assert('restore rejects UPDATE on options', $rejUpd);
+
+$rejTrunc = false;
+try { BackupService::restore("TRUNCATE TABLE `{$wpdb->prefix}users`;"); } catch (\RuntimeException $e) { $rejTrunc = true; }
+$assert('restore rejects TRUNCATE on users', $rejTrunc);
+
 $wpdb->query("DROP TABLE IF EXISTS `$T`");           // cleanup

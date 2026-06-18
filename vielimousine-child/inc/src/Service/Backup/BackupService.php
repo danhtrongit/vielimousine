@@ -108,8 +108,22 @@ final class BackupService
     {
         global $wpdb;
 
-        preg_match_all('/(?:DROP\s+TABLE\s+IF\s+EXISTS|CREATE\s+TABLE|INSERT\s+INTO)\s+`?([A-Za-z0-9_]+)`?/i', $sql, $m);
-        $tables = array_values(array_unique($m[1]));
+        // Quét MỌI câu lệnh có thể chạm bảng (defense-in-depth, không chỉ output của export()).
+        preg_match_all(
+            '/(?:DROP\s+TABLE(?:\s+IF\s+EXISTS)?'
+          . '|TRUNCATE(?:\s+TABLE)?'
+          . '|CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?'
+          . '|ALTER\s+TABLE'
+          . '|RENAME\s+TABLE'
+          . '|INSERT(?:\s+IGNORE)?\s+INTO'
+          . '|REPLACE(?:\s+INTO)?'
+          . '|UPDATE(?:\s+LOW_PRIORITY)?(?:\s+IGNORE)?'
+          . ')\s+`?([A-Za-z0-9_]+)`?/i',
+            $sql, $m
+        );
+        // RENAME TABLE `a` TO `b` — bắt cả tên đích.
+        preg_match_all('/RENAME\s+TABLE\s+`?[A-Za-z0-9_]+`?\s+TO\s+`?([A-Za-z0-9_]+)`?/i', $sql, $m2);
+        $tables = array_values(array_unique(array_merge($m[1], $m2[1])));
         $bad = array_values(array_filter($tables, static fn($t) => !self::isAllowed($t)));
         if ($bad) {
             throw new \RuntimeException('Bảng ngoài phạm vi cho phép: ' . implode(', ', $bad));
@@ -120,7 +134,9 @@ final class BackupService
         $errors = [];
         $stmts = 0;
 
-        if (mysqli_multi_query($dbh, $full)) {
+        if (!mysqli_multi_query($dbh, $full)) {
+            $errors[] = mysqli_error($dbh) ?: 'multi_query failed';
+        } else {
             do {
                 $stmts++;
                 if ($r = mysqli_store_result($dbh)) {
@@ -130,10 +146,10 @@ final class BackupService
                     break;
                 }
             } while (mysqli_next_result($dbh));
-        }
-        $err = mysqli_error($dbh);
-        if ($err !== '') {
-            $errors[] = $err;
+            $e = mysqli_error($dbh); // câu lệnh lỗi (nếu có) làm next_result trả false
+            if ($e !== '') {
+                $errors[] = $e;
+            }
         }
         $wpdb->flush();
 
