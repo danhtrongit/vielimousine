@@ -74,4 +74,13 @@ $rejTrunc = false;
 try { BackupService::restore("TRUNCATE TABLE `{$wpdb->prefix}users`;"); } catch (\RuntimeException $e) { $rejTrunc = true; }
 $assert('restore rejects TRUNCATE on users', $rejTrunc);
 
+$rejDelete = false;
+try { BackupService::restore("DELETE FROM `{$wpdb->prefix}users` WHERE ID=999;"); } catch (\RuntimeException $e) { $rejDelete = true; }
+$assert('restore rejects DELETE FROM users', $rejDelete);
+$assert('users untouched after DELETE attempt', (int)$wpdb->get_var("SELECT COUNT(*) FROM `{$wpdb->prefix}users` WHERE ID=999") === 0);
+
+$rejBacktick = false;
+try { BackupService::restore("SOMETHING WEIRD `{$wpdb->prefix}options` blah;"); } catch (\RuntimeException $e) { $rejBacktick = true; }
+$assert('restore rejects any backticked non-vie table (verb-independent)', $rejBacktick);
+
 $wpdb->query("DROP TABLE IF EXISTS `$T`");           // cleanup

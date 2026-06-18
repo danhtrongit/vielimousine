@@ -108,7 +108,9 @@ final class BackupService
     {
         global $wpdb;
 
-        // Quét MỌI câu lệnh có thể chạm bảng (defense-in-depth, không chỉ output của export()).
+        $wpPrefix = $wpdb->prefix; // vd "wpte_"
+
+        // (a) Tên bảng đứng sau các verb chạm bảng (kể cả không backtick), gồm DELETE.
         preg_match_all(
             '/(?:DROP\s+TABLE(?:\s+IF\s+EXISTS)?'
           . '|TRUNCATE(?:\s+TABLE)?'
@@ -118,12 +120,17 @@ final class BackupService
           . '|INSERT(?:\s+IGNORE)?\s+INTO'
           . '|REPLACE(?:\s+INTO)?'
           . '|UPDATE(?:\s+LOW_PRIORITY)?(?:\s+IGNORE)?'
+          . '|DELETE(?:\s+FROM)?'
           . ')\s+`?([A-Za-z0-9_]+)`?/i',
             $sql, $m
         );
-        // RENAME TABLE `a` TO `b` — bắt cả tên đích.
+        // (b) Mọi tên đích của RENAME ... TO ...
         preg_match_all('/RENAME\s+TABLE\s+`?[A-Za-z0-9_]+`?\s+TO\s+`?([A-Za-z0-9_]+)`?/i', $sql, $m2);
-        $tables = array_values(array_unique(array_merge($m[1], $m2[1])));
+        // (c) Lớp bảo vệ tổng quát (chống whack-a-mole): MỌI identifier backtick có tiền tố WP.
+        //     Dump thật luôn backtick tên bảng; giá trị trong INSERT là chuỗi nháy đơn nên không khớp.
+        preg_match_all('/`(' . preg_quote($wpPrefix, '/') . '[A-Za-z0-9_]+)`/i', $sql, $m3);
+
+        $tables = array_values(array_unique(array_merge($m[1], $m2[1], $m3[1])));
         $bad = array_values(array_filter($tables, static fn($t) => !self::isAllowed($t)));
         if ($bad) {
             throw new \RuntimeException('Bảng ngoài phạm vi cho phép: ' . implode(', ', $bad));
