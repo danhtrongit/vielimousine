@@ -81,7 +81,12 @@ async function doRestore(): Promise<void> {
   restoring.value = true;
   try {
     const resp = await backupApi.restore(restoreSql.value, confirmText.value);
-    notify.success('Đã phục hồi', `${resp.data.tables_restored.length} bảng · snapshot: ${resp.data.snapshot_file}`);
+    const errs = resp.data.errors ?? [];
+    if (errs.length > 0) {
+      notify.apiError(null, `Phục hồi có lỗi (đã có snapshot ${resp.data.snapshot_file}): ${errs.join('; ')}`);
+    } else {
+      notify.success('Đã phục hồi', `${resp.data.tables_restored.length} bảng · snapshot: ${resp.data.snapshot_file}`);
+    }
     confirmText.value = '';
   } catch (e) {
     notify.apiError(e, 'Phục hồi thất bại');
