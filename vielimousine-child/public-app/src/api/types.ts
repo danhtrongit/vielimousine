@@ -42,7 +42,7 @@ export interface Quote {
   subtotal: number;
   discount: number;
   total: number;
-  cost_total: number;
+  // cost_total: bỏ — endpoint /quote public không trả giá vốn (xem QuoteController::quote).
   requires_quote: boolean;
   rooms_expanded: boolean;
   messages: string[];

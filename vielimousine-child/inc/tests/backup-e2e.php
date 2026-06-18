@@ -83,6 +83,37 @@ $rejBacktick = false;
 try { BackupService::restore("SOMETHING WEIRD `{$wpdb->prefix}options` blah;"); } catch (\RuntimeException $e) { $rejBacktick = true; }
 $assert('restore rejects any backticked non-vie table (verb-independent)', $rejBacktick);
 
+echo "Scenario C2: statement-type allowlist (reject statements with no allowlisted verb)\n";
+// Statements that reference NO table slip past the table-name allowlist; they must be
+// rejected by a positive statement-type allowlist (only SET NAMES / SET FOREIGN_KEY_CHECKS /
+// DROP TABLE IF EXISTS / CREATE TABLE / INSERT INTO / TRUNCATE TABLE on vie_* are allowed).
+$rejSelect = false;
+try { BackupService::restore("SELECT 1;"); } catch (\RuntimeException $e) { $rejSelect = true; }
+$assert('restore rejects bare SELECT (no allowlisted verb)', $rejSelect);
+
+$rejSetVar = false;
+try { BackupService::restore("SET @vie_probe := 1;"); } catch (\RuntimeException $e) { $rejSetVar = true; }
+$assert('restore rejects SET of arbitrary variable', $rejSetVar);
+
+$rejOutfile = false;
+try { BackupService::restore("SELECT 1 INTO OUTFILE '/tmp/vie_e2e_probe.sql';"); } catch (\RuntimeException $e) { $rejOutfile = true; }
+$assert('restore rejects SELECT ... INTO OUTFILE', $rejOutfile);
+
+// A legitimate vie_ dump must still round-trip through the allowlist unharmed.
+$Tx = $wpdb->prefix . 'vie_backup_test';
+$wpdb->query("DROP TABLE IF EXISTS `$Tx`");
+$wpdb->query("CREATE TABLE `$Tx` (id INT PRIMARY KEY, label VARCHAR(50) NOT NULL) ENGINE=InnoDB");
+$wpdb->query("INSERT INTO `$Tx` (id,label) VALUES (1,'still works; with semicolon')");
+$legitOk = false;
+try {
+    $r = BackupService::restore(BackupService::export([$Tx]));
+    $legitOk = empty($r['errors'])
+        && (int) $wpdb->get_var("SELECT COUNT(*) FROM `$Tx`") === 1
+        && $wpdb->get_var("SELECT label FROM `$Tx` WHERE id=1") === 'still works; with semicolon';
+} catch (\Throwable $e) { $legitOk = false; }
+$assert('restore still accepts a legit vie_ dump (incl. value with semicolon)', $legitOk);
+$wpdb->query("DROP TABLE IF EXISTS `$Tx`");
+
 $wpdb->query("DROP TABLE IF EXISTS `$T`");           // cleanup
 
 echo "Scenario D: controller endpoints\n";
@@ -124,5 +155,24 @@ $dataRes = $respRes->get_data()['data'] ?? [];
 $assert('controller restore returns snapshot_file', !empty($dataRes['snapshot_file']));
 $assert('controller restore lists the table', in_array($Td, $dataRes['tables_restored'] ?? [], true));
 $wpdb->query("DROP TABLE IF EXISTS `$Td`");
+
+echo "Scenario E: auto-snapshot directory is not web-accessible\n";
+$Te = $wpdb->prefix . 'vie_backup_test';
+$wpdb->query("DROP TABLE IF EXISTS `$Te`");
+$wpdb->query("CREATE TABLE `$Te` (id INT PRIMARY KEY, label VARCHAR(50) NOT NULL) ENGINE=InnoDB");
+$wpdb->query("INSERT INTO `$Te` (id,label) VALUES (1,'snap')");
+$reqE = new \WP_REST_Request('POST', '/backup/restore');
+$reqE->set_header('Content-Type', 'application/json');
+$reqE->set_body(json_encode(['sql' => \Vie\Service\Backup\BackupService::export([$Te]), 'confirm' => 'RESTORE']));
+$respE = \Vie\Http\Controllers\BackupController::restore($reqE);
+$assert('controller restore success -> 200 (snapshot path)', $respE->get_status() === 200);
+
+$bdir = wp_upload_dir()['basedir'] . '/vie-backups';
+$assert('snapshot dir has deny-all .htaccess', is_file($bdir . '/.htaccess') && stripos((string) @file_get_contents($bdir . '/.htaccess'), 'denied') !== false);
+$assert('snapshot dir has index.php', is_file($bdir . '/index.php'));
+
+$snapName = basename((string) ($respE->get_data()['data']['snapshot_file'] ?? ''));
+$assert('snapshot filename uses high-entropy suffix', (bool) preg_match('/^auto-[0-9]{8}-[0-9]{6}-[0-9a-f]{16}\.sql$/', $snapName), "got: {$snapName}");
+$wpdb->query("DROP TABLE IF EXISTS `$Te`");
 
 wp_set_current_user(0);

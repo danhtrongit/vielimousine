@@ -30,7 +30,7 @@ export interface PriceBreakdown {
   subtotal: number;
   discount: number;
   total: number;
-  cost_total: number;
+  // cost_total: bỏ — /quote public không trả giá vốn. Giá vốn order lấy từ endpoint order (gated CostVisibility).
   requires_quote: boolean;
   messages: string[];
   unavailable_date: string | null;

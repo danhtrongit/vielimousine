@@ -63,4 +63,15 @@ final readonly class PriceBreakdown
             'unavailable_date'      => $this->unavailableDate,
         ];
     }
+
+    /**
+     * Phiên bản an toàn cho client công khai: bỏ các trường nội bộ (giá vốn/biên lợi nhuận).
+     * Dùng cho endpoint /quote public. Bản đầy đủ toArray() chỉ dùng nội bộ (pricing_snapshot).
+     */
+    public function toPublicArray(): array
+    {
+        $data = $this->toArray();
+        unset($data['cost_total']);
+        return $data;
+    }
 }

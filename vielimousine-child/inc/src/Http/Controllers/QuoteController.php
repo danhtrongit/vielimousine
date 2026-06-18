@@ -39,7 +39,8 @@ final class QuoteController
             $req       = QuoteRequest::fromArray($v->validated());
             $calc      = Container::get(PriceCalculator::class);
             $breakdown = $calc->quote($req);
-            return ResponseEnvelope::success($breakdown->toArray());
+            // KHÔNG lộ cost_total (giá vốn) ra response public — chỉ trả bản công khai.
+            return ResponseEnvelope::success($breakdown->toPublicArray());
         } catch (RepositoryException $e) {
             return ResponseEnvelope::notFound('Phòng');
         }

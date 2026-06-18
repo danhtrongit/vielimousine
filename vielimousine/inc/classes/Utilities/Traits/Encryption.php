@@ -15,19 +15,32 @@ trait Encryption {
 	 * @return void
 	 */
 	private static function loadKeys(): void {
-		if ( is_null( self::$method ) || is_null( self::$secretKey ) ) {
-			$keyFile = INC_PATH . 'encryption-key.php';
-
-			if ( ! is_file( $keyFile ) ) {
-				throw new \RuntimeException( "Key file not found: $keyFile" );
-			}
-
-			include $keyFile;
-
-			// Set values from the included variables
-			self::$method    = $cipher_method ?? 'AES-128-CBC';
-			self::$secretKey = $secret_key ?? 'd24eebeca3db6407c18d4de572fff114';
+		if ( ! is_null( self::$method ) && ! is_null( self::$secretKey ) ) {
+			return;
 		}
+
+		$cipher_method = null;
+		$secret_key    = null;
+
+		$keyFile = INC_PATH . 'encryption-key.php';
+		if ( is_file( $keyFile ) ) {
+			include $keyFile; // đặt $cipher_method, $secret_key (ưu tiên hằng số / option)
+		}
+
+		// Hằng số wp-config (nếu có) luôn được ưu tiên — không hard-code khóa trong repo.
+		if ( \defined( 'VIE_ENCRYPTION_KEY' ) ) {
+			$secret_key = VIE_ENCRYPTION_KEY;
+		}
+		if ( \defined( 'VIE_ENCRYPTION_CIPHER' ) ) {
+			$cipher_method = VIE_ENCRYPTION_CIPHER;
+		}
+
+		if ( empty( $secret_key ) ) {
+			throw new \RuntimeException( 'Encryption key chưa được cấu hình (define VIE_ENCRYPTION_KEY trong wp-config.php).' );
+		}
+
+		self::$method    = $cipher_method ?: 'AES-128-CBC';
+		self::$secretKey = $secret_key;
 	}
 
 	// -------------------------------------------------------------

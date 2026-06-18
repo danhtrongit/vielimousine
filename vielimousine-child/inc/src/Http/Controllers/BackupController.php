@@ -52,11 +52,8 @@ final class BackupController
             preg_match_all('/(?:DROP\s+TABLE\s+IF\s+EXISTS|CREATE\s+TABLE|INSERT\s+INTO)\s+`?([A-Za-z0-9_]+)`?/i', $sql, $m);
             $refTables = array_values(array_filter(array_unique($m[1]), [BackupService::class, 'isAllowed']));
 
-            $dir = wp_upload_dir()['basedir'] . '/vie-backups';
-            if (!is_dir($dir)) {
-                wp_mkdir_p($dir);
-            }
-            $snap = $dir . '/auto-' . gmdate('Ymd-His') . '-' . substr(uniqid(), -6) . '.sql';
+            $dir  = BackupService::backupDir(); // tạo thư mục + .htaccess deny-all + index.php
+            $snap = $dir . '/auto-' . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.sql';
             $written = file_put_contents($snap, BackupService::export($refTables));
             if ($written === false) {
                 return ResponseEnvelope::error([
