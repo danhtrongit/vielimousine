@@ -12,6 +12,8 @@ use Vie\Support\CostVisibility;
 use Vie\Service\Auth\RoleInstaller;
 use Vie\Http\Controllers\OrderController;
 use Vie\Http\Controllers\OrderItemController;
+use Vie\Http\Controllers\OrderActionController;
+use Vie\Http\Controllers\InvoiceController;
 
 if (!isset($GLOBALS['wpdb'])) {
     throw new RuntimeException('cost-visibility-e2e must run inside WP context');
@@ -145,6 +147,48 @@ if ($itemId > 0) {
     $assert('admin order-items show keeps cost_total', is_array($mone) && array_key_exists('cost_total', $mone));
 } else {
     echo "  • skip Scenario D — no order_item rows (run full suite for integration)\n";
+}
+
+echo "Scenario E: cancel + invoice/data strip cost/profit for sales\n";
+$wpdb = $GLOBALS['wpdb'];
+
+// --- invoice/data (gated by vie_print_order which sales HAS; no IDOR) ---
+$invOrderId = (int) $wpdb->get_var("SELECT id FROM {$wpdb->prefix}vie_order ORDER BY id DESC LIMIT 1");
+if ($invOrderId > 0) {
+    \Vie\Container::get(\Vie\Service\Settings\InvoiceSettings::class)->update(['company_name' => 'E2E Test Co']);
+    $ireq = new \WP_REST_Request('GET', '/orders/' . $invOrderId . '/invoice/data');
+    $ireq->set_param('id', $invOrderId);
+
+    wp_set_current_user($salesId);
+    $idata = InvoiceController::data($ireq)->get_data()['data'] ?? null;
+    $assert('sales invoice/data order has no cost_total', is_array($idata) && isset($idata['order']) && !array_key_exists('cost_total', $idata['order']));
+    $assert('sales invoice/data order has no profit_total', is_array($idata) && isset($idata['order']) && !array_key_exists('profit_total', $idata['order']));
+    $assert('sales invoice/data items stripped', is_array($idata) && is_array($idata['items'] ?? null) && (empty($idata['items']) || !array_key_exists('cost_total', $idata['items'][0])));
+
+    wp_set_current_user($mgrId);
+    $mdata = InvoiceController::data($ireq)->get_data()['data'] ?? null;
+    $assert('admin invoice/data order keeps cost_total', is_array($mdata) && isset($mdata['order']) && array_key_exists('cost_total', $mdata['order']));
+} else {
+    echo "  • skip invoice/data — no order rows\n";
+}
+
+// --- cancel (gated by vie_cancel_orders which sales HAS; force sales ownership) ---
+$cancelId = (int) $wpdb->get_var("SELECT id FROM {$wpdb->prefix}vie_order WHERE status IN ('pending','confirmed') ORDER BY id DESC LIMIT 1");
+if ($cancelId > 0) {
+    $wpdb->update("{$wpdb->prefix}vie_order", ['sales_user_id' => $salesId], ['id' => $cancelId]);
+    wp_set_current_user($salesId);
+    $creq = new \WP_REST_Request('POST', '/orders/' . $cancelId . '/cancel');
+    $creq->set_param('id', $cancelId);
+    $creq->set_header('Content-Type', 'application/json');
+    $creq->set_body(json_encode(['reason' => 'e2e cost-vis cancel', 'refund_amount' => 0]));
+    $cdata = OrderActionController::cancel($creq)->get_data()['data'] ?? null;
+    $assert('sales cancel response has no cost_total', is_array($cdata) && !array_key_exists('cost_total', $cdata));
+    $assert('sales cancel response has no profit_total', is_array($cdata) && !array_key_exists('profit_total', $cdata));
+    if (is_array($cdata) && isset($cdata['items'][0])) {
+        $assert('sales cancel items stripped', !array_key_exists('cost_total', $cdata['items'][0]));
+    }
+} else {
+    echo "  • skip cancel — no cancellable order\n";
 }
 
 wp_set_current_user(0);

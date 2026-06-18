@@ -11,6 +11,7 @@ use Vie\Service\Order\IllegalTransitionException;
 use Vie\Service\Order\OrderNotFoundException;
 use Vie\Service\Order\OrderService;
 use Vie\Service\Settings\EmailSettings;
+use Vie\Support\CostVisibility;
 use Vie\Support\ResponseEnvelope;
 
 final class OrderActionController
@@ -74,7 +75,7 @@ final class OrderActionController
         try {
             $orderSvc = Container::get(OrderService::class);
             $result   = $orderSvc->transition($id, $target, (int) get_current_user_id());
-            return ResponseEnvelope::success($result);
+            return ResponseEnvelope::success(CostVisibility::stripOrder($result));
         } catch (OrderNotFoundException $e) {
             return ResponseEnvelope::notFound('Đơn hàng');
         } catch (IllegalTransitionException $e) {
@@ -178,7 +179,7 @@ final class OrderActionController
         } catch (OrderNotFoundException $e) {
             $detail = $repo->find($id);
         }
-        return ResponseEnvelope::success($detail);
+        return ResponseEnvelope::success(CostVisibility::stripOrder($detail));
     }
 
     public static function cancel(\WP_REST_Request $request): \WP_REST_Response
@@ -213,7 +214,7 @@ final class OrderActionController
         try {
             $orderSvc = Container::get(OrderService::class);
             $result   = $orderSvc->cancel($id, $reason, (int) get_current_user_id(), $refundAmount);
-            return ResponseEnvelope::success($result);
+            return ResponseEnvelope::success(CostVisibility::stripOrder($result));
         } catch (OrderNotFoundException $e) {
             return ResponseEnvelope::notFound('Đơn hàng');
         } catch (IllegalTransitionException $e) {

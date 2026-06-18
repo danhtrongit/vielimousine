@@ -9,6 +9,7 @@ use Vie\Repository\OrderRepository;
 use Vie\Service\Invoice\InvoiceService;
 use Vie\Service\Settings\InvoiceSettings;
 use Vie\Support\NumberToText;
+use Vie\Support\CostVisibility;
 use Vie\Support\ResponseEnvelope;
 
 final class InvoiceController
@@ -81,6 +82,9 @@ final class InvoiceController
         $invSvc        = Container::get(InvoiceService::class);
         $invoiceNumber = $invSvc->getOrAssignNumber($orderId);
         $order['invoice_number'] = $invoiceNumber;
+
+        $order = CostVisibility::stripOrder($order);
+        $items = CostVisibility::stripItemRows($items);
 
         return ResponseEnvelope::success([
             'order'            => $order,
