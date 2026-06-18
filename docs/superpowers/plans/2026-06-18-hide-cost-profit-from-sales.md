@@ -31,10 +31,16 @@ Focused run of just the new cost-visibility test (fast TDD loop):
 docker exec vie_cli wp --path=/var/www/html --allow-root eval '$pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/cost-visibility-e2e.php"; echo "\n--- cost-visibility: {$pass} passed, {$fail} failed ---\n"; exit($fail===0?0:1);'
 ```
 
-Full backend suite:
+Full backend suite (NOTE — pre-existing baseline: this aborts inside `auth-e2e.php` at `JwtService.php:60`; the JWT `iss` fix lived on the reverted mobile branch, so `run.php` does NOT reach `=== TOTAL ===` on this branch. That crash is out of scope for this feature — do not try to fix it):
 ```bash
 docker exec vie_cli wp --path=/var/www/html --allow-root eval 'require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/run.php";'
 ```
+
+**Cost-visibility verification command (USE THIS to verify this feature's backend tests).** It seeds order/item data via `order-e2e`, resets the counters, runs only `cost-visibility-e2e`, and skips the broken auth/security phases:
+```bash
+docker exec vie_cli wp --path=/var/www/html --allow-root eval '$pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/order-e2e.php"; $pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/cost-visibility-e2e.php"; echo "\n=== COST-VIS: {$pass} passed, {$fail} failed ===\n"; exit($fail===0?0:1);'
+```
+For the RED step of a TDD task, run the same command but expect the new assertions to FAIL (or a fatal if a class is missing).
 
 ---
 
@@ -281,10 +287,9 @@ require __DIR__ . '/cost-visibility-e2e.php';
 - [ ] **Step 6: Run the full suite to confirm nothing regressed**
 
 ```bash
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'global $wpdb;$wpdb->query("DELETE FROM {$wpdb->prefix}vie_activity_log WHERE action=\"login_failed\"");delete_option("vie_blocked_ips");'
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/run.php";'
+docker exec vie_cli wp --path=/var/www/html --allow-root eval '$pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/order-e2e.php"; $pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/cost-visibility-e2e.php"; echo "\n=== COST-VIS: {$pass} passed, {$fail} failed ===\n"; exit($fail===0?0:1);'
 ```
-Expected: ends `=== TOTAL: N passed, 0 failed ===`, including the new "Cost/Profit Visibility E2E" section all `✓`.
+Expected: ends `=== COST-VIS: N passed, 0 failed ===`, including the new "Cost/Profit Visibility E2E" section all `✓`.
 
 - [ ] **Step 7: Commit**
 
@@ -341,8 +346,7 @@ if ($orderId > 0) {
 - [ ] **Step 2: Run the full suite to verify the new Scenario C assertions pass for the authorized path and define behavior**
 
 ```bash
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'global $wpdb;$wpdb->query("DELETE FROM {$wpdb->prefix}vie_activity_log WHERE action=\"login_failed\"");delete_option("vie_blocked_ips");'
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/run.php";'
+docker exec vie_cli wp --path=/var/www/html --allow-root eval '$pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/order-e2e.php"; $pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/cost-visibility-e2e.php"; echo "\n=== COST-VIS: {$pass} passed, {$fail} failed ===\n"; exit($fail===0?0:1);'
 ```
 Expected: Scenario C `✓` (order-e2e ran first, so an order exists). This confirms the admin path returns the fields and the sales transform strips them. (This step has no RED because Scenario C asserts the helper transform + the authorized controller path; the controller wiring in Step 3 is what guarantees the helper is actually invoked in production.)
 
@@ -393,10 +397,9 @@ Change `update` (currently lines 153-155) to strip the writable payload before p
 - [ ] **Step 4: Re-run the full suite — confirm green and no regression**
 
 ```bash
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'global $wpdb;$wpdb->query("DELETE FROM {$wpdb->prefix}vie_activity_log WHERE action=\"login_failed\"");delete_option("vie_blocked_ips");'
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/run.php";'
+docker exec vie_cli wp --path=/var/www/html --allow-root eval '$pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/order-e2e.php"; $pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/cost-visibility-e2e.php"; echo "\n=== COST-VIS: {$pass} passed, {$fail} failed ===\n"; exit($fail===0?0:1);'
 ```
-Expected: `=== TOTAL: N passed, 0 failed ===`. The "admin show() keeps cost_total" assertion still passes (admin authorized), confirming we did not over-strip.
+Expected: `=== COST-VIS: N passed, 0 failed ===`. The "admin show() keeps cost_total" assertion still passes (admin authorized), confirming we did not over-strip.
 
 - [ ] **Step 5: Commit**
 
@@ -455,8 +458,7 @@ if ($itemId > 0) {
 - [ ] **Step 2: Run the full suite to verify it fails**
 
 ```bash
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'global $wpdb;$wpdb->query("DELETE FROM {$wpdb->prefix}vie_activity_log WHERE action=\"login_failed\"");delete_option("vie_blocked_ips");'
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/run.php";'
+docker exec vie_cli wp --path=/var/www/html --allow-root eval '$pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/order-e2e.php"; $pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/cost-visibility-e2e.php"; echo "\n=== COST-VIS: {$pass} passed, {$fail} failed ===\n"; exit($fail===0?0:1);'
 ```
 Expected: FAIL on "sales order-items index has no cost_total" / "...show has no cost_total" — the controller still returns the fields to sales.
 
@@ -487,10 +489,9 @@ Change the success return in `show` (currently line 35) from `return ResponseEnv
 - [ ] **Step 4: Re-run the full suite to verify it passes**
 
 ```bash
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'global $wpdb;$wpdb->query("DELETE FROM {$wpdb->prefix}vie_activity_log WHERE action=\"login_failed\"");delete_option("vie_blocked_ips");'
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/run.php";'
+docker exec vie_cli wp --path=/var/www/html --allow-root eval '$pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/order-e2e.php"; $pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/cost-visibility-e2e.php"; echo "\n=== COST-VIS: {$pass} passed, {$fail} failed ===\n"; exit($fail===0?0:1);'
 ```
-Expected: `=== TOTAL: N passed, 0 failed ===`, Scenario D all `✓`.
+Expected: `=== COST-VIS: N passed, 0 failed ===`, Scenario D all `✓`.
 
 - [ ] **Step 5: Commit**
 
@@ -1081,10 +1082,9 @@ Expected: all specs pass (`__harness__`, `useCostVisibility`, `ordersCsv`, `Orde
 - [ ] **Step 3: Final full backend suite**
 
 ```bash
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'global $wpdb;$wpdb->query("DELETE FROM {$wpdb->prefix}vie_activity_log WHERE action=\"login_failed\"");delete_option("vie_blocked_ips");'
-docker exec vie_cli wp --path=/var/www/html --allow-root eval 'require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/run.php";'
+docker exec vie_cli wp --path=/var/www/html --allow-root eval '$pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/order-e2e.php"; $pass=0;$fail=0; require "/var/www/html/wp-content/themes/vielimousine-child/inc/tests/cost-visibility-e2e.php"; echo "\n=== COST-VIS: {$pass} passed, {$fail} failed ===\n"; exit($fail===0?0:1);'
 ```
-Expected: `=== TOTAL: N passed, 0 failed ===`.
+Expected: `=== COST-VIS: N passed, 0 failed ===`.
 
 - [ ] **Step 4: Commit the rebuilt dist**
 
