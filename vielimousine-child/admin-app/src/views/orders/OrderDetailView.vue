@@ -26,6 +26,7 @@ import { useUIStore } from '@/stores/ui.store';
 import { labelBookingType, labelPaymentMethod, labelPaymentType, labelGateway } from '@/stores/lookup.store';
 import { useNotify } from '@/composables/useNotify';
 import { useAuthStore } from '@/stores/auth.store';
+import { useCostVisibility } from '@/composables/useCostVisibility';
 import { formatVND, formatDate, formatDateTime } from '@/composables/useFormat';
 import type { OrderDetail } from '@/types/order';
 
@@ -35,6 +36,7 @@ const notify = useNotify();
 const auth = useAuthStore();
 const canManageOrders = computed(() => auth.can('vie_manage_orders'));
 const canPrintInvoice = computed(() => auth.can('vie_print_order'));
+const { canViewCost } = useCostVisibility();
 
 const invoiceDialog = ref(false);
 function openInvoiceDialog() {
@@ -342,7 +344,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
         </template>
       </Card>
 
-      <Card>
+      <Card v-if="canViewCost">
         <template #title>Giá vốn &amp; Lợi nhuận</template>
         <template #content>
           <div class="field">
