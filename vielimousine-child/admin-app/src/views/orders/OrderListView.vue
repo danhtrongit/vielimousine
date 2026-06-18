@@ -12,8 +12,10 @@ import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { useNotify } from '@/composables/useNotify';
 import { useCsvExport } from '@/composables/useCsvExport';
+import { useCostVisibility } from '@/composables/useCostVisibility';
+import { ordersCsvHeaders, orderToCsvRow } from './ordersCsv';
 import { ordersApi } from '@/api/orders.api';
-import { ORDER_STATUSES, PAYMENT_STATUSES, ORDER_SOURCES, labelOrderStatus } from '@/stores/lookup.store';
+import { ORDER_STATUSES, PAYMENT_STATUSES, ORDER_SOURCES } from '@/stores/lookup.store';
 import { formatVND, formatDate, formatDateTime } from '@/composables/useFormat';
 
 const router = useRouter();
@@ -21,6 +23,7 @@ const route = useRoute();
 const ui = useUIStore();
 const notify = useNotify();
 const csv = useCsvExport();
+const { canViewCost } = useCostVisibility();
 const exporting = ref(false);
 
 const filterSchema: FilterDef[] = [
@@ -64,34 +67,12 @@ async function exportAll() {
   exporting.value = true;
   try {
     const resp = await ordersApi.list({ per_page: 5000 });
-    // Nháp là đơn chưa hoàn thiện — không đưa vào CSV xuất (đồng nhất với việc loại nháp khỏi báo cáo).
-    const rows = resp.data.filter((o) => o.status !== 'draft').map((o) => [
-      o.code,
-      o.customer_name,
-      formatDate(o.checkin),
-      formatDate(o.checkout),
-      o.hotel_names ?? '',
-      o.nights,
-      formatVND(o.total),
-      formatVND(o.hotel_subtotal),
-      formatVND(o.ticket_subtotal),
-      formatVND(o.cost_total),
-      formatVND(o.profit_total),
-      formatVND(o.paid_amount),
-      formatVND(remaining(o)),
-      labelOrderStatus(o.status),
-      formatDateTime(o.created_at),
-    ]);
+    // Nháp là đơn chưa hoàn thiện — không đưa vào CSV xuất.
+    const rows = resp.data
+      .filter((o) => o.status !== 'draft')
+      .map((o) => orderToCsvRow(o, canViewCost.value));
     const today = new Date().toISOString().slice(0, 10);
-    csv.downloadCsv(
-      `vie-orders-${today}.csv`,
-      [
-        'Mã đơn', 'Tên khách hàng', 'Check in', 'Check out', 'Tên khách sạn', 'Đêm',
-        'Tổng tiền', 'Tổng khách sạn', 'Tổng chi phí vé', 'Tổng giá vốn', 'Lợi nhuận dự kiến',
-        'Đã thanh toán', 'Chưa thanh toán', 'Trạng thái', 'Tạo lúc',
-      ],
-      rows
-    );
+    csv.downloadCsv(`vie-orders-${today}.csv`, ordersCsvHeaders(canViewCost.value), rows);
     notify.success('Đã xuất CSV', `${rows.length} dòng`);
   } catch (e) {
     notify.apiError(e);
@@ -148,10 +129,10 @@ async function exportAll() {
       <Column field="ticket_subtotal" header="Tổng chi phí vé" class="col-money">
         <template #body="{ data }">{{ formatVND(data.ticket_subtotal) }}</template>
       </Column>
-      <Column field="cost_total" header="Tổng giá vốn" sortable class="col-money">
+      <Column v-if="canViewCost" field="cost_total" header="Tổng giá vốn" sortable class="col-money">
         <template #body="{ data }">{{ formatVND(data.cost_total) }}</template>
       </Column>
-      <Column field="profit_total" header="Lợi nhuận dự kiến" sortable class="col-money">
+      <Column v-if="canViewCost" field="profit_total" header="Lợi nhuận dự kiến" sortable class="col-money">
         <template #body="{ data }">{{ formatVND(data.profit_total) }}</template>
       </Column>
       <Column field="paid_amount" header="Đã thanh toán" sortable class="col-money">
