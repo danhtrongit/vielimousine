@@ -5,6 +5,7 @@ namespace Vie\Http;
 
 use Vie\Http\Controllers\ActivityLogController;
 use Vie\Http\Controllers\AuthController;
+use Vie\Http\Controllers\BackupController;
 use Vie\Http\Controllers\CouponActionController;
 use Vie\Http\Controllers\CouponController;
 use Vie\Http\Controllers\CouponUsageController;
@@ -207,6 +208,23 @@ final class RestRouter
             'methods'             => 'POST',
             'callback'            => [RoomPriceBulkController::class, 'bulk'],
             'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+        ]);
+
+        // Backup & Restore (admin only)
+        register_rest_route(VIE_API_NAMESPACE, '/backup/tables', [
+            'methods'             => 'GET',
+            'callback'            => [BackupController::class, 'tables'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_backup'),
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/backup/export', [
+            'methods'             => 'POST',
+            'callback'            => [BackupController::class, 'export'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_backup'),
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/backup/restore', [
+            'methods'             => 'POST',
+            'callback'            => [BackupController::class, 'restore'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_backup'),
         ]);
 
         // Phase 17: unified pricing matrix endpoints

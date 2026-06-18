@@ -84,3 +84,28 @@ try { BackupService::restore("SOMETHING WEIRD `{$wpdb->prefix}options` blah;"); 
 $assert('restore rejects any backticked non-vie table (verb-independent)', $rejBacktick);
 
 $wpdb->query("DROP TABLE IF EXISTS `$T`");           // cleanup
+
+echo "Scenario D: controller endpoints\n";
+wp_set_current_user((int)$admId);
+
+$reqMissing = new \WP_REST_Request('POST', '/backup/restore');
+$reqMissing->set_body(json_encode(['sql' => 'x']));
+$reqMissing->set_header('Content-Type', 'application/json');
+$respMissing = \Vie\Http\Controllers\BackupController::restore($reqMissing);
+$assert('restore without confirm -> 422', $respMissing->get_status() === 422);
+
+$reqExp = new \WP_REST_Request('POST', '/backup/export');
+$reqExp->set_body(json_encode(['tables' => [$wpdb->prefix.'vie_coupon']]));
+$reqExp->set_header('Content-Type', 'application/json');
+$dataExp = \Vie\Http\Controllers\BackupController::export($reqExp)->get_data()['data'] ?? [];
+$assert('export returns filename', isset($dataExp['filename']) && str_ends_with($dataExp['filename'], '.sql'));
+$assert('export returns sql with CREATE', isset($dataExp['sql']) && strpos($dataExp['sql'], 'CREATE TABLE') !== false);
+
+$reqExpBad = new \WP_REST_Request('POST', '/backup/export');
+$reqExpBad->set_body(json_encode(['tables' => [$wpdb->prefix.'users']]));
+$reqExpBad->set_header('Content-Type', 'application/json');
+$assert('export rejects non-allowlisted -> 422', \Vie\Http\Controllers\BackupController::export($reqExpBad)->get_status() === 422);
+
+$tblData = \Vie\Http\Controllers\BackupController::tables(new \WP_REST_Request('GET','/backup/tables'))->get_data()['data'] ?? [];
+$assert('tables endpoint returns list', is_array($tblData) && count($tblData) > 0);
+wp_set_current_user(0);
