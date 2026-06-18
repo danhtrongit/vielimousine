@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite';
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
 
@@ -19,5 +20,9 @@ export default defineConfig({
     proxy: {
       '/wp-json': 'http://vielimo.local',
     },
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.spec.ts'],
   },
 });
