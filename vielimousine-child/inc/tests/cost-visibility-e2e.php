@@ -92,4 +92,30 @@ $assert('stripOrders keeps cost_total for admin', ($kos[0]['cost_total'] ?? null
 $kw = CostVisibility::stripWritable(['cost_total' => 5]);
 $assert('stripWritable keeps cost_total for admin', ($kw['cost_total'] ?? null) === 5);
 
+echo "Scenario C: OrderController::show transforms the real order payload\n";
+$wpdb    = $GLOBALS['wpdb'];
+$orderId = (int) $wpdb->get_var("SELECT id FROM {$wpdb->prefix}vie_order ORDER BY id DESC LIMIT 1");
+if ($orderId > 0) {
+    // Authorized (admin) path through the actual controller keeps the fields.
+    wp_set_current_user($mgrId);
+    $req = new \WP_REST_Request('GET', '/orders/' . $orderId);
+    $req->set_param('id', $orderId);
+    $resp   = OrderController::show($req);
+    $detail = $resp->get_data()['data'] ?? [];
+    $assert('admin show() keeps cost_total', is_array($detail) && array_key_exists('cost_total', $detail));
+
+    // Re-run the controller as a sales user who owns nothing -> 403 is expected,
+    // so instead assert the controller's transform on the SAME real payload: under
+    // sales context stripOrder() (the exact call show() makes) removes the fields.
+    wp_set_current_user($salesId);
+    $salesView = CostVisibility::stripOrder($detail);
+    $assert('sales view of real order has no cost_total', !array_key_exists('cost_total', $salesView));
+    $assert('sales view of real order has no profit_total', !array_key_exists('profit_total', $salesView));
+    if (isset($salesView['items'][0]) && is_array($salesView['items'][0])) {
+        $assert('sales view real items stripped', !array_key_exists('cost_total', $salesView['items'][0]));
+    }
+} else {
+    echo "  • skip Scenario C — no order rows (run full suite for integration)\n";
+}
+
 wp_set_current_user(0);

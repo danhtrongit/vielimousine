@@ -12,6 +12,7 @@ use Vie\Service\Order\OrderService;
 use Vie\Service\Order\RequiresQuoteException;
 use Vie\Service\Order\StockUnavailableException;
 use Vie\Service\Payment\SepayCheckout;
+use Vie\Support\CostVisibility;
 use Vie\Support\ResponseEnvelope;
 use Vie\Support\Validator;
 use Vie\Validation\Schemas\OrderCreateValidation;
@@ -45,7 +46,7 @@ final class OrderController
         $repo   = Container::get(OrderRepository::class);
         $result = $repo->all($request->get_params());
 
-        return ResponseEnvelope::paginated($result['data'], $result['pagination'], [
+        return ResponseEnvelope::paginated(CostVisibility::stripOrders($result['data']), $result['pagination'], [
             'sort'            => $result['sort'],
             'filters_applied' => $result['filters_applied'],
             'available_sorts' => $repo->availableSorts(),
@@ -67,7 +68,7 @@ final class OrderController
                 ], 403);
             }
 
-            return ResponseEnvelope::success($detail);
+            return ResponseEnvelope::success(CostVisibility::stripOrder($detail));
         } catch (OrderNotFoundException $e) {
             return ResponseEnvelope::notFound('Đơn hàng');
         }
@@ -108,7 +109,7 @@ final class OrderController
                 $detail['redirect_url'] = null;
             }
 
-            return ResponseEnvelope::success($detail, [], 201);
+            return ResponseEnvelope::success(CostVisibility::stripOrder($detail), [], 201);
         } catch (StockUnavailableException $e) {
             return ResponseEnvelope::error([
                 [
@@ -151,8 +152,8 @@ final class OrderController
         }
 
         $repo = Container::get(OrderRepository::class);
-        $row  = $repo->update($id, $v->validated());
-        return ResponseEnvelope::success($row);
+        $row  = $repo->update($id, CostVisibility::stripWritable($v->validated()));
+        return ResponseEnvelope::success(CostVisibility::stripOrder($row));
     }
 
     /**
