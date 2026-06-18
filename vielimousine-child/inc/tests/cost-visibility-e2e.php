@@ -118,4 +118,30 @@ if ($orderId > 0) {
     echo "  • skip Scenario C — no order rows (run full suite for integration)\n";
 }
 
+echo "Scenario D: OrderItemController::index strips cost/profit for sales\n";
+$itemId = (int) $GLOBALS['wpdb']->get_var("SELECT id FROM {$GLOBALS['wpdb']->prefix}vie_order_item ORDER BY id DESC LIMIT 1");
+if ($itemId > 0) {
+    wp_set_current_user($salesId);
+    $req = new \WP_REST_Request('GET', '/order-items');
+    $req->set_param('per_page', 5);
+    $rows = OrderItemController::index($req)->get_data()['data'] ?? [];
+    $assert('order-items index returns rows', is_array($rows) && count($rows) > 0);
+    if (!empty($rows)) {
+        $assert('sales order-items index has no cost_total', !array_key_exists('cost_total', $rows[0]));
+        $assert('sales order-items index has no profit_total', !array_key_exists('profit_total', $rows[0]));
+    }
+
+    $sreq = new \WP_REST_Request('GET', '/order-items/' . $itemId);
+    $sreq->set_param('id', $itemId);
+    $one = OrderItemController::show($sreq)->get_data()['data'] ?? [];
+    $assert('sales order-items show has no cost_total', is_array($one) && !array_key_exists('cost_total', $one));
+
+    // Authorized path unchanged.
+    wp_set_current_user($mgrId);
+    $mrows = OrderItemController::index($req)->get_data()['data'] ?? [];
+    $assert('admin order-items index keeps cost_total', !empty($mrows) && array_key_exists('cost_total', $mrows[0]));
+} else {
+    echo "  • skip Scenario D — no order_item rows (run full suite for integration)\n";
+}
+
 wp_set_current_user(0);

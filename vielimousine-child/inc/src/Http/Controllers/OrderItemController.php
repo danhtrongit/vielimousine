@@ -5,6 +5,7 @@ namespace Vie\Http\Controllers;
 
 use Vie\Container;
 use Vie\Repository\OrderItemRepository;
+use Vie\Support\CostVisibility;
 use Vie\Support\ResponseEnvelope;
 use Vie\Support\Validator;
 use Vie\Validation\Schemas\OrderItemValidation;
@@ -16,7 +17,7 @@ final class OrderItemController
         $repo   = Container::get(OrderItemRepository::class);
         $result = $repo->all($request->get_params());
 
-        return ResponseEnvelope::paginated($result['data'], $result['pagination'], [
+        return ResponseEnvelope::paginated(CostVisibility::stripItemRows($result['data']), $result['pagination'], [
             'sort'            => $result['sort'],
             'filters_applied' => $result['filters_applied'],
             'available_sorts' => $repo->availableSorts(),
@@ -32,7 +33,7 @@ final class OrderItemController
             return ResponseEnvelope::notFound('Order Item');
         }
 
-        return ResponseEnvelope::success($row);
+        return ResponseEnvelope::success(CostVisibility::stripItemRow($row));
     }
 
     public static function store(\WP_REST_Request $request): \WP_REST_Response
