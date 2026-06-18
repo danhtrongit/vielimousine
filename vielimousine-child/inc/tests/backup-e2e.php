@@ -44,3 +44,22 @@ $tables = BackupService::listTables();
 $names = array_column($tables, 'name');
 $assert('listTables includes our table', in_array($T, $names, true));
 $assert('listTables excludes non-vie tables', count(array_filter($names, fn($n)=>strpos($n, $wpdb->prefix.'vie_')!==0))===0);
+
+echo "Scenario C: restore round-trip + allowlist\n";
+$sqlBackup = BackupService::export([$T]);            // 2 rows (from Scenario B)
+$wpdb->query("DELETE FROM `$T`");                    // simulate data loss
+$assert('table emptied before restore', (int)$wpdb->get_var("SELECT COUNT(*) FROM `$T`") === 0);
+
+$res = BackupService::restore($sqlBackup);
+$assert('restore reports our table', in_array($T, $res['tables_restored'], true));
+$assert('restore no errors', empty($res['errors']), implode('; ', $res['errors']));
+$assert('rows restored (2)', (int)$wpdb->get_var("SELECT COUNT(*) FROM `$T`") === 2);
+$assert('value restored', $wpdb->get_var("SELECT label FROM `$T` WHERE id=1") === 'alpha');
+
+$rejected = false;
+try { BackupService::restore("INSERT INTO `{$wpdb->prefix}users` (ID) VALUES (999);"); }
+catch (\RuntimeException $e) { $rejected = true; }
+$assert('restore rejects non-allowlisted table', $rejected);
+$assert('users table untouched', (int)$wpdb->get_var("SELECT COUNT(*) FROM `{$wpdb->prefix}users` WHERE ID=999") === 0);
+
+$wpdb->query("DROP TABLE IF EXISTS `$T`");           // cleanup

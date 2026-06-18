@@ -98,4 +98,45 @@ final class BackupService
         $out .= "SET FOREIGN_KEY_CHECKS=1;\n";
         return $out;
     }
+
+    /**
+     * Phục hồi từ SQL. Quét tên bảng trước: nếu có bảng ngoài allowlist -> ném RuntimeException,
+     * KHÔNG thực thi gì. Thực thi nguyên khối qua mysqli_multi_query (server tự parse).
+     * @return array{tables_restored:array<int,string>,statements:int,errors:array<int,string>}
+     */
+    public static function restore(string $sql): array
+    {
+        global $wpdb;
+
+        preg_match_all('/(?:DROP\s+TABLE\s+IF\s+EXISTS|CREATE\s+TABLE|INSERT\s+INTO)\s+`?([A-Za-z0-9_]+)`?/i', $sql, $m);
+        $tables = array_values(array_unique($m[1]));
+        $bad = array_values(array_filter($tables, static fn($t) => !self::isAllowed($t)));
+        if ($bad) {
+            throw new \RuntimeException('Bảng ngoài phạm vi cho phép: ' . implode(', ', $bad));
+        }
+
+        $dbh = $wpdb->dbh; // mysqli
+        $full = "SET FOREIGN_KEY_CHECKS=0;\n" . $sql . "\nSET FOREIGN_KEY_CHECKS=1;\n";
+        $errors = [];
+        $stmts = 0;
+
+        if (mysqli_multi_query($dbh, $full)) {
+            do {
+                $stmts++;
+                if ($r = mysqli_store_result($dbh)) {
+                    mysqli_free_result($r);
+                }
+                if (!mysqli_more_results($dbh)) {
+                    break;
+                }
+            } while (mysqli_next_result($dbh));
+        }
+        $err = mysqli_error($dbh);
+        if ($err !== '') {
+            $errors[] = $err;
+        }
+        $wpdb->flush();
+
+        return ['tables_restored' => $tables, 'statements' => $stmts, 'errors' => $errors];
+    }
 }
