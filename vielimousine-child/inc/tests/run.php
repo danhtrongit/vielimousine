@@ -85,6 +85,9 @@ require __DIR__ . '/child-slot-pricing.php';
 echo "\n=== Phase 4 — Order E2E ===\n\n";
 require __DIR__ . '/order-e2e.php';
 
+echo "\n=== Cost/Profit Visibility E2E ===\n\n";
+require __DIR__ . '/cost-visibility-e2e.php';
+
 echo "\n=== Order Draft E2E ===\n\n";
 require __DIR__ . '/draft-e2e.php';
 
