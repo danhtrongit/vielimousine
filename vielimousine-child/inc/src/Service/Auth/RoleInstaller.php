@@ -9,6 +9,7 @@ final class RoleInstaller
     public const ROLE_HOTEL_MANAGER = 'vie_hotel_manager';
 
     public const CAP_MANAGE_USERS = 'vie_manage_users';
+    public const CAP_MANAGE_BACKUP = 'vie_manage_backup';
 
     public const OBSOLETE_ROLES = [
         'vie_manager',
@@ -50,6 +51,8 @@ final class RoleInstaller
             // Quản lý tài khoản nhân viên: chỉ administrator, không nằm trong ALL_CAPS
             // vì ALL_CAPS được cấp nguyên khối cho vie_hotel_manager.
             $admin->add_cap(self::CAP_MANAGE_USERS);
+            // Backup/Restore: chỉ administrator (rất nhạy cảm, không nằm trong ALL_CAPS).
+            $admin->add_cap(self::CAP_MANAGE_BACKUP);
             foreach (self::OBSOLETE_CAPS as $cap) {
                 $admin->remove_cap($cap);
             }
@@ -73,6 +76,7 @@ final class RoleInstaller
             $role = get_role($slug);
             if ($role !== null) {
                 $role->remove_cap(self::CAP_MANAGE_USERS);
+                $role->remove_cap(self::CAP_MANAGE_BACKUP);
             }
         }
 
