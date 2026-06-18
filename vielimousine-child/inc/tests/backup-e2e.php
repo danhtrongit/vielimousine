@@ -108,4 +108,21 @@ $assert('export rejects non-allowlisted -> 422', \Vie\Http\Controllers\BackupCon
 
 $tblData = \Vie\Http\Controllers\BackupController::tables(new \WP_REST_Request('GET','/backup/tables'))->get_data()['data'] ?? [];
 $assert('tables endpoint returns list', is_array($tblData) && count($tblData) > 0);
+
+// Controller restore success path (round-trip through the HTTP layer)
+$Td = $wpdb->prefix . 'vie_backup_test';
+$wpdb->query("DROP TABLE IF EXISTS `$Td`");
+$wpdb->query("CREATE TABLE `$Td` (id INT PRIMARY KEY, label VARCHAR(50) NOT NULL) ENGINE=InnoDB");
+$wpdb->query("INSERT INTO `$Td` (id,label) VALUES (1,'ctrl')");
+$sqlD = \Vie\Service\Backup\BackupService::export([$Td]);
+$reqRes = new \WP_REST_Request('POST', '/backup/restore');
+$reqRes->set_header('Content-Type', 'application/json');
+$reqRes->set_body(json_encode(['sql' => $sqlD, 'confirm' => 'RESTORE']));
+$respRes = \Vie\Http\Controllers\BackupController::restore($reqRes);
+$assert('controller restore success -> 200', $respRes->get_status() === 200);
+$dataRes = $respRes->get_data()['data'] ?? [];
+$assert('controller restore returns snapshot_file', !empty($dataRes['snapshot_file']));
+$assert('controller restore lists the table', in_array($Td, $dataRes['tables_restored'] ?? [], true));
+$wpdb->query("DROP TABLE IF EXISTS `$Td`");
+
 wp_set_current_user(0);

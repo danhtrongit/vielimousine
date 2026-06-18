@@ -56,8 +56,13 @@ final class BackupController
             if (!is_dir($dir)) {
                 wp_mkdir_p($dir);
             }
-            $snap = $dir . '/auto-' . gmdate('Ymd-His') . '.sql';
-            file_put_contents($snap, BackupService::export($refTables));
+            $snap = $dir . '/auto-' . gmdate('Ymd-His') . '-' . substr(uniqid(), -6) . '.sql';
+            $written = file_put_contents($snap, BackupService::export($refTables));
+            if ($written === false) {
+                return ResponseEnvelope::error([
+                    ['code' => 'snapshot_failed', 'field' => null, 'message' => 'Không thể ghi auto-snapshot trước khi phục hồi — hủy restore'],
+                ], 500);
+            }
 
             $res = BackupService::restore($sql);
             $res['snapshot_file'] = str_replace(wp_upload_dir()['basedir'], '', $snap);
