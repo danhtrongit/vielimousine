@@ -7,8 +7,8 @@ use Vie\Support\ResponseEnvelope;
 
 final class ReportsController
 {
-    /** Cap khoảng ngày để chặn full-table scan / DoS. */
-    private const MAX_RANGE_DAYS = 366;
+    /** Cap khoảng ngày để chặn full-table scan / DoS (5 năm — đủ xem toàn bộ dữ liệu lịch sử 2024+). */
+    private const MAX_RANGE_DAYS = 1830;
     /** Cap số phần tử filter array. */
     private const MAX_FILTER_LEN = 50;
 

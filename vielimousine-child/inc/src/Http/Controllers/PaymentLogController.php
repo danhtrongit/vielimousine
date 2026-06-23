@@ -18,7 +18,16 @@ final class PaymentLogController
     public static function index(\WP_REST_Request $request): \WP_REST_Response
     {
         $repo   = Container::get(PaymentLogRepository::class);
-        $result = $repo->all($request->get_params());
+        $params = $request->get_params();
+
+        // Cache pull báo cáo/bulk (per_page > 100); danh sách tương tác (<=100) luôn tươi.
+        $result = ((int) ($params['per_page'] ?? 0) > 100)
+            ? \Vie\Support\QueryCache::remember(
+                'payments_index|' . get_current_user_id() . '|' . wp_json_encode($params),
+                \Vie\Support\QueryCache::TTL,
+                static fn() => $repo->all($params)
+            )
+            : $repo->all($params);
 
         return ResponseEnvelope::paginated($result['data'], $result['pagination'], [
             'sort'            => $result['sort'],

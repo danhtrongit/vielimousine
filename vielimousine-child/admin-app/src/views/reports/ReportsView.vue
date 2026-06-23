@@ -89,7 +89,7 @@ async function reload() {
     const orderParams: Record<string, unknown> = {
       date_from: fmt(dateFrom.value),
       date_to: fmt(dateTo.value),
-      per_page: 5000,
+      per_page: 10000,
     };
     if (selectedSalesUserIds.value.length > 0) {
       orderParams.sales_user_id = selectedSalesUserIds.value.join(',');
@@ -102,7 +102,7 @@ async function reload() {
       paymentsApi.list({
         date_from: fmt(dateFrom.value),
         date_to: fmt(dateTo.value),
-        per_page: 5000,
+        per_page: 10000,
       }),
     ]);
     orders.value = oResp.data;

@@ -10,6 +10,12 @@ final class OrderRepository extends AbstractRepository
         return 'vie_order';
     }
 
+    /** Báo cáo cần kéo toàn bộ đơn trong khoảng (client tự tổng hợp) — nâng trần per_page. */
+    protected function maxPerPage(): int
+    {
+        return 10000;
+    }
+
     protected function fillable(): array
     {
         // SYSTEM-MANAGED FIELDS (KHÔNG được expose qua API validation rules):

@@ -44,7 +44,17 @@ final class OrderController
     public static function index(\WP_REST_Request $request): \WP_REST_Response
     {
         $repo   = Container::get(OrderRepository::class);
-        $result = $repo->all($request->get_params());
+        $params = $request->get_params();
+
+        // Cache pull báo cáo/bulk (per_page > 100); bảng tương tác (<=100) luôn tươi.
+        // Key gồm user id để tôn trọng applyUserScope (sales chỉ thấy đơn của mình).
+        $result = ((int) ($params['per_page'] ?? 0) > 100)
+            ? \Vie\Support\QueryCache::remember(
+                'orders_index|' . get_current_user_id() . '|' . wp_json_encode($params),
+                \Vie\Support\QueryCache::TTL,
+                static fn() => $repo->all($params)
+            )
+            : $repo->all($params);
 
         return ResponseEnvelope::paginated(CostVisibility::stripOrders($result['data']), $result['pagination'], [
             'sort'            => $result['sort'],

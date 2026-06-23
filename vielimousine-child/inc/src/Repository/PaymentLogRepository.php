@@ -10,6 +10,12 @@ final class PaymentLogRepository extends AbstractRepository
         return 'vie_payment_log';
     }
 
+    /** Báo cáo cần kéo toàn bộ giao dịch trong khoảng (client tự tổng hợp) — nâng trần per_page. */
+    protected function maxPerPage(): int
+    {
+        return 10000;
+    }
+
     protected function fillable(): array
     {
         // SYSTEM-MANAGED FIELDS:

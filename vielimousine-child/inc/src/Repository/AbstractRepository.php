@@ -267,10 +267,16 @@ abstract class AbstractRepository
         return ['field' => $firstCol, 'order' => strtolower($default[$firstCol])];
     }
 
+    /** Trần per_page cho list endpoint (chặn full-table scan). Repo con có thể nâng (vd báo cáo). */
+    protected function maxPerPage(): int
+    {
+        return 100;
+    }
+
     protected function applyPagination(QueryBuilder $qb, array $params): array
     {
         $page    = max(1, (int) ($params['page'] ?? 1));
-        $perPage = min(100, max(1, (int) ($params['per_page'] ?? 20)));
+        $perPage = min($this->maxPerPage(), max(1, (int) ($params['per_page'] ?? 20)));
         $offset  = ($page - 1) * $perPage;
 
         $qb->limit($perPage);
