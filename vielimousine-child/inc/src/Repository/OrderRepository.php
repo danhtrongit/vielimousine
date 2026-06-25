@@ -79,12 +79,14 @@ final class OrderRepository extends AbstractRepository
 
     protected function defaultSort(): array
     {
-        return ['created_at' => 'DESC'];
+        // Theo id (auto-increment) thay vì created_at: đơn mới tạo luôn có id lớn nhất nên
+        // luôn nằm đầu danh sách — kể cả khi có đơn import created_at ở tương lai (order_date 2026...).
+        return ['id' => 'DESC'];
     }
 
     public function availableSorts(): array
     {
-        return ['created_at', 'checkin', 'total', 'code', 'status'];
+        return ['id', 'created_at', 'checkin', 'total', 'code', 'status'];
     }
 
     protected function filterConfig(): array

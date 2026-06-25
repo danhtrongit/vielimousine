@@ -93,8 +93,8 @@ async function exportAll() {
 
     <DataTablePanel
       endpoint="/orders"
-      :defaults="{ sort: 'created_at', order: 'desc' }"
-      storage-key="orders.list.v1"
+      :defaults="{ sort: 'id', order: 'desc' }"
+      storage-key="orders.list.v2"
       table-style="min-width: 1900px"
     >
       <template #filters="{ update }">
