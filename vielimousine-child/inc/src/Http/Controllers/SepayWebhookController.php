@@ -14,9 +14,20 @@ final class SepayWebhookController
         if (!is_array($payload)) {
             $payload = [];
         }
-        // SePay Cổng thanh toán xác thực IPN bằng header X-Secret-Key.
+        // SePay Cổng thanh toán xác thực IPN theo cấu hình:
+        //  - auth type = SECRET_KEY  -> header "X-Secret-Key: <secret>"
+        //  - auth type = API Key (MẶC ĐỊNH) -> header "Authorization: Apikey <secret>"
+        // Chấp nhận cả hai để chạy được dù merchant chọn kiểu nào.
         $authSecret = (string) ($request->get_header('X-Secret-Key') ?? $request->get_header('X_SECRET_KEY') ?? '');
-        $ip         = $_SERVER['REMOTE_ADDR'] ?? null;
+        if ($authSecret === '') {
+            $authz = trim((string) ($request->get_header('Authorization') ?? ''));
+            if (stripos($authz, 'Apikey ') === 0) {
+                $authSecret = trim(substr($authz, 7));
+            } elseif (stripos($authz, 'Bearer ') === 0) {
+                $authSecret = trim(substr($authz, 7));
+            }
+        }
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
 
         try {
             $webhook = Container::get(SepayWebhook::class);
