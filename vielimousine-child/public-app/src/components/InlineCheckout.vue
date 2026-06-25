@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, watch } from 'vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
@@ -43,10 +43,18 @@ const vatEnabled = ref(false);
 
 const room = computed(() => props.rooms.find((r) => r.id === selection.roomId));
 const quote = computed(() => (selection.roomId ? getQuote(selection.roomId, selection.bookingType) : null));
-// Hết phòng (unavailable_date) hoặc vượt sức chứa (requires_quote) → chuyển sang
-// FORM LIÊN HỆ ĐẶT PHÒNG thay vì chặn: khách để lại thông tin, gửi qua quote-inquiry.
-const isSoldOut = computed(() => !!quote.value?.unavailable_date);
+// Hết phòng → chuyển sang FORM LIÊN HỆ ĐẶT PHÒNG thay vì chặn. Hai nguồn:
+//  (1) quote báo unavailable_date (biết trước khi đặt)
+//  (2) tạo đơn bị backend trả stock_unavailable (chỉ lộ ra lúc submit) → stockUnavailable
+const stockUnavailable = ref(false);
+const isSoldOut = computed(() => !!quote.value?.unavailable_date || stockUnavailable.value);
 const isQuoteMode = computed(() => quote.value?.requires_quote === true || isSoldOut.value);
+
+// Đổi phòng/loại/ngày → reset cờ hết-phòng để form quay lại chế độ đặt bình thường.
+watch(
+  () => [selection.roomId, selection.bookingType, search.checkin, search.checkout],
+  () => { stockUnavailable.value = false; }
+);
 const isCombo = computed(() => selection.bookingType === 'combo');
 
 // Đổi nhanh loại đặt (phòng ↔ combo) ngay trong form, không phải quay lại danh sách phòng.
@@ -165,7 +173,16 @@ async function submitOrder(ev: Event) {
       phone: form.phone.trim(),
     }).toString();
   } catch (e: any) {
-    errorMsg.value = (e?.errors || []).map((er: any) => er.message).join('. ') || 'Đặt phòng thất bại';
+    const errs = e?.errors || [];
+    // Hết phòng lúc tạo đơn → KHÔNG báo lỗi cụt, chuyển form sang "yêu cầu đặt phòng"
+    // (giữ nguyên thông tin khách đã nhập). Lần bấm tiếp theo sẽ gửi qua quote-inquiry.
+    if (errs.some((er: any) => er.code === 'stock_unavailable')) {
+      stockUnavailable.value = true;
+      errorMsg.value = '';
+      submitting.value = false;
+      return;
+    }
+    errorMsg.value = errs.map((er: any) => er.message).join('. ') || 'Đặt phòng thất bại';
     submitting.value = false;
   }
 }
