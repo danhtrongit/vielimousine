@@ -713,6 +713,9 @@
 }
 
 .vh-fieldset {
+  /* display:block bắt buộc — theme cha có rule global "form fieldset { display:none }"
+     ẩn mọi fieldset trong <form>; class này thắng specificity nên hiện lại form đặt phòng. */
+  display: block;
   border: 1px solid var(--app-card-border);
   border-radius: var(--radius-lg);
   padding: var(--space-4) var(--space-5);
