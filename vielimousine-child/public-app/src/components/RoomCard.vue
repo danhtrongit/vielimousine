@@ -181,12 +181,12 @@ function pick(type: BookingType) {
           </template>
         </div>
         <Button
-          :label="pickedType === 'room' ? 'Đã chọn' : (priceChecked ? 'Chọn phòng' : 'Kiểm tra giá trước')"
-          :icon="pickedType === 'room' ? 'pi pi-check' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock')"
+          :label="pickedType === 'room' ? 'Đã chọn' : (roomOpt.unavailable ? 'Liên hệ đặt phòng' : (priceChecked ? 'Chọn phòng' : 'Kiểm tra giá trước'))"
+          :icon="pickedType === 'room' ? 'pi pi-check' : (roomOpt.unavailable ? 'pi pi-phone' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock'))"
           :icon-pos="pickedType === 'room' ? 'left' : 'right'"
-          :severity="pickedType === 'room' ? 'success' : undefined"
-          :disabled="!priceChecked || roomOpt.unavailable || roomOpt.loading"
-          :aria-label="pickedType === 'room' ? `Đã chọn phòng ${room.name}` : `Chọn phòng ${room.name}`"
+          :severity="pickedType === 'room' ? 'success' : (roomOpt.unavailable ? 'secondary' : undefined)"
+          :disabled="!priceChecked || roomOpt.loading"
+          :aria-label="pickedType === 'room' ? `Đã chọn phòng ${room.name}` : (roomOpt.unavailable ? `Liên hệ đặt phòng ${room.name}` : `Chọn phòng ${room.name}`)"
           size="small"
           fluid
           @click="pick('room')"
@@ -223,12 +223,12 @@ function pick(type: BookingType) {
           </template>
         </div>
         <Button
-          :label="pickedType === 'combo' ? 'Đã chọn' : (priceChecked ? 'Chọn combo' : 'Kiểm tra giá trước')"
-          :icon="pickedType === 'combo' ? 'pi pi-check' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock')"
+          :label="pickedType === 'combo' ? 'Đã chọn' : (comboOpt.unavailable ? 'Liên hệ đặt combo' : (priceChecked ? 'Chọn combo' : 'Kiểm tra giá trước'))"
+          :icon="pickedType === 'combo' ? 'pi pi-check' : (comboOpt.unavailable ? 'pi pi-phone' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock'))"
           :icon-pos="pickedType === 'combo' ? 'left' : 'right'"
-          :severity="pickedType === 'combo' ? 'success' : 'warn'"
-          :disabled="!priceChecked || comboOpt.unavailable || comboOpt.loading"
-          :aria-label="pickedType === 'combo' ? `Đã chọn combo cho ${room.name}` : `Chọn combo cho ${room.name}`"
+          :severity="pickedType === 'combo' ? 'success' : (comboOpt.unavailable ? 'secondary' : 'warn')"
+          :disabled="!priceChecked || comboOpt.loading"
+          :aria-label="pickedType === 'combo' ? `Đã chọn combo cho ${room.name}` : (comboOpt.unavailable ? `Liên hệ đặt combo cho ${room.name}` : `Chọn combo cho ${room.name}`)"
           size="small"
           fluid
           @click="pick('combo')"

@@ -43,7 +43,10 @@ const vatEnabled = ref(false);
 
 const room = computed(() => props.rooms.find((r) => r.id === selection.roomId));
 const quote = computed(() => (selection.roomId ? getQuote(selection.roomId, selection.bookingType) : null));
-const isQuoteMode = computed(() => quote.value?.requires_quote === true);
+// Hết phòng (unavailable_date) hoặc vượt sức chứa (requires_quote) → chuyển sang
+// FORM LIÊN HỆ ĐẶT PHÒNG thay vì chặn: khách để lại thông tin, gửi qua quote-inquiry.
+const isSoldOut = computed(() => !!quote.value?.unavailable_date);
+const isQuoteMode = computed(() => quote.value?.requires_quote === true || isSoldOut.value);
 const isCombo = computed(() => selection.bookingType === 'combo');
 
 // Đổi nhanh loại đặt (phòng ↔ combo) ngay trong form, không phải quay lại danh sách phòng.
@@ -206,8 +209,8 @@ async function submitInquiry() {
     <!-- Thank-you state after inquiry submitted -->
     <div v-if="inquirySent" class="vh-inquiry-success">
       <i class="pi pi-check-circle vh-inquiry-success-icon" />
-      <h2 class="vh-section-title vh-inquiry-success-title">Đã gửi yêu cầu báo giá</h2>
-      <p>Cảm ơn <strong>{{ form.name }}</strong>! Vie Lim sẽ liên hệ lại số <strong>{{ form.phone }}</strong> trong thời gian sớm nhất để tư vấn và báo giá chi tiết.</p>
+      <h2 class="vh-section-title vh-inquiry-success-title">{{ isSoldOut ? 'Đã gửi yêu cầu đặt phòng' : 'Đã gửi yêu cầu báo giá' }}</h2>
+      <p>Cảm ơn <strong>{{ form.name }}</strong>! Vie Lim sẽ liên hệ lại số <strong>{{ form.phone }}</strong> trong thời gian sớm nhất để {{ isSoldOut ? 'sắp xếp phòng hoặc gợi ý phương án phù hợp' : 'tư vấn và báo giá chi tiết' }}.</p>
       <p class="vh-muted">Đặt phòng khác hoặc đóng trình duyệt — bạn không cần thao tác thêm.</p>
       <Button label="Chọn phòng khác" icon="pi pi-arrow-left" severity="secondary" outlined @click="changeRoom" />
     </div>
@@ -215,7 +218,7 @@ async function submitInquiry() {
     <template v-else>
       <h2 class="vh-section-title">
         <i :class="['pi', isQuoteMode ? 'pi-comments' : 'pi-check-circle']" />
-        {{ isQuoteMode ? 'Gửi yêu cầu báo giá' : 'Hoàn tất đặt phòng' }}
+        {{ isSoldOut ? 'Liên hệ đặt phòng' : (isQuoteMode ? 'Gửi yêu cầu báo giá' : 'Hoàn tất đặt phòng') }}
       </h2>
       <div class="vh-progress">
         <span class="vh-step vh-step-done">1. Phòng đã chọn</span>
@@ -249,7 +252,8 @@ async function submitInquiry() {
 
       <div v-if="isQuoteMode" class="vh-inquiry-note">
         <i class="pi pi-info-circle" />
-        <span>Cấu hình bạn chọn vượt giá niêm yết — vui lòng để lại thông tin, Vie Lim sẽ liên hệ báo giá phù hợp.</span>
+        <span v-if="isSoldOut">Phòng đã hết cho ngày bạn chọn — để lại thông tin, Vie Lim sẽ liên hệ sắp xếp hoặc gợi ý phương án phù hợp.</span>
+        <span v-else>Cấu hình bạn chọn vượt giá niêm yết — vui lòng để lại thông tin, Vie Lim sẽ liên hệ báo giá phù hợp.</span>
       </div>
 
       <form class="vh-checkout-form" novalidate @submit="submitOrder">
@@ -371,7 +375,7 @@ async function submitInquiry() {
             type="submit"
             :label="submitting
               ? 'Đang xử lý…'
-              : (isQuoteMode ? 'Gửi yêu cầu báo giá' : 'Xác nhận & Thanh toán')"
+              : (isSoldOut ? 'Gửi yêu cầu đặt phòng' : (isQuoteMode ? 'Gửi yêu cầu báo giá' : 'Xác nhận & Thanh toán'))"
             :icon="isQuoteMode ? 'pi pi-send' : 'pi pi-arrow-right'"
             icon-pos="right"
             size="large"

@@ -28,6 +28,6 @@ require_once __DIR__ . '/_partials.php';
 <?php endif; ?>
 <?php if (!empty($ctx['admin_url'])): ?>
   <p style="margin:16px 0;text-align:right;">
-    <a href="<?php echo esc_url((string) $ctx['admin_url']); ?>" style="display:inline-block;background:#fa541c;color:#ffffff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px;">Xem trong admin →</a>
+    <a href="<?php echo esc_url((string) $ctx['admin_url']); ?>" style="display:inline-block;background:#00A651;color:#ffffff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px;">Xem trong admin →</a>
   </p>
 <?php endif; ?>

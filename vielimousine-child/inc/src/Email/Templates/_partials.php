@@ -156,3 +156,56 @@ if (!function_exists('vie_email_render_vat')) {
             . '</table>';
     }
 }
+
+if (!function_exists('vie_email_render_hotel_info')) {
+    /** Render thông tin khách sạn (tên, hạng sao, địa chỉ, liên hệ, giờ nhận/trả). */
+    function vie_email_render_hotel_info(array $ctx): string
+    {
+        $name = trim((string) ($ctx['hotel_name'] ?? ''));
+        if ($name === '') {
+            return '';
+        }
+        $stars = (int) ($ctx['hotel_stars'] ?? 0);
+        $title = esc_html($name) . ($stars > 0 ? ' ' . str_repeat('★', min($stars, 5)) : '');
+        $rows = '';
+        $row = static function (string $label, string $val): string {
+            $val = trim($val);
+            return $val === '' ? '' :
+                '<tr><td style="padding:6px 12px;color:#6b7280;width:42%;">' . esc_html($label) . '</td><td style="padding:6px 12px;">' . esc_html($val) . '</td></tr>';
+        };
+        $rows .= $row('Địa chỉ', (string) ($ctx['hotel_address'] ?? ''));
+        $rows .= $row('Hotline', (string) ($ctx['hotel_phone'] ?? ''));
+        $rows .= $row('Email', (string) ($ctx['hotel_email'] ?? ''));
+        $ci = trim((string) ($ctx['hotel_checkin_time'] ?? ''));
+        $co = trim((string) ($ctx['hotel_checkout_time'] ?? ''));
+        if ($ci !== '' || $co !== '') {
+            $rows .= $row('Giờ nhận / trả phòng', trim(($ci !== '' ? 'Từ ' . $ci : '') . ($co !== '' ? ' – đến ' . $co : '')));
+        }
+        return '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #e5e7eb;border-radius:6px;margin:0 0 12px;border-collapse:separate;">'
+            . '<tr><td colspan="2" style="background:#f9fafb;padding:8px 12px;font-weight:600;border-bottom:1px solid #e5e7eb;">🏨 ' . $title . '</td></tr>'
+            . $rows
+            . '</table>';
+    }
+}
+
+if (!function_exists('vie_email_render_policies')) {
+    /** Render chính sách hủy + chính sách giá (nếu có). */
+    function vie_email_render_policies(array $ctx): string
+    {
+        $cancel  = (string) ($ctx['cancellation_policy_html'] ?? '');
+        $pricing = (string) ($ctx['pricing_policy_html'] ?? '');
+        if (trim($cancel) === '' && trim($pricing) === '') {
+            return '';
+        }
+        $out = '';
+        if (trim($cancel) !== '') {
+            $out .= '<h3 style="margin:16px 0 6px;font-size:14px;color:#111827;">Chính sách hủy</h3>'
+                  . '<div style="font-size:13px;color:#4b5563;line-height:1.6;">' . wp_kses_post($cancel) . '</div>';
+        }
+        if (trim($pricing) !== '') {
+            $out .= '<h3 style="margin:16px 0 6px;font-size:14px;color:#111827;">Chính sách giá</h3>'
+                  . '<div style="font-size:13px;color:#4b5563;line-height:1.6;">' . wp_kses_post($pricing) . '</div>';
+        }
+        return $out;
+    }
+}

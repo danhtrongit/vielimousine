@@ -33,7 +33,7 @@ final class OrderEmailService
         'completed'          => '[{site_name}] Cảm ơn quý khách – #{order_code}',
         'cancelled'          => '[{site_name}] Đã hủy đặt phòng #{order_code}',
         'checkin_code'       => '[{site_name}] Mã nhận phòng #{order_code}',
-        'admin_notification' => '[ĐẶT PHÒNG MỚI] #{order_code} – {customer_name} – Seats:{total_seats}',
+        'admin_notification' => '[ĐẶT PHÒNG MỚI] #{order_code} – {customer_name} – {total}',
         'admin_paid'         => '[THU TIỀN] #{order_code} +{payment_amount}',
         'admin_cancelled'    => '[HỦY] #{order_code} hoàn {refund_amount}',
     ];
@@ -238,6 +238,13 @@ final class OrderEmailService
             $totalSeats += (int) ($it['ticket_count'] ?? 0);
         }
 
+        // Khách sạn chính của đơn (lấy theo item đầu) — nguồn thông tin + chính sách.
+        $primaryHotel = null;
+        $firstHotelId = (int) ($items[0]['hotel_id'] ?? 0);
+        if ($firstHotelId > 0) {
+            $primaryHotel = $this->hotelRepo->find($firstHotelId);
+        }
+
         $total       = (int) ($order['total'] ?? 0);
         $paidAmount  = (int) ($order['paid_amount'] ?? 0);
         $remaining   = max(0, $total - $paidAmount);
@@ -275,6 +282,19 @@ final class OrderEmailService
 
             // Hóa đơn VAT (nếu khách yêu cầu)
             'vat'             => $this->normalizeVat($order['customer_vat'] ?? null),
+
+            // Thông tin khách sạn (kéo từ vie_hotel của item đầu)
+            'hotel_name'           => (string) ($primaryHotel['name'] ?? ($items[0]['hotel_name'] ?? '')),
+            'hotel_address'        => (string) ($primaryHotel['address'] ?? ''),
+            'hotel_phone'          => (string) ($primaryHotel['contact_phone'] ?? ''),
+            'hotel_email'          => (string) ($primaryHotel['contact_email'] ?? ''),
+            'hotel_stars'          => (int) ($primaryHotel['star_rating'] ?? 0),
+            'hotel_checkin_time'   => substr((string) ($primaryHotel['default_checkin'] ?? ''), 0, 5),
+            'hotel_checkout_time'  => substr((string) ($primaryHotel['default_checkout'] ?? ''), 0, 5),
+
+            // Chính sách khách sạn
+            'cancellation_policy_html' => $this->policyHtml($primaryHotel['cancellation_policy'] ?? null),
+            'pricing_policy_html'      => $this->policyHtml($primaryHotel['pricing_policy'] ?? null),
 
             // Items
             'items'           => $formattedItems,
@@ -354,6 +374,23 @@ final class OrderEmailService
             'email'        => trim((string) ($vat['email'] ?? '')),
         ];
         return array_filter($out) === [] ? [] : $out;
+    }
+
+    /**
+     * Chuẩn hoá chính sách (LONGTEXT) → HTML an toàn. Nếu là plain-text thì xuống dòng;
+     * nếu đã là HTML thì lọc qua wp_kses_post. Trả '' nếu rỗng.
+     */
+    private function policyHtml($val): string
+    {
+        // Cột policy cast 'json' → thường là {"text":"..."}; cũng chấp nhận chuỗi thuần.
+        if (is_array($val)) {
+            $val = $val['text'] ?? '';
+        }
+        $raw = trim((string) ($val ?? ''));
+        if ($raw === '') {
+            return '';
+        }
+        return strip_tags($raw) === $raw ? nl2br(esc_html($raw)) : wp_kses_post($raw);
     }
 
     /**

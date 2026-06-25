@@ -21,7 +21,7 @@ $logoUrl  = esc_url((string) ($ctx['logo_url'] ?? ''));
     <td align="center">
       <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
         <tr>
-          <td style="background:#fa541c;padding:18px 24px;text-align:left;">
+          <td style="background:#00A651;padding:18px 24px;text-align:left;">
             <?php if ($logoUrl !== ''): ?>
               <img src="<?php echo $logoUrl; ?>" alt="<?php echo $siteName; ?>" height="36" style="display:block;height:36px;width:auto;border:0;">
             <?php else: ?>
@@ -36,7 +36,7 @@ $logoUrl  = esc_url((string) ($ctx['logo_url'] ?? ''));
         </tr>
         <tr>
           <td style="background:#f9fafb;padding:16px 24px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;text-align:center;">
-            <?php echo $siteName; ?> · <a href="<?php echo $siteUrl; ?>" style="color:#fa541c;text-decoration:none;"><?php echo esc_html(parse_url($siteUrl, PHP_URL_HOST) ?: $siteUrl); ?></a>
+            <?php echo $siteName; ?> · <a href="<?php echo $siteUrl; ?>" style="color:#007A3D;text-decoration:none;"><?php echo esc_html(parse_url($siteUrl, PHP_URL_HOST) ?: $siteUrl); ?></a>
           </td>
         </tr>
       </table>
