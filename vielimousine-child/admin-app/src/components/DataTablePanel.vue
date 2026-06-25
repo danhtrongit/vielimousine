@@ -88,9 +88,10 @@ function onSort(e: { sortField?: unknown; sortOrder?: number | null }) {
       :total-records="pagination.total"
       :rows-per-page-options="[10, 20, 50, 100]"
       :first="(pagination.page - 1) * pagination.per_page"
+      :page-link-size="5"
       @page="onPage"
-      template="FirstPageLink PrevPageLink CurrentPageReport NextPageLink LastPageLink RowsPerPageDropdown"
-      current-page-report-template="Trang {currentPage}/{totalPages} ({totalRecords} bản ghi)"
+      template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+      current-page-report-template="{totalRecords} bản ghi"
       class="paginator"
     />
   </div>
