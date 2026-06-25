@@ -86,6 +86,9 @@ final class OrderLookupController
             'currency'       => $order['currency'],
             'customer_name'  => $order['customer_name'],
             'customer_phone' => $order['customer_phone'],
+            'pickup'         => is_array($order['pickup'] ?? null) ? $order['pickup'] : null,
+            'dropoff'        => is_array($order['dropoff'] ?? null) ? $order['dropoff'] : null,
+            'customer_vat'   => is_array($order['customer_vat'] ?? null) ? $order['customer_vat'] : null,
             'items'          => $publicItems,
         ]);
     }

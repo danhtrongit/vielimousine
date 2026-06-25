@@ -17,6 +17,7 @@ import type {
 } from '@/api/types';
 import { search, selection, getQuote, clearSelectionBack, appliedCoupon, resetCoupon, DROPOFF_OPTIONS, setSelection, type BookingType } from '@/composables/useBookingState';
 import { fetchQuoteForRoom } from '@/composables/useQuotes';
+import { submitCheckoutForm } from '@/composables/useCheckout';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const props = defineProps<{ rooms: Array<{ id: number; name: string }> }>();
@@ -149,15 +150,17 @@ async function submitOrder(ev: Event) {
   submitting.value = true;
   try {
     const data = await api.post<CreateOrderResponse>('public/orders', body, { idempotencyKey: idemKey });
-    if (data.redirect_url) {
-      window.location.href = data.redirect_url;
-    } else {
-      const successUrl = window.VieRest?.successUrl || '/dat-phong-thanh-cong/';
-      window.location.href = successUrl + '?' + new URLSearchParams({
-        code: data.code,
-        phone: form.phone.trim(),
-      }).toString();
+    if (data.checkout) {
+      // Đẩy khách sang trang thanh toán SePay bằng POST form.
+      submitCheckoutForm(data.checkout);
+      return;
     }
+    // Không có cổng thanh toán (vd chỉ chuyển khoản) → về trang xem đơn.
+    const successUrl = window.VieRest?.successUrl || '/dat-phong-thanh-cong/';
+    window.location.href = successUrl + '?' + new URLSearchParams({
+      code: data.code,
+      phone: form.phone.trim(),
+    }).toString();
   } catch (e: any) {
     errorMsg.value = (e?.errors || []).map((er: any) => er.message).join('. ') || 'Đặt phòng thất bại';
     submitting.value = false;

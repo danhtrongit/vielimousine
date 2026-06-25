@@ -75,6 +75,12 @@ final class RestRouter
             'permission_callback' => '__return_true',
         ]);
 
+        register_rest_route(VIE_API_NAMESPACE, '/public/orders/checkout', [
+            'methods'             => 'POST',
+            'callback'            => [PublicOrderController::class, 'checkout'],
+            'permission_callback' => '__return_true',
+        ]);
+
         register_rest_route(VIE_API_NAMESPACE, '/public/quote-inquiries', [
             'methods'             => 'POST',
             'callback'            => [QuoteInquiryController::class, 'create'],

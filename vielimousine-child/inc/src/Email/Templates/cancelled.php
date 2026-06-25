@@ -14,7 +14,7 @@ $penaltyAmount = (string) ($ctx['penalty_amount'] ?? '');
     <tr><td style="padding:8px 12px;color:#6b7280;">Phí hủy</td><td style="padding:8px 12px;text-align:right;"><?php echo esc_html($penaltyAmount); ?></td></tr>
   <?php endif; ?>
   <?php if ($refundAmount !== ''): ?>
-    <tr><td style="padding:8px 12px;color:#6b7280;">Số tiền hoàn lại</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#166534;"><?php echo esc_html($refundAmount); ?></td></tr>
+    <tr><td style="padding:8px 12px;color:#6b7280;">Số tiền hoàn lại</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#bd3210;"><?php echo esc_html($refundAmount); ?></td></tr>
   <?php endif; ?>
 </table>
 <?php endif; ?>

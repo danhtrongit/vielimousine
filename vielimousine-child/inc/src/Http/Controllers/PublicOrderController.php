@@ -5,6 +5,9 @@ namespace Vie\Http\Controllers;
 
 use Vie\Container;
 use Vie\DTO\OrderRequest;
+use Vie\Http\RateLimiter;
+use Vie\Repository\CustomerRepository;
+use Vie\Repository\OrderRepository;
 use Vie\Service\Coupon\CouponException;
 use Vie\Service\Order\OrderService;
 use Vie\Service\Order\RequiresQuoteException;
@@ -62,10 +65,10 @@ final class PublicOrderController
             $detail   = $orderSvc->create($req);
 
             try {
-                $checkout              = Container::get(SepayCheckout::class);
-                $detail['redirect_url'] = $checkout->buildRedirectUrl((int) $detail['id']);
+                $checkout            = Container::get(SepayCheckout::class);
+                $detail['checkout']  = $checkout->buildCheckoutForm((int) $detail['id']);
             } catch (\Throwable) {
-                $detail['redirect_url'] = null;
+                $detail['checkout']  = null;
             }
 
             return ResponseEnvelope::success(self::publicView($detail), [], 201);
@@ -94,6 +97,48 @@ final class PublicOrderController
                 ],
             ], 422);
         }
+    }
+
+    /**
+     * Tạo lại form checkout SePay cho một đơn đang chờ thanh toán (nút "Thanh toán ngay"
+     * ở trang xem đơn). Xác thực bằng code + phone như lookup.
+     */
+    public static function checkout(\WP_REST_Request $request): \WP_REST_Response
+    {
+        if ($denied = RateLimiter::check('order_recheckout', 10, 300)) {
+            return $denied;
+        }
+
+        $data  = $request->get_json_params() ?? [];
+        $code  = trim((string) ($data['code'] ?? ''));
+        $phone = CustomerRepository::normalizePhone(trim((string) ($data['phone'] ?? '')));
+
+        if ($code === '' || $phone === '') {
+            return ResponseEnvelope::error([
+                ['code' => 'validation_error', 'field' => null, 'message' => 'Thiếu mã đơn hoặc số điện thoại'],
+            ], 422);
+        }
+
+        $orderRepo = Container::get(OrderRepository::class);
+        $order     = $orderRepo->findByCode($code);
+        if ($order === null || $order['customer_phone'] !== $phone) {
+            return ResponseEnvelope::notFound('Đơn hàng');
+        }
+
+        if (($order['payment_status'] ?? '') === 'paid' || ($order['status'] ?? '') === 'cancelled') {
+            return ResponseEnvelope::error([
+                ['code' => 'invalid_state', 'field' => null, 'message' => 'Đơn không ở trạng thái cần thanh toán.'],
+            ], 409);
+        }
+
+        $form = Container::get(SepayCheckout::class)->buildCheckoutForm((int) $order['id']);
+        if ($form === null) {
+            return ResponseEnvelope::error([
+                ['code' => 'gateway_unavailable', 'field' => null, 'message' => 'Cổng thanh toán chưa sẵn sàng.'],
+            ], 503);
+        }
+
+        return ResponseEnvelope::success(['checkout' => $form]);
     }
 
     private static function rateLimitExceeded(string $ip): bool

@@ -110,13 +110,12 @@ final class OrderController
             $orderSvc = Container::get(OrderService::class);
             $detail   = $orderSvc->create($req);
 
-            // Build SePay redirect URL nếu enabled
+            // Build SePay checkout form (POST) nếu enabled
             try {
                 $checkout = Container::get(SepayCheckout::class);
-                $url      = $checkout->buildRedirectUrl((int) $detail['id']);
-                $detail['redirect_url'] = $url;
+                $detail['checkout'] = $checkout->buildCheckoutForm((int) $detail['id']);
             } catch (\Throwable $e) {
-                $detail['redirect_url'] = null;
+                $detail['checkout'] = null;
             }
 
             return ResponseEnvelope::success(CostVisibility::stripOrder($detail), [], 201);

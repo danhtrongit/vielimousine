@@ -7,62 +7,35 @@ use Vie\Service\Settings\SepaySettings;
 
 final class SepaySignature
 {
+    /**
+     * Thứ tự field để ký — đúng theo tài liệu Cổng thanh toán SePay
+     * (form-thanh-toan). Chỉ field nào CÓ MẶT mới được đưa vào chuỗi ký.
+     */
     private const SIGN_FIELDS = [
-        'merchant', 'operation', 'payment_method', 'order_amount',
-        'currency', 'order_invoice_number', 'order_description',
-        'customer_id', 'success_url', 'error_url', 'cancel_url',
+        'order_amount', 'merchant', 'currency', 'operation',
+        'order_description', 'order_invoice_number', 'customer_id',
+        'payment_method', 'success_url', 'error_url', 'cancel_url',
     ];
 
     public function __construct(private readonly SepaySettings $settings)
     {
     }
 
-    public function sign(array $params): string
-    {
-        $payload = implode('|', array_map(
-            static fn($f) => (string) ($params[$f] ?? ''),
-            self::SIGN_FIELDS
-        ));
-        return hash_hmac('sha256', $payload, $this->settings->secretKey());
-    }
-
-    public function verify(array $params, string $signature): bool
-    {
-        if ($signature === '') {
-            return false;
-        }
-        return hash_equals($this->sign($params), $signature);
-    }
-
     /**
-     * Webhook signing scope đã được mở rộng thêm `paid_at` và `timestamp` để:
-     *
-     *   1. Chống tampering `paid_at` (trước đây attacker có signature hợp lệ
-     *      vẫn có thể đổi ngày thanh toán → lệch báo cáo).
-     *   2. Hỗ trợ replay-protection: webhook hợp lệ cũ không pass khi
-     *      timestamp đã ra ngoài cửa sổ 5 phút (kiểm tra ở SepayWebhook).
-     *
-     * Nếu SePay chưa gửi `timestamp` ở payload, trường trống "" được ký → vẫn
-     * tương thích ngược, chỉ là replay-window không enforce.
+     * Ký form checkout: lọc field có mặt theo đúng thứ tự, ghép "field=value"
+     * ngăn bằng dấu phẩy, HMAC-SHA256 (raw binary) rồi base64_encode.
+     * Khớp 100% cách SePay verify ở phía họ.
      */
-    public function signWebhook(array $payload): string
+    public function signCheckout(array $fields): string
     {
-        $payloadStr = implode('|', [
-            (string) ($payload['order_invoice_number'] ?? ''),
-            (string) ($payload['transaction_id']       ?? ''),
-            (string) ($payload['amount']               ?? ''),
-            (string) ($payload['status']               ?? ''),
-            (string) ($payload['paid_at']              ?? ''),
-            (string) ($payload['timestamp']            ?? ''),
-        ]);
-        return hash_hmac('sha256', $payloadStr, $this->settings->secretKey());
-    }
-
-    public function verifyWebhook(array $payload, string $signature): bool
-    {
-        if ($signature === '') {
-            return false;
+        $parts = [];
+        foreach (self::SIGN_FIELDS as $f) {
+            if (array_key_exists($f, $fields) && $fields[$f] !== '' && $fields[$f] !== null) {
+                $parts[] = $f . '=' . $fields[$f];
+            }
         }
-        return hash_equals($this->signWebhook($payload), $signature);
+        return base64_encode(
+            hash_hmac('sha256', implode(',', $parts), $this->settings->secretKey(), true)
+        );
     }
 }

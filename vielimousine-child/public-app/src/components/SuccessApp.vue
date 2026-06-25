@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
 import { api } from '@/api/client';
-import type { OrderLookup } from '@/api/types';
+import type { OrderLookup, CheckoutForm } from '@/api/types';
+import { submitCheckoutForm } from '@/composables/useCheckout';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const params = new URLSearchParams(window.location.search);
@@ -34,6 +35,25 @@ async function fetchOnce() {
 async function refresh() {
   refreshing.value = true;
   try { await fetchOnce(); } finally { refreshing.value = false; }
+}
+
+const paying = ref(false);
+const payError = ref('');
+async function payNow() {
+  payError.value = '';
+  paying.value = true;
+  try {
+    const res = await api.post<{ checkout: CheckoutForm | null }>('public/orders/checkout', { code, phone });
+    if (res.checkout) {
+      submitCheckoutForm(res.checkout); // điều hướng sang SePay (POST form)
+    } else {
+      payError.value = 'Cổng thanh toán chưa sẵn sàng. Vui lòng thử lại sau.';
+      paying.value = false;
+    }
+  } catch (e: any) {
+    payError.value = e?.errors?.[0]?.message || 'Không tạo được phiên thanh toán';
+    paying.value = false;
+  }
 }
 
 const statusLabel = computed(() => ({
@@ -73,6 +93,14 @@ const remaining = computed(() => {
   if (!order.value) return 0;
   return Math.max(0, order.value.total - order.value.paid_amount);
 });
+
+const pickupAddr = computed(() => order.value?.pickup?.address || '');
+const dropoffAddr = computed(() => order.value?.dropoff?.address || '');
+const vat = computed(() => {
+  const v = order.value?.customer_vat;
+  return v && (v.company_name || v.tax_code) ? v : null;
+});
+const canPay = computed(() => !!order.value && order.value.status !== 'cancelled' && order.value.payment_status !== 'paid');
 
 onMounted(async () => {
   await fetchOnce();
@@ -133,11 +161,23 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
           </li>
         </ul>
 
+        <div v-if="pickupAddr || dropoffAddr" class="vh-success-extra">
+          <div v-if="pickupAddr"><span class="vh-muted">Điểm đón:</span> <strong>{{ pickupAddr }}</strong></div>
+          <div v-if="dropoffAddr"><span class="vh-muted">Điểm trả:</span> <strong>{{ dropoffAddr }}</strong></div>
+        </div>
+
+        <div v-if="vat" class="vh-success-extra">
+          <div><span class="vh-muted">Hóa đơn VAT:</span> <strong>{{ vat.company_name }}</strong></div>
+          <div v-if="vat.tax_code"><span class="vh-muted">MST:</span> <strong>{{ vat.tax_code }}</strong></div>
+        </div>
+
         <div class="vh-success-totals">
           <div><span>Tổng cộng</span><strong>{{ formatVND(order.total) }}</strong></div>
           <div><span>Đã thanh toán</span><strong>{{ formatVND(order.paid_amount) }}</strong></div>
           <div v-if="remaining > 0" class="vh-line-warn"><span>Còn lại</span><strong>{{ formatVND(remaining) }}</strong></div>
         </div>
+
+        <div v-if="payError" class="vh-error">{{ payError }}</div>
 
         <p class="vh-muted">
           Email xác nhận đã gửi đến
@@ -146,16 +186,16 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
           Vui lòng kiểm tra hộp thư (cả Spam).
         </p>
 
-        <button
-          v-if="order.payment_status === 'pending'"
-          type="button"
-          class="vh-btn"
-          :disabled="refreshing"
-          @click="refresh"
-        >
-          <i :class="['pi', refreshing ? 'pi-spin pi-spinner' : 'pi-refresh']" aria-hidden="true" />
-          {{ refreshing ? 'Đang kiểm tra…' : 'Kiểm tra trạng thái' }}
-        </button>
+        <div v-if="canPay" class="vh-success-actions">
+          <button type="button" class="vh-btn vh-btn-primary" :disabled="paying" @click="payNow">
+            <i :class="['pi', paying ? 'pi-spin pi-spinner' : 'pi-credit-card']" aria-hidden="true" />
+            {{ paying ? 'Đang chuyển tới cổng thanh toán…' : 'Thanh toán ngay' }}
+          </button>
+          <button type="button" class="vh-btn vh-btn-secondary" :disabled="refreshing" @click="refresh">
+            <i :class="['pi', refreshing ? 'pi-spin pi-spinner' : 'pi-refresh']" aria-hidden="true" />
+            {{ refreshing ? 'Đang kiểm tra…' : 'Kiểm tra trạng thái' }}
+          </button>
+        </div>
       </div>
     </template>
   </div>

@@ -10,7 +10,7 @@ require_once __DIR__ . '/_partials.php';
 <?php echo vie_email_render_totals($ctx, false); ?>
 <?php if (!empty($ctx['lookup_url'])): ?>
   <p style="margin:16px 0;text-align:center;">
-    <a href="<?php echo esc_url((string) $ctx['lookup_url']); ?>" style="display:inline-block;background:#1d4ed8;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Xem chi tiết đơn</a>
+    <a href="<?php echo esc_url((string) $ctx['lookup_url']); ?>" style="display:inline-block;background:#fa541c;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Xem chi tiết đơn</a>
   </p>
 <?php endif; ?>
 <?php if (!empty($ctx['cancellation_policy_html'])): ?>

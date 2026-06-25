@@ -9,17 +9,12 @@ use Vie\Repository\OrderRepository;
 use Vie\Repository\PaymentLogRepository;
 use Vie\Service\Settings\SepaySettings;
 
+/**
+ * Xử lý IPN của SePay Cổng thanh toán (Payment Gateway).
+ * Xác thực bằng header X-Secret-Key; payload lồng order{}/transaction{}.
+ */
 final class SepayWebhook
 {
-    /** Cửa sổ thời gian chấp nhận webhook so với `timestamp` trong payload. */
-    private const TIMESTAMP_WINDOW_SECONDS = 300;
-
-    /** Chỉ field này được persist vào raw_payload. Field ngoài whitelist bị loại bỏ. */
-    private const RAW_PAYLOAD_WHITELIST = [
-        'order_invoice_number', 'transaction_id', 'amount', 'status',
-        'paid_at', 'payment_method', 'currency', 'timestamp',
-    ];
-
     public function __construct(
         private readonly SepaySettings $settings,
         private readonly SepaySignature $signature,
@@ -31,127 +26,138 @@ final class SepayWebhook
     }
 
     /**
+     * @param string $authSecret Giá trị header X-Secret-Key SePay gửi.
      * @return array{accepted: bool, reason: ?string}
      */
-    public function handle(array $payload, string $signature, ?string $ip = null): array
+    public function handle(array $payload, string $authSecret, ?string $ip = null): array
     {
-        // 0. Fail-closed: nếu secret_key rỗng (chưa cấu hình), refuse mọi IPN.
-        // Trước đây verify với secret='' luôn ra signature giống nhau → endpoint
-        // không xác thực — nguy hiểm nếu admin quên config.
-        if (trim($this->settings->secretKey()) === '') {
+        $secret = trim($this->settings->secretKey());
+
+        // 0. Fail-closed: chưa cấu hình secret → từ chối mọi IPN.
+        if ($secret === '') {
             $this->logActivity('sepay_webhook_no_secret', $payload, $ip);
             return ['accepted' => false, 'reason' => 'gateway_not_configured'];
         }
 
-        // 1. Verify signature
-        if (!$this->signature->verifyWebhook($payload, $signature)) {
-            $this->logActivity('sepay_webhook_invalid_sig', $payload, $ip);
-            return ['accepted' => false, 'reason' => 'invalid_signature'];
+        // 1. Xác thực: header X-Secret-Key phải khớp secret_key (so sánh hằng-thời-gian).
+        if ($authSecret === '' || !hash_equals($secret, $authSecret)) {
+            $this->logActivity('sepay_webhook_invalid_secret', $payload, $ip);
+            return ['accepted' => false, 'reason' => 'invalid_secret'];
         }
 
-        // 2. Validate payload structure
-        $required = ['order_invoice_number', 'transaction_id', 'amount', 'status'];
-        foreach ($required as $field) {
-            if (!isset($payload[$field]) || $payload[$field] === '') {
-                $this->logActivity('sepay_webhook_missing_field', $payload, $ip);
-                return ['accepted' => false, 'reason' => 'missing_field:' . $field];
-            }
+        // 2. Parse payload lồng (Cổng thanh toán IPN).
+        $orderObj    = is_array($payload['order'] ?? null) ? $payload['order'] : [];
+        $txObj       = is_array($payload['transaction'] ?? null) ? $payload['transaction'] : [];
+        $notiType    = (string) ($payload['notification_type'] ?? '');
+        $invoice     = (string) ($orderObj['order_invoice_number'] ?? '');
+        $orderStatus = (string) ($orderObj['order_status'] ?? '');
+        $txStatus    = (string) ($txObj['transaction_status'] ?? '');
+        $txType      = (string) ($txObj['transaction_type'] ?? 'PAYMENT');
+        $txId        = (string) ($txObj['transaction_id'] ?? '');
+        $amount      = (int) round((float) ($txObj['transaction_amount'] ?? $orderObj['order_amount'] ?? 0));
+
+        if ($invoice === '' || $txId === '') {
+            $this->logActivity('sepay_webhook_missing_field', $payload, $ip);
+            return ['accepted' => false, 'reason' => 'missing_field'];
         }
 
-        // 2b. Replay-protection bằng timestamp (nếu SePay gửi `timestamp`).
-        // Khi SePay chưa hỗ trợ, payload thiếu field này → skip check (giữ
-        // tương thích). Khi có, reject nếu lệch > 5 phút.
-        if (isset($payload['timestamp']) && $payload['timestamp'] !== '') {
-            $ts = (int) $payload['timestamp'];
-            if ($ts <= 0 || abs(time() - $ts) > self::TIMESTAMP_WINDOW_SECONDS) {
-                $this->logActivity('sepay_webhook_stale_timestamp', $payload, $ip);
-                return ['accepted' => false, 'reason' => 'stale_timestamp'];
-            }
+        // 3. Chỉ xử lý thanh toán thành công: ORDER_PAID + CAPTURED + APPROVED + PAYMENT.
+        //    Các sự kiện khác (VOID/DECLINED/refund) → trả 200 để SePay không retry, không xử lý.
+        $isPaid = $notiType === 'ORDER_PAID'
+            && $orderStatus === 'CAPTURED'
+            && $txStatus === 'APPROVED'
+            && $txType === 'PAYMENT';
+        if (!$isPaid) {
+            $this->logActivity('sepay_webhook_non_success', $this->maskedPayload($payload, $orderObj, $txObj), $ip);
+            return ['accepted' => true, 'reason' => 'ignored_non_paid'];
         }
 
-        // 2c. Amount sanity — không bao giờ chấp nhận amount âm/zero qua webhook
-        // (refund đi qua endpoint admin thủ công, không qua IPN).
-        $amount = (int) $payload['amount'];
         if ($amount <= 0) {
             $this->logActivity('sepay_webhook_invalid_amount', $payload, $ip);
             return ['accepted' => false, 'reason' => 'invalid_amount'];
         }
 
-        // 3. Only process success
-        if ((string) $payload['status'] !== 'success') {
-            $this->logActivity('sepay_webhook_non_success', $payload, $ip);
-            return ['accepted' => false, 'reason' => 'non_success_status'];
-        }
-
-        // 4. Lookup order
-        $order = $this->orderRepo->findByCode((string) $payload['order_invoice_number']);
+        // 4. Lookup order theo order_invoice_number (= mã đơn).
+        $order = $this->orderRepo->findByCode($invoice);
         if ($order === null) {
             $this->logActivity('sepay_webhook_unknown_order', $payload, $ip);
             return ['accepted' => false, 'reason' => 'unknown_order'];
         }
 
-        // 4b. Order đã cancelled — không auto-confirm, ghi activity để operator
-        // hoàn tiền thủ công (return 200 để SePay không retry).
+        // 4a. Amount phải khớp tổng đơn (chống tampering số tiền).
+        if ($amount !== (int) ($order['total'] ?? -1)) {
+            $this->logActivity(
+                'sepay_webhook_amount_mismatch',
+                array_merge($this->maskedPayload($payload, $orderObj, $txObj), [
+                    'order_id'    => (int) $order['id'],
+                    'order_total' => (int) ($order['total'] ?? 0),
+                ]),
+                $ip
+            );
+            return ['accepted' => false, 'reason' => 'amount_mismatch'];
+        }
+
+        // 4b. Đơn đã cancelled — cần hoàn tiền thủ công (trả 200, không retry).
         if ((string) ($order['status'] ?? '') === 'cancelled') {
-            $this->logActivity('sepay_webhook_into_cancelled_order',
-                array_merge($payload, ['order_id' => (int) $order['id']]), $ip);
+            $this->logActivity(
+                'sepay_webhook_into_cancelled_order',
+                array_merge($this->maskedPayload($payload, $orderObj, $txObj), ['order_id' => (int) $order['id']]),
+                $ip
+            );
             return ['accepted' => true, 'reason' => 'order_cancelled_manual_refund_needed'];
         }
 
-        // 5. Idempotency
-        $existing = $this->findExistingPayment((string) $payload['transaction_id']);
-        if ($existing !== null) {
-            $this->logActivity('sepay_webhook_duplicate', $payload, $ip);
+        // 5. Idempotency theo transaction_id.
+        if ($this->findExistingPayment($txId) !== null) {
+            $this->logActivity('sepay_webhook_duplicate', $this->maskedPayload($payload, $orderObj, $txObj), $ip);
             return ['accepted' => true, 'reason' => 'duplicate_ignored'];
         }
 
-        // 6. Build PaymentRequest + record via ledger
+        // 6. Ghi nhận thanh toán qua ledger (tự cập nhật payment_status / confirm theo cấu hình).
         $req = new PaymentRequest(
             orderId:       (int) $order['id'],
             type:          'payment',
             amount:        $amount,
             method:        'sepay',
             gateway:       'sepay',
-            transactionId: (string) $payload['transaction_id'],
-            note:          'SePay IPN',
-            paidAt:        isset($payload['paid_at']) ? (string) $payload['paid_at'] : current_time('mysql'),
+            transactionId: $txId,
+            note:          'SePay IPN' . ($txObj['payment_method'] ?? '' ? ' (' . (string) $txObj['payment_method'] . ')' : ''),
+            paidAt:        current_time('mysql'),
             createdBy:     null,
-            rawPayload:    $this->maskedPayload($payload),
+            rawPayload:    $this->maskedPayload($payload, $orderObj, $txObj),
         );
 
         try {
             $this->ledger->record($req);
         } catch (IdempotencyConflictException $e) {
-            // Race condition — đã được xử lý ở pre-check, ở đây phòng hờ
-            $this->logActivity('sepay_webhook_duplicate', $payload, $ip);
+            $this->logActivity('sepay_webhook_duplicate', $this->maskedPayload($payload, $orderObj, $txObj), $ip);
             return ['accepted' => true, 'reason' => 'duplicate_ignored'];
         } catch (\Throwable $e) {
-            $this->logActivity('sepay_webhook_error', array_merge($payload, ['error' => $e->getMessage()]), $ip);
+            $this->logActivity('sepay_webhook_error', ['error' => $e->getMessage(), 'order_id' => (int) $order['id']], $ip);
             return ['accepted' => false, 'reason' => 'ledger_error'];
         }
 
-        $this->logActivity('sepay_webhook_accepted', $this->maskedPayload($payload), $ip);
+        $this->logActivity('sepay_webhook_accepted', $this->maskedPayload($payload, $orderObj, $txObj), $ip);
         return ['accepted' => true, 'reason' => null];
     }
 
     /**
-     * Lọc payload chỉ giữ các field nghiệp vụ cần audit, loại bỏ PII không cần
-     * (số tài khoản đầy đủ, BIN, etc.). Field `signature` không bao giờ giữ.
+     * Trích các field nghiệp vụ cần audit từ payload lồng (không giữ PII thừa).
+     * @return array<string,mixed>
      */
-    private function maskedPayload(array $payload): array
+    private function maskedPayload(array $payload, array $orderObj = [], array $txObj = []): array
     {
-        $safe = [];
-        foreach (self::RAW_PAYLOAD_WHITELIST as $key) {
-            if (array_key_exists($key, $payload)) {
-                $safe[$key] = $payload[$key];
-            }
-        }
-        // Mask số tài khoản nếu SePay gửi (giữ 4 ký tự cuối để đối soát).
-        if (isset($payload['account_number']) && is_string($payload['account_number'])) {
-            $acc = $payload['account_number'];
-            $safe['account_number_tail'] = strlen($acc) > 4 ? substr($acc, -4) : $acc;
-        }
-        return $safe;
+        return [
+            'notification_type'    => (string) ($payload['notification_type'] ?? ''),
+            'timestamp'            => $payload['timestamp'] ?? null,
+            'order_invoice_number' => (string) ($orderObj['order_invoice_number'] ?? ''),
+            'order_status'         => (string) ($orderObj['order_status'] ?? ''),
+            'order_amount'         => $orderObj['order_amount'] ?? null,
+            'transaction_id'       => (string) ($txObj['transaction_id'] ?? ''),
+            'transaction_amount'   => $txObj['transaction_amount'] ?? null,
+            'transaction_status'   => (string) ($txObj['transaction_status'] ?? ''),
+            'payment_method'       => (string) ($txObj['payment_method'] ?? ''),
+        ];
     }
 
     private function findExistingPayment(string $txId): ?array
@@ -171,7 +177,6 @@ final class SepayWebhook
 
     private function logActivity(string $action, array $payload, ?string $ip): void
     {
-        // Mask secret-like fields nếu có
         $safe = $payload;
         unset($safe['signature']);
 

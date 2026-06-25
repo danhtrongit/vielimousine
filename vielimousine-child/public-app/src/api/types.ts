@@ -104,6 +104,11 @@ export interface CreateOrderRequest {
   dropoff?: { address: string } | null;
 }
 
+export interface CheckoutForm {
+  action: string;
+  fields: Record<string, string>;
+}
+
 export interface CreateOrderResponse {
   id: number;
   code: string;
@@ -111,7 +116,7 @@ export interface CreateOrderResponse {
   paid_amount: number;
   status: string;
   payment_status: string;
-  redirect_url?: string | null;
+  checkout?: CheckoutForm | null;
 }
 
 export interface OrderLookupItem {
@@ -135,6 +140,9 @@ export interface OrderLookup {
   total: number;
   paid_amount: number;
   items: OrderLookupItem[];
+  pickup?: { address?: string } | null;
+  dropoff?: { address?: string } | null;
+  customer_vat?: { company_name?: string; tax_code?: string; address?: string; email?: string } | null;
 }
 
 export interface QuoteInquiryRequest {

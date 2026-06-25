@@ -170,6 +170,15 @@ final class PublicAssets
     {
         global $post;
         if (!$post instanceof \WP_Post) return false;
-        return strpos((string) $post->post_content, $attr) !== false;
+        $content = (string) $post->post_content;
+        if (strpos($content, $attr) !== false) {
+            return true;
+        }
+        // Shortcode tương ứng cũng tính là có mount: shortcode render ra phần tử mount
+        // lúc hiển thị, nhưng quyết định enqueue chạy trước nên phải dò shortcode trong content.
+        $shortcodeMap = [
+            'data-vie-public-success' => 'vie_order_success',
+        ];
+        return isset($shortcodeMap[$attr]) && has_shortcode($content, $shortcodeMap[$attr]);
     }
 }
