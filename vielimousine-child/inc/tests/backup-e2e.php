@@ -133,6 +133,26 @@ try {
 $assert('restore accepts dump with ON UPDATE CURRENT_TIMESTAMP column', $tsOk, $tsErr);
 $wpdb->query("DROP TABLE IF EXISTS `$Tts`");
 
+// Regression: backup từ site khác prefix (vd combo "wpte_") phải tự dịch sang prefix local.
+$Tcp = $wpdb->prefix . 'vie_backup_test';
+$wpdb->query("DROP TABLE IF EXISTS `$Tcp`");
+$foreignSql = "DROP TABLE IF EXISTS `zzx_vie_backup_test`;\n"
+  . "CREATE TABLE `zzx_vie_backup_test` (id INT PRIMARY KEY, label VARCHAR(50) NOT NULL) ENGINE=InnoDB;\n"
+  . "INSERT INTO `zzx_vie_backup_test` (id,label) VALUES (1,'crossprefix');";
+$cpOk = false; $cpErr = '';
+try {
+    $r = BackupService::restore($foreignSql);
+    $cpOk = empty($r['errors']) && $wpdb->get_var("SELECT label FROM `$Tcp` WHERE id=1") === 'crossprefix';
+} catch (\Throwable $e) { $cpErr = $e->getMessage(); }
+$assert('restore tự dịch prefix nguồn (zzx_ → local) cho bảng vie_', $cpOk, $cpErr);
+$wpdb->query("DROP TABLE IF EXISTS `$Tcp`");
+
+// An toàn: dịch prefix CHỈ áp cho bảng vie_ — bảng non-vie prefix lạ vẫn phải bị chặn.
+$rejForeignNonVie = false;
+try { BackupService::restore("INSERT INTO `zzx_users` (ID) VALUES (1);"); }
+catch (\RuntimeException $e) { $rejForeignNonVie = true; }
+$assert('restore vẫn từ chối bảng non-vie prefix lạ (zzx_users)', $rejForeignNonVie);
+
 $wpdb->query("DROP TABLE IF EXISTS `$T`");           // cleanup
 
 echo "Scenario D: controller endpoints\n";

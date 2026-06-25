@@ -134,6 +134,12 @@ final class BackupService
 
         $wpPrefix = $wpdb->prefix; // vd "wpte_"
 
+        // Tự DỊCH prefix nguồn của bảng vie_ sang prefix của site hiện tại, để backup từ
+        // site khác prefix (vd combo "wpte_") restore được trên site này (vd "wp_") mà
+        // không phải sửa tay. CHỈ đổi định danh backtick dạng `<prefix>vie_...`; KHÔNG đụng
+        // bảng non-vie → allowlist vẫn an toàn (vd `wpte_users` không bị dịch → vẫn bị chặn).
+        $sql = self::translateViePrefix($sql, $wpPrefix);
+
         // (a) Tên bảng đứng NGAY SAU verb chạm bảng — chỉ xét ở ĐẦU mỗi câu lệnh.
         //     Quét toàn cục sẽ khớp nhầm 'UPDATE' trong 'ON UPDATE CURRENT_TIMESTAMP'
         //     (định nghĩa cột) hoặc 'ON DUPLICATE KEY UPDATE', rồi bắt token kế tiếp
@@ -196,6 +202,35 @@ final class BackupService
         $wpdb->flush();
 
         return ['tables_restored' => $tables, 'statements' => $stmts, 'errors' => $errors];
+    }
+
+    /**
+     * Dịch prefix nguồn của các bảng vie_ trong dump sang prefix của site hiện tại.
+     * Phát hiện prefix nguồn từ tên bảng (sau DROP/CREATE/INSERT) có dạng `<prefix>vie_<name>`,
+     * rồi thay `<src>vie_` -> `<local>vie_` trong định danh backtick.
+     *
+     * An toàn allowlist: chỉ dịch định danh chứa "vie_" → bảng non-vie (vd `wpte_users`)
+     * KHÔNG bị dịch, vẫn giữ prefix lạ và bị isAllowed() từ chối như cũ.
+     */
+    private static function translateViePrefix(string $sql, string $localPrefix): string
+    {
+        $localViePrefix = $localPrefix . 'vie_';
+        preg_match_all(
+            '/(?:DROP\s+TABLE(?:\s+IF\s+EXISTS)?'
+          . '|CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?'
+          . '|INSERT(?:\s+IGNORE)?\s+INTO'
+          . '|TRUNCATE(?:\s+TABLE)?)\s+`([A-Za-z0-9_]+?vie_)[A-Za-z0-9_]+`/i',
+            $sql,
+            $m
+        );
+        $sources = array_values(array_unique($m[1] ?? []));
+        foreach ($sources as $srcViePrefix) {           // vd "wpte_vie_"
+            if ($srcViePrefix === $localViePrefix) {
+                continue;
+            }
+            $sql = str_replace('`' . $srcViePrefix, '`' . $localViePrefix, $sql);
+        }
+        return $sql;
     }
 
     /**
