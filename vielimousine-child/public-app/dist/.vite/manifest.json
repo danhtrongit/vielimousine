@@ -1,10 +1,6 @@
 {
-  "_main-bKgmSkNi.css": {
-    "file": "assets/main-bKgmSkNi.css",
-    "src": "_main-bKgmSkNi.css"
-  },
-  "_main-mYeYGghP.js": {
-    "file": "assets/main-mYeYGghP.js",
+  "_main-CEdrhSMQ.js": {
+    "file": "assets/main-CEdrhSMQ.js",
     "name": "main",
     "css": [
       "assets/main-bKgmSkNi.css"
@@ -16,6 +12,10 @@
       "assets/primeicons-MpK4pl85.ttf",
       "assets/primeicons-Dr5RGzOO.svg"
     ]
+  },
+  "_main-bKgmSkNi.css": {
+    "file": "assets/main-bKgmSkNi.css",
+    "src": "_main-bKgmSkNi.css"
   },
   "node_modules/primeicons/fonts/primeicons.eot": {
     "file": "assets/primeicons-DMOk5skT.eot",
@@ -38,24 +38,24 @@
     "src": "node_modules/primeicons/fonts/primeicons.woff2"
   },
   "src/entries/hotel.ts": {
-    "file": "assets/hotel-DU1oM_7I.js",
+    "file": "assets/hotel-kV68lJit.js",
     "name": "hotel",
     "src": "src/entries/hotel.ts",
     "isEntry": true,
     "imports": [
-      "_main-mYeYGghP.js"
+      "_main-CEdrhSMQ.js"
     ],
     "css": [
       "assets/hotel-BsOrsDaW.css"
     ]
   },
   "src/entries/success.ts": {
-    "file": "assets/success-B0FCp01F.js",
+    "file": "assets/success-DnnDdoK9.js",
     "name": "success",
     "src": "src/entries/success.ts",
     "isEntry": true,
     "imports": [
-      "_main-mYeYGghP.js"
+      "_main-CEdrhSMQ.js"
     ]
   }
 }

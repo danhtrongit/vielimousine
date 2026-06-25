@@ -51,6 +51,17 @@ const order = ref<OrderDetail | null>(null);
 const loading = ref(true);
 const orderId = computed(() => Number(route.params.id));
 
+function locationAddress(loc: Record<string, unknown> | null | undefined): string {
+  return loc && typeof loc.address === 'string' ? loc.address : '';
+}
+const pickupAddress = computed(() => locationAddress(order.value?.pickup));
+const dropoffAddress = computed(() => locationAddress(order.value?.dropoff));
+const vat = computed(() => {
+  const v = order.value?.customer_vat as Record<string, string> | null | undefined;
+  if (!v || typeof v !== 'object') return null;
+  return (v.company_name || v.tax_code || v.address || v.email) ? v : null;
+});
+
 const cancelDialog = ref(false);
 const cancelReason = ref('');
 const cancelRefundAmount = ref(0);
@@ -393,6 +404,12 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
           <div v-if="order.customer && order.customer.booking_count > 0" class="kv">
             <span>Lịch sử:</span><strong>{{ order.customer.booking_count }} đơn</strong>
           </div>
+          <template v-if="vat">
+            <div class="kv"><span>VAT · Công ty:</span><strong>{{ vat.company_name || '—' }}</strong></div>
+            <div class="kv"><span>VAT · MST:</span><strong>{{ vat.tax_code || '—' }}</strong></div>
+            <div v-if="vat.address" class="kv"><span>VAT · Địa chỉ:</span><strong>{{ vat.address }}</strong></div>
+            <div v-if="vat.email" class="kv"><span>VAT · Email:</span><strong>{{ vat.email }}</strong></div>
+          </template>
         </template>
       </Card>
 
@@ -404,6 +421,8 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
           <div class="kv"><span>Số đêm:</span><strong>{{ order.nights }}</strong></div>
           <div class="kv"><span>Người lớn:</span><strong>{{ order.adults }}</strong></div>
           <div class="kv"><span>Trẻ em:</span><strong>{{ order.children }}</strong></div>
+          <div v-if="pickupAddress" class="kv"><span>Điểm đón:</span><strong>{{ pickupAddress }}</strong></div>
+          <div v-if="dropoffAddress" class="kv"><span>Điểm trả:</span><strong>{{ dropoffAddress }}</strong></div>
         </template>
       </Card>
 

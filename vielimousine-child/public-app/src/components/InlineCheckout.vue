@@ -4,6 +4,9 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import RadioButton from 'primevue/radiobutton';
+import Select from 'primevue/select';
+import SelectButton from 'primevue/selectbutton';
+import Checkbox from 'primevue/checkbox';
 import { api, uuidv4 } from '@/api/client';
 import type {
   CreateOrderRequest,
@@ -12,7 +15,8 @@ import type {
   QuoteInquiryRequest,
   QuoteInquiryResponse,
 } from '@/api/types';
-import { search, selection, getQuote, clearSelectionBack } from '@/composables/useBookingState';
+import { search, selection, getQuote, clearSelectionBack, appliedCoupon, resetCoupon, DROPOFF_OPTIONS, setSelection, type BookingType } from '@/composables/useBookingState';
+import { fetchQuoteForRoom } from '@/composables/useQuotes';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const props = defineProps<{ rooms: Array<{ id: number; name: string }> }>();
@@ -21,7 +25,6 @@ const idemKey = uuidv4();
 const submitting = ref(false);
 const errorMsg = ref('');
 const couponStatus = ref<{ text: string; kind: 'ok' | 'err' } | null>(null);
-const appliedCoupon = ref<string | null>(null);
 const inquirySent = ref(false);
 
 const form = reactive({
@@ -31,16 +34,35 @@ const form = reactive({
   customer_note: '',
   coupon_code: '',
   payment_method: 'sepay' as 'sepay' | 'bank_transfer',
+  pickupAddress: '',
+  dropoffAddress: '',
+  vat: { company_name: '', tax_code: '', address: '', email: '' },
 });
+const vatEnabled = ref(false);
 
 const room = computed(() => props.rooms.find((r) => r.id === selection.roomId));
 const quote = computed(() => (selection.roomId ? getQuote(selection.roomId, selection.bookingType) : null));
 const isQuoteMode = computed(() => quote.value?.requires_quote === true);
+const isCombo = computed(() => selection.bookingType === 'combo');
+
+// Đổi nhanh loại đặt (phòng ↔ combo) ngay trong form, không phải quay lại danh sách phòng.
+const typeOptions = [
+  { label: 'Chỉ phòng', value: 'room' as BookingType },
+  { label: 'Combo (phòng + vé)', value: 'combo' as BookingType },
+];
+async function switchType(type: BookingType | null) {
+  if (!type || !selection.roomId || type === selection.bookingType) return;
+  const rid = selection.roomId;
+  setSelection(rid, type);          // cập nhật loại đặt + tự reset mã giảm giá
+  couponStatus.value = null;
+  form.coupon_code = '';
+  if (!getQuote(rid, type)) await fetchQuoteForRoom(rid, type); // nạp quote nếu chưa cache
+}
 
 async function applyCoupon() {
   couponStatus.value = null;
   const code = form.coupon_code.trim();
-  if (!code) { appliedCoupon.value = null; return; }
+  if (!code) { resetCoupon(); return; }
   if (!selection.roomId || !quote.value) {
     couponStatus.value = { text: 'Chọn phòng + chờ tính giá trước.', kind: 'err' };
     return;
@@ -52,10 +74,11 @@ async function applyCoupon() {
       room_id: selection.roomId,
       booking_type: selection.bookingType,
     });
-    appliedCoupon.value = code;
+    appliedCoupon.code = code;
+    appliedCoupon.discount = data.discount;
     couponStatus.value = { text: 'Đã áp dụng: −' + formatVND(data.discount), kind: 'ok' };
   } catch (e: any) {
-    appliedCoupon.value = null;
+    resetCoupon();
     couponStatus.value = { text: e?.errors?.[0]?.message || 'Mã không hợp lệ', kind: 'err' };
   }
 }
@@ -69,6 +92,12 @@ function validateContact(): string | null {
   if (!selection.roomId) return 'Vui lòng chọn phòng.';
   if (!form.name.trim() || !form.phone.trim()) {
     return 'Vui lòng nhập họ tên và số điện thoại.';
+  }
+  if (isCombo.value && (!form.pickupAddress.trim() || !form.dropoffAddress.trim())) {
+    return 'Đơn combo cần nhập điểm đón và chọn điểm trả.';
+  }
+  if (vatEnabled.value && (!form.vat.company_name.trim() || !form.vat.tax_code.trim())) {
+    return 'Vui lòng nhập tên công ty và mã số thuế để xuất hóa đơn VAT.';
   }
   return null;
 }
@@ -103,7 +132,19 @@ async function submitOrder(ev: Event) {
     customer_note: form.customer_note.trim() || null,
     payment_method: form.payment_method,
   };
-  if (appliedCoupon.value) body.coupon_code = appliedCoupon.value;
+  if (appliedCoupon.code) body.coupon_code = appliedCoupon.code;
+  if (isCombo.value) {
+    body.pickup = { address: form.pickupAddress.trim() };
+    body.dropoff = { address: form.dropoffAddress.trim() };
+  }
+  if (vatEnabled.value) {
+    body.customer.vat = {
+      company_name: form.vat.company_name.trim() || null,
+      tax_code: form.vat.tax_code.trim() || null,
+      address: form.vat.address.trim() || null,
+      email: form.vat.email.trim() || null,
+    };
+  }
 
   submitting.value = true;
   try {
@@ -191,6 +232,18 @@ async function submitInquiry() {
         <Button label="Đổi phòng" icon="pi pi-pencil" severity="secondary" text size="small" @click="changeRoom" />
       </div>
 
+      <!-- Đổi nhanh loại đặt phòng/combo ngay tại đây -->
+      <div class="vh-type-switch">
+        <SelectButton
+          :model-value="selection.bookingType"
+          :options="typeOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          @update:model-value="switchType"
+        />
+      </div>
+
       <div v-if="isQuoteMode" class="vh-inquiry-note">
         <i class="pi pi-info-circle" />
         <span>Cấu hình bạn chọn vượt giá niêm yết — vui lòng để lại thông tin, Vie Lim sẽ liên hệ báo giá phù hợp.</span>
@@ -222,6 +275,57 @@ async function submitInquiry() {
               fluid
             />
           </div>
+        </fieldset>
+
+        <!-- Đưa đón: chỉ hiện cho đơn combo (đã gồm xe limousine khứ hồi) -->
+        <fieldset v-if="!isQuoteMode && isCombo" class="vh-fieldset">
+          <legend><i class="pi pi-car" /> Thông tin đưa đón</legend>
+          <div class="vh-field">
+            <label>Điểm đón <em>*</em></label>
+            <InputText
+              v-model="form.pickupAddress"
+              placeholder="Địa chỉ đón khách (số nhà, đường, phường, tỉnh/thành)"
+              fluid
+            />
+          </div>
+          <div class="vh-field">
+            <label>Điểm trả <em>*</em></label>
+            <Select
+              v-model="form.dropoffAddress"
+              :options="DROPOFF_OPTIONS"
+              placeholder="Chọn điểm trả"
+              fluid
+            />
+          </div>
+        </fieldset>
+
+        <!-- Hóa đơn VAT: tích để mở phần điền thông tin -->
+        <fieldset v-if="!isQuoteMode" class="vh-fieldset">
+          <legend><i class="pi pi-file-edit" /> Hóa đơn VAT</legend>
+          <label class="vh-check-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <Checkbox v-model="vatEnabled" :binary="true" input-id="vh-vat-toggle" />
+            <span>Tôi cần xuất hóa đơn VAT (tích để điền thông tin)</span>
+          </label>
+          <template v-if="vatEnabled">
+            <div class="vh-form-row" style="margin-top:12px;">
+              <div class="vh-field">
+                <label>Tên công ty <em>*</em></label>
+                <InputText v-model="form.vat.company_name" fluid />
+              </div>
+              <div class="vh-field">
+                <label>Mã số thuế <em>*</em></label>
+                <InputText v-model="form.vat.tax_code" inputmode="numeric" fluid />
+              </div>
+            </div>
+            <div class="vh-field">
+              <label>Địa chỉ công ty</label>
+              <InputText v-model="form.vat.address" fluid />
+            </div>
+            <div class="vh-field">
+              <label>Email nhận hóa đơn</label>
+              <InputText v-model="form.vat.email" autocomplete="email" fluid />
+            </div>
+          </template>
         </fieldset>
 
         <!-- Coupon + Payment chỉ hiện khi không phải chế độ báo giá -->

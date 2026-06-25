@@ -16,6 +16,8 @@ require_once __DIR__ . '/_partials.php';
 </table>
 
 <?php echo vie_email_render_items($ctx['items'] ?? [], true); ?>
+<?php echo vie_email_render_pickup_dropoff($ctx); ?>
+<?php echo vie_email_render_vat($ctx); ?>
 <?php echo vie_email_render_totals($ctx, true); ?>
 
 <?php if (!empty($ctx['customer_note'])): ?>

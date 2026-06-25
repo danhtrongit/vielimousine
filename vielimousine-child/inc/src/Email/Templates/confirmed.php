@@ -8,5 +8,6 @@ require_once __DIR__ . '/_partials.php';
   Vui lòng kiểm tra thông tin chi tiết bên dưới.
 </p>
 <?php echo vie_email_render_items($ctx['items'] ?? [], false); ?>
+<?php echo vie_email_render_pickup_dropoff($ctx); ?>
 <?php echo vie_email_render_totals($ctx, false); ?>
 <p style="margin:18px 0 0;">Mọi thắc mắc xin liên hệ Vielimousine. Hẹn gặp bạn!</p>

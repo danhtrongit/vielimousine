@@ -269,6 +269,13 @@ final class OrderEmailService
             'child_ages'      => (string) ($order['child_ages'] ?? ''),
             'total_seats'     => $totalSeats,
 
+            // Đưa đón (đơn combo)
+            'pickup'          => $this->formatLocation($order['pickup'] ?? null),
+            'dropoff'         => $this->formatLocation($order['dropoff'] ?? null),
+
+            // Hóa đơn VAT (nếu khách yêu cầu)
+            'vat'             => $this->normalizeVat($order['customer_vat'] ?? null),
+
             // Items
             'items'           => $formattedItems,
 
@@ -309,6 +316,44 @@ final class OrderEmailService
         ];
 
         return $ctx;
+    }
+
+    /**
+     * Chuẩn hoá pickup/dropoff (LONGTEXT JSON hoặc array đã cast) → chuỗi địa chỉ hiển thị.
+     */
+    private function formatLocation($loc): string
+    {
+        if (is_string($loc) && $loc !== '') {
+            $decoded = json_decode($loc, true);
+            $loc = is_array($decoded) ? $decoded : null;
+        }
+        if (!is_array($loc)) {
+            return '';
+        }
+        return trim((string) ($loc['address'] ?? ''));
+    }
+
+    /**
+     * Chuẩn hoá VAT (JSON/array, hoặc chuỗi MST cũ) → mảng {company_name,tax_code,address,email}.
+     * Trả [] nếu rỗng để template biết không render.
+     * @return array<string,string>
+     */
+    private function normalizeVat($vat): array
+    {
+        if (is_string($vat) && $vat !== '') {
+            $decoded = json_decode($vat, true);
+            $vat = is_array($decoded) ? $decoded : ['tax_code' => $vat];
+        }
+        if (!is_array($vat)) {
+            return [];
+        }
+        $out = [
+            'company_name' => trim((string) ($vat['company_name'] ?? '')),
+            'tax_code'     => trim((string) ($vat['tax_code'] ?? '')),
+            'address'      => trim((string) ($vat['address'] ?? '')),
+            'email'        => trim((string) ($vat['email'] ?? '')),
+        ];
+        return array_filter($out) === [] ? [] : $out;
     }
 
     /**

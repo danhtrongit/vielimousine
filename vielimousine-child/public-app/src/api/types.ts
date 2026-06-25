@@ -85,11 +85,23 @@ export interface CreateOrderItem {
 }
 
 export interface CreateOrderRequest {
-  customer: { phone: string; name: string; email: string | null };
+  customer: {
+    phone: string;
+    name: string;
+    email: string | null;
+    vat?: {
+      company_name: string | null;
+      tax_code: string | null;
+      address: string | null;
+      email: string | null;
+    } | null;
+  };
   items: CreateOrderItem[];
   customer_note?: string | null;
   coupon_code?: string;
   payment_method?: string;
+  pickup?: { address: string } | null;
+  dropoff?: { address: string } | null;
 }
 
 export interface CreateOrderResponse {

@@ -33,6 +33,7 @@ export interface Order {
   internal_note: string | null;
   pickup: Record<string, unknown> | null;
   dropoff: Record<string, unknown> | null;
+  customer_vat: Record<string, unknown> | null;
   draft_payload: Record<string, unknown> | null;
   created_at: string;
   hotel_names: string;

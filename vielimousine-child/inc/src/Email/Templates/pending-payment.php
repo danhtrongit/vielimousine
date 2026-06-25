@@ -5,6 +5,8 @@ require_once __DIR__ . '/_partials.php';
 <h2 style="margin:0 0 12px;color:#111827;font-size:18px;">Cảm ơn <?php echo esc_html((string) ($ctx['customer_name'] ?? 'Quý khách')); ?> đã đặt phòng</h2>
 <p style="margin:0 0 16px;">Đơn đặt phòng <strong>#<?php echo esc_html((string) ($ctx['order_code'] ?? '')); ?></strong> đang ở trạng thái <strong>Chờ thanh toán</strong>.</p>
 <?php echo vie_email_render_items($ctx['items'] ?? [], false); ?>
+<?php echo vie_email_render_pickup_dropoff($ctx); ?>
+<?php echo vie_email_render_vat($ctx); ?>
 <?php echo vie_email_render_totals($ctx, false); ?>
 <?php if (!empty($ctx['lookup_url'])): ?>
   <p style="margin:16px 0;text-align:center;">

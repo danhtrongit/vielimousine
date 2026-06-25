@@ -46,10 +46,29 @@ export const selection = reactive<{ roomId: number | null; bookingType: BookingT
   bookingType: 'room',
 });
 
+// Mã giảm giá đang áp dụng — chia sẻ giữa InlineCheckout (nơi áp dụng) và
+// BookingWidget (nơi hiển thị "Tổng cộng") để tổng tiền trừ đúng phần giảm.
+export const appliedCoupon = reactive<{ code: string | null; discount: number }>({
+  code: null,
+  discount: 0,
+});
+export function resetCoupon(): void {
+  appliedCoupon.code = null;
+  appliedCoupon.discount = 0;
+}
+
+// Điểm trả cố định cho đơn combo (đưa đón limousine khứ hồi).
+export const DROPOFF_OPTIONS: string[] = [
+  '131 Nguyễn Thái Bình, Phường Bến Thành, TPHCM',
+  '217 Hoàng Hoa Thám, Phường Tân Bình, TPHCM',
+];
+
 let pushedBookingState = false;
 
 export function setSelection(roomId: number | null, type: BookingType = 'room') {
   const wasEmpty = selection.roomId === null;
+  // Đổi phòng/loại đặt → mã giảm giá cũ (validate theo phòng+subtotal cũ) không còn đúng.
+  resetCoupon();
   selection.roomId = roomId;
   selection.bookingType = type;
   // Push a history entry the first time a room is selected so the browser

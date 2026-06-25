@@ -8,5 +8,6 @@ require_once __DIR__ . '/_partials.php';
   cho đơn <strong>#<?php echo esc_html((string) ($ctx['order_code'] ?? '')); ?></strong>.
 </p>
 <?php echo vie_email_render_items($ctx['items'] ?? [], false); ?>
+<?php echo vie_email_render_pickup_dropoff($ctx); ?>
 <?php echo vie_email_render_totals($ctx, false); ?>
 <p style="margin:18px 0 0;">Chúng tôi mong được phục vụ bạn tại Vielimousine. Hẹn gặp bạn ngày <?php echo esc_html((string) ($ctx['checkin'] ?? '')); ?>!</p>

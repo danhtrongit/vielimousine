@@ -76,6 +76,30 @@ final class PublicOrderValidation
             }
         }
 
+        // Đơn combo (gồm đưa đón limousine) bắt buộc có điểm đón + điểm trả.
+        $hasCombo = is_array($items) && array_filter(
+            $items,
+            static fn($it) => is_array($it) && (($it['booking_type'] ?? '') === 'combo')
+        ) !== [];
+        if ($hasCombo) {
+            $pickupAddr  = trim((string) ($data['pickup']['address'] ?? ''));
+            $dropoffAddr = trim((string) ($data['dropoff']['address'] ?? ''));
+            if ($pickupAddr === '') {
+                $errors[] = [
+                    'code'    => 'validation_error',
+                    'field'   => 'pickup',
+                    'message' => 'Đơn combo cần nhập điểm đón.',
+                ];
+            }
+            if ($dropoffAddr === '') {
+                $errors[] = [
+                    'code'    => 'validation_error',
+                    'field'   => 'dropoff',
+                    'message' => 'Đơn combo cần chọn điểm trả.',
+                ];
+            }
+        }
+
         return $errors;
     }
 }

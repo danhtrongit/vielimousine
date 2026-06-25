@@ -97,3 +97,62 @@ if (!function_exists('vie_email_render_totals')) {
         return $html;
     }
 }
+
+if (!function_exists('vie_email_render_pickup_dropoff')) {
+    /**
+     * Render thông tin đưa/đón (chỉ hiện nếu có — đơn combo). Dùng chung admin/customer.
+     */
+    function vie_email_render_pickup_dropoff(array $ctx): string
+    {
+        $pickup  = trim((string) ($ctx['pickup'] ?? ''));
+        $dropoff = trim((string) ($ctx['dropoff'] ?? ''));
+        if ($pickup === '' && $dropoff === '') {
+            return '';
+        }
+        $rows = '';
+        if ($pickup !== '') {
+            $rows .= '<tr><td style="padding:6px 12px;color:#6b7280;width:42%;">Điểm đón</td><td style="padding:6px 12px;">' . esc_html($pickup) . '</td></tr>';
+        }
+        if ($dropoff !== '') {
+            $rows .= '<tr><td style="padding:6px 12px;color:#6b7280;">Điểm trả</td><td style="padding:6px 12px;">' . esc_html($dropoff) . '</td></tr>';
+        }
+        return '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #e5e7eb;border-radius:6px;margin:0 0 12px;border-collapse:separate;">'
+            . '<tr><td colspan="2" style="background:#f9fafb;padding:8px 12px;font-weight:600;border-bottom:1px solid #e5e7eb;">🚐 Thông tin đưa đón</td></tr>'
+            . $rows
+            . '</table>';
+    }
+}
+
+if (!function_exists('vie_email_render_vat')) {
+    /**
+     * Render thông tin hóa đơn VAT (chỉ hiện nếu có). $ctx['vat'] = mảng {company_name,tax_code,address,email}.
+     */
+    function vie_email_render_vat(array $ctx): string
+    {
+        $vat = $ctx['vat'] ?? [];
+        if (!is_array($vat) || $vat === []) {
+            return '';
+        }
+        $labels = [
+            'company_name' => 'Tên công ty',
+            'tax_code'     => 'Mã số thuế',
+            'address'      => 'Địa chỉ',
+            'email'        => 'Email nhận hóa đơn',
+        ];
+        $rows = '';
+        foreach ($labels as $key => $label) {
+            $val = trim((string) ($vat[$key] ?? ''));
+            if ($val === '') {
+                continue;
+            }
+            $rows .= '<tr><td style="padding:6px 12px;color:#6b7280;width:42%;">' . esc_html($label) . '</td><td style="padding:6px 12px;">' . esc_html($val) . '</td></tr>';
+        }
+        if ($rows === '') {
+            return '';
+        }
+        return '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #e5e7eb;border-radius:6px;margin:0 0 12px;border-collapse:separate;">'
+            . '<tr><td colspan="2" style="background:#f9fafb;padding:8px 12px;font-weight:600;border-bottom:1px solid #e5e7eb;">🧾 Hóa đơn VAT</td></tr>'
+            . $rows
+            . '</table>';
+    }
+}

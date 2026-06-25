@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import Button from 'primevue/button';
-import { search, selection, getQuote } from '@/composables/useBookingState';
+import { search, selection, getQuote, appliedCoupon } from '@/composables/useBookingState';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const props = defineProps<{ rooms: Array<{ id: number; name: string }> }>();
@@ -25,10 +25,15 @@ const childSurchargeLine = computed(() => {
   return q.child_surcharge_total + (isCombo.value ? q.child_ticket_subtotal : 0);
 });
 
+// Phần giảm của mã coupon đang áp dụng, không vượt quá tổng đơn.
+const couponDiscount = computed(() => {
+  if (!quote.value) return 0;
+  return Math.min(appliedCoupon.discount, quote.value.total);
+});
 const totalText = computed(() => {
   if (!quote.value) return '—';
   if (quote.value.requires_quote) return 'Liên hệ';
-  return formatVND(quote.value.total);
+  return formatVND(Math.max(0, quote.value.total - couponDiscount.value));
 });
 const childrenSummary = computed(() => {
   if (search.childAges.length === 0) return '';
@@ -86,6 +91,10 @@ function scrollToCheckout() {
           </div>
           <div v-if="quote.discount" class="vh-line vh-line-discount">
             <span>Giảm giá</span><span>−{{ formatVND(quote.discount) }}</span>
+          </div>
+          <div v-if="couponDiscount > 0" class="vh-line vh-line-discount">
+            <span>Mã giảm giá<template v-if="appliedCoupon.code"> ({{ appliedCoupon.code }})</template></span>
+            <span>−{{ formatVND(couponDiscount) }}</span>
           </div>
         </div>
 

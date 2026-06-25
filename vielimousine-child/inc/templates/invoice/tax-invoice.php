@@ -113,8 +113,23 @@ $preTax = max(0, $total - $taxInTotal);
       &nbsp;•&nbsp; <strong>Email:</strong> <?= $esc($order['customer_email']) ?>
     <?php endif; ?>
   </p>
-  <?php if (!empty($order['customer_vat'])): ?>
-    <p><strong>MST khách hàng:</strong> <?= $esc((string) $order['customer_vat']) ?></p>
+  <?php
+  $cvat = $order['customer_vat'] ?? null;
+  if (is_string($cvat) && $cvat !== '') {
+      $decoded = json_decode($cvat, true);
+      $cvat = is_array($decoded) ? $decoded : ['tax_code' => $cvat];
+  }
+  if (is_array($cvat) && array_filter($cvat)):
+  ?>
+    <?php if (!empty($cvat['company_name'])): ?>
+      <p><strong>Đơn vị mua hàng:</strong> <?= $esc((string) $cvat['company_name']) ?></p>
+    <?php endif; ?>
+    <?php if (!empty($cvat['tax_code'])): ?>
+      <p><strong>MST khách hàng:</strong> <?= $esc((string) $cvat['tax_code']) ?></p>
+    <?php endif; ?>
+    <?php if (!empty($cvat['address'])): ?>
+      <p><strong>Địa chỉ xuất hoá đơn:</strong> <?= $esc((string) $cvat['address']) ?></p>
+    <?php endif; ?>
   <?php endif; ?>
   <p><strong>Hình thức thanh toán:</strong> Chuyển khoản / Tiền mặt</p>
 </div>
