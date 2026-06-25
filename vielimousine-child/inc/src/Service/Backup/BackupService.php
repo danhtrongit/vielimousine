@@ -134,27 +134,34 @@ final class BackupService
 
         $wpPrefix = $wpdb->prefix; // vd "wpte_"
 
-        // (a) Tên bảng đứng sau các verb chạm bảng (kể cả không backtick), gồm DELETE.
-        preg_match_all(
-            '/(?:DROP\s+TABLE(?:\s+IF\s+EXISTS)?'
-          . '|TRUNCATE(?:\s+TABLE)?'
-          . '|CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?'
-          . '|ALTER\s+TABLE'
-          . '|RENAME\s+TABLE'
-          . '|INSERT(?:\s+IGNORE)?\s+INTO'
-          . '|REPLACE(?:\s+INTO)?'
-          . '|UPDATE(?:\s+LOW_PRIORITY)?(?:\s+IGNORE)?'
-          . '|DELETE(?:\s+FROM)?'
-          . ')\s+`?([A-Za-z0-9_]+)`?/i',
-            $sql, $m
-        );
+        // (a) Tên bảng đứng NGAY SAU verb chạm bảng — chỉ xét ở ĐẦU mỗi câu lệnh.
+        //     Quét toàn cục sẽ khớp nhầm 'UPDATE' trong 'ON UPDATE CURRENT_TIMESTAMP'
+        //     (định nghĩa cột) hoặc 'ON DUPLICATE KEY UPDATE', rồi bắt token kế tiếp
+        //     ("CURRENT_TIMESTAMP") làm "tên bảng" → từ chối nhầm cả backup hợp lệ.
+        $statements = self::splitStatements($sql);
+        $verbRe = '/^(?:DROP\s+TABLE(?:\s+IF\s+EXISTS)?'
+                . '|TRUNCATE(?:\s+TABLE)?'
+                . '|CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?'
+                . '|ALTER\s+TABLE'
+                . '|RENAME\s+TABLE'
+                . '|INSERT(?:\s+IGNORE)?\s+INTO'
+                . '|REPLACE(?:\s+INTO)?'
+                . '|UPDATE(?:\s+LOW_PRIORITY)?(?:\s+IGNORE)?'
+                . '|DELETE(?:\s+FROM)?'
+                . ')\s+`?([A-Za-z0-9_]+)`?/i';
+        $m1 = [];
+        foreach ($statements as $stmt) {
+            if (preg_match($verbRe, $stmt, $mm)) {
+                $m1[] = $mm[1];
+            }
+        }
         // (b) Mọi tên đích của RENAME ... TO ...
         preg_match_all('/RENAME\s+TABLE\s+`?[A-Za-z0-9_]+`?\s+TO\s+`?([A-Za-z0-9_]+)`?/i', $sql, $m2);
         // (c) Lớp bảo vệ tổng quát (chống whack-a-mole): MỌI identifier backtick có tiền tố WP.
         //     Dump thật luôn backtick tên bảng; giá trị trong INSERT là chuỗi nháy đơn nên không khớp.
         preg_match_all('/`(' . preg_quote($wpPrefix, '/') . '[A-Za-z0-9_]+)`/i', $sql, $m3);
 
-        $tables = array_values(array_unique(array_merge($m[1], $m2[1], $m3[1])));
+        $tables = array_values(array_unique(array_merge($m1, $m2[1], $m3[1])));
         $bad = array_values(array_filter($tables, static fn($t) => !self::isAllowed($t)));
         if ($bad) {
             throw new \RuntimeException('Bảng ngoài phạm vi cho phép: ' . implode(', ', $bad));

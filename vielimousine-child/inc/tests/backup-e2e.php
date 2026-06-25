@@ -114,6 +114,25 @@ try {
 $assert('restore still accepts a legit vie_ dump (incl. value with semicolon)', $legitOk);
 $wpdb->query("DROP TABLE IF EXISTS `$Tx`");
 
+// Regression: every real vie_ table has `updated_at ... ON UPDATE CURRENT_TIMESTAMP`.
+// The table-name scanner must NOT treat the `UPDATE` inside `ON UPDATE CURRENT_TIMESTAMP`
+// as a table-touching verb — otherwise it captures "CURRENT_TIMESTAMP" and rejects a valid
+// backup ("Bảng ngoài phạm vi cho phép: CURRENT_TIMESTAMP").
+$Tts = $wpdb->prefix . 'vie_backup_test';
+$wpdb->query("DROP TABLE IF EXISTS `$Tts`");
+$wpdb->query(
+    "CREATE TABLE `$Tts` (id INT PRIMARY KEY, label VARCHAR(50) NOT NULL, "
+  . "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB"
+);
+$wpdb->query("INSERT INTO `$Tts` (id,label) VALUES (1,'ts')");
+$tsOk = false; $tsErr = '';
+try {
+    $r = BackupService::restore(BackupService::export([$Tts]));
+    $tsOk = empty($r['errors']) && (int) $wpdb->get_var("SELECT COUNT(*) FROM `$Tts`") === 1;
+} catch (\Throwable $e) { $tsErr = $e->getMessage(); }
+$assert('restore accepts dump with ON UPDATE CURRENT_TIMESTAMP column', $tsOk, $tsErr);
+$wpdb->query("DROP TABLE IF EXISTS `$Tts`");
+
 $wpdb->query("DROP TABLE IF EXISTS `$T`");           // cleanup
 
 echo "Scenario D: controller endpoints\n";
