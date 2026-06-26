@@ -7,10 +7,12 @@ import Button from 'primevue/button';
 import StatusTag from '@/components/StatusTag.vue';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { formatVND, formatDate } from '@/composables/useFormat';
+import { useNotify } from '@/composables/useNotify';
 import type { Order } from '@/types/order';
 
 const props = defineProps<{ orders: Order[] }>();
 const csv = useCsvExport();
+const notify = useNotify();
 
 const receivables = computed(() => {
   return props.orders
@@ -32,21 +34,26 @@ const totalOutstanding = computed(() =>
 const overdueCount = computed(() => receivables.value.filter((o) => o.is_overdue).length);
 
 function exportCsv() {
-  csv.downloadCsv(
-    `vie-receivable-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Mã đơn', 'Khách hàng', 'SĐT', 'Check-in', 'Tổng', 'Đã trả', 'Còn phải thu', 'Trạng thái', 'Quá hạn'],
-    receivables.value.map((o) => [
-      o.code,
-      o.customer_name,
-      o.customer_phone,
-      o.checkin,
-      o.total,
-      o.paid_amount,
-      o.remaining,
-      o.status,
-      o.is_overdue ? '1' : '0',
-    ])
-  );
+  try {
+    csv.downloadCsv(
+      `vie-receivable-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Mã đơn', 'Khách hàng', 'SĐT', 'Check-in', 'Tổng', 'Đã trả', 'Còn phải thu', 'Trạng thái', 'Quá hạn'],
+      receivables.value.map((o) => [
+        o.code,
+        o.customer_name,
+        o.customer_phone,
+        o.checkin,
+        o.total,
+        o.paid_amount,
+        o.remaining,
+        o.status,
+        o.is_overdue ? '1' : '0',
+      ])
+    );
+    notify.success('Đã xuất CSV');
+  } catch (e) {
+    notify.apiError(e, 'Không xuất được CSV');
+  }
 }
 </script>
 

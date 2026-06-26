@@ -130,7 +130,9 @@ function onUploaded(uploaded: MediaItem[]) {
 }
 
 function copyUrl(url: string) {
-  navigator.clipboard.writeText(url).then(() => notify.success('Đã copy URL.'));
+  navigator.clipboard.writeText(url)
+    .then(() => notify.success('Đã copy URL.'))
+    .catch(() => notify.error('Không copy được URL.'));
 }
 
 function formatBytes(n: number): string {

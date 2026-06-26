@@ -256,6 +256,8 @@ async function flush() {
 
     if (resp.data.errors.length > 0) {
       notify.warn(`Lưu ${resp.data.saved} thay đổi, ${resp.data.errors.length} lỗi`);
+    } else {
+      notify.success('Đã cập nhật giá', `${resp.data.saved} thay đổi`);
     }
     await loadAll();
   } catch (e) {

@@ -7,11 +7,13 @@ import Column from 'primevue/column';
 import Button from 'primevue/button';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { formatVND } from '@/composables/useFormat';
+import { useNotify } from '@/composables/useNotify';
 import { labelSource } from '@/stores/lookup.store';
 import type { Order } from '@/types/order';
 
 const props = defineProps<{ orders: Order[] }>();
 const csv = useCsvExport();
+const notify = useNotify();
 
 const aggregated = computed(() => {
   const map = new Map<string, { source: string; orders: number; revenue: number; paid: number }>();
@@ -48,17 +50,22 @@ const chartOptions = {
 };
 
 function exportCsv() {
-  csv.downloadCsv(
-    `vie-by-source-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Nguồn', 'Số đơn', 'Doanh thu', 'Đã thu', 'AOV'],
-    aggregated.value.map((r) => [
-      labelSource(r.source),
-      r.orders,
-      r.revenue,
-      r.paid,
-      Math.round(r.orders > 0 ? r.revenue / r.orders : 0),
-    ])
-  );
+  try {
+    csv.downloadCsv(
+      `vie-by-source-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Nguồn', 'Số đơn', 'Doanh thu', 'Đã thu', 'AOV'],
+      aggregated.value.map((r) => [
+        labelSource(r.source),
+        r.orders,
+        r.revenue,
+        r.paid,
+        Math.round(r.orders > 0 ? r.revenue / r.orders : 0),
+      ])
+    );
+    notify.success('Đã xuất CSV');
+  } catch (e) {
+    notify.apiError(e, 'Không xuất được CSV');
+  }
 }
 </script>
 

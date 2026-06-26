@@ -7,11 +7,13 @@ import Column from 'primevue/column';
 import Button from 'primevue/button';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { formatVND } from '@/composables/useFormat';
+import { useNotify } from '@/composables/useNotify';
 import { labelPaymentMethod } from '@/stores/lookup.store';
 import type { Payment } from '@/types/order';
 
 const props = defineProps<{ payments: Payment[] }>();
 const csv = useCsvExport();
+const notify = useNotify();
 
 // Filter receiving payments only (positive cash inflows)
 const inflows = computed(() =>
@@ -89,11 +91,16 @@ const totalAmount = computed(() =>
 );
 
 function exportCsv() {
-  csv.downloadCsv(
-    `vie-received-cash-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Ngày', 'Phương thức', 'Số giao dịch', 'Số tiền'],
-    aggregated.value.rows.map((r) => [r.date, r.method, r.txns, r.amount])
-  );
+  try {
+    csv.downloadCsv(
+      `vie-received-cash-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Ngày', 'Phương thức', 'Số giao dịch', 'Số tiền'],
+      aggregated.value.rows.map((r) => [r.date, r.method, r.txns, r.amount])
+    );
+    notify.success('Đã xuất CSV');
+  } catch (e) {
+    notify.apiError(e, 'Không xuất được CSV');
+  }
 }
 </script>
 

@@ -5,10 +5,12 @@ import Chart from 'primevue/chart';
 import Button from 'primevue/button';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { formatVND } from '@/composables/useFormat';
+import { useNotify } from '@/composables/useNotify';
 import type { Order } from '@/types/order';
 
 const props = defineProps<{ orders: Order[] }>();
 const csv = useCsvExport();
+const notify = useNotify();
 
 // Match Dashboard logic: filter out cancelled orders
 const filtered = computed(() => props.orders.filter((o) => o.status !== 'cancelled'));
@@ -68,19 +70,24 @@ const chartOptions = {
 };
 
 function exportCsv() {
-  const s = summary.value;
-  csv.downloadCsv(
-    `vie-revenue-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Chỉ tiêu', 'Giá trị'],
-    [
-      ['Tổng số đơn (không tính hủy)', s.orders],
-      ['Doanh thu', s.revenue],
-      ['Đã thu', s.paid],
-      ['Còn phải thu', s.outstanding],
-      ['Chi phí', s.cost],
-      ['Lợi nhuận', s.profit],
-    ]
-  );
+  try {
+    const s = summary.value;
+    csv.downloadCsv(
+      `vie-revenue-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Chỉ tiêu', 'Giá trị'],
+      [
+        ['Tổng số đơn (không tính hủy)', s.orders],
+        ['Doanh thu', s.revenue],
+        ['Đã thu', s.paid],
+        ['Còn phải thu', s.outstanding],
+        ['Chi phí', s.cost],
+        ['Lợi nhuận', s.profit],
+      ]
+    );
+    notify.success('Đã xuất CSV');
+  } catch (e) {
+    notify.apiError(e, 'Không xuất được CSV');
+  }
 }
 </script>
 

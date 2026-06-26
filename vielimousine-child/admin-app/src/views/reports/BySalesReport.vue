@@ -7,11 +7,13 @@ import Column from 'primevue/column';
 import Button from 'primevue/button';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { formatVND } from '@/composables/useFormat';
+import { useNotify } from '@/composables/useNotify';
 import { useLookupStore } from '@/stores/lookup.store';
 import type { Order } from '@/types/order';
 
 const props = defineProps<{ orders: Order[] }>();
 const csv = useCsvExport();
+const notify = useNotify();
 const lookup = useLookupStore();
 
 const aggregated = computed(() => {
@@ -48,14 +50,19 @@ const chartOptions = {
 };
 
 function exportCsv() {
-  csv.downloadCsv(
-    `vie-by-sales-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Nhân viên', 'Email', 'Số đơn', 'Doanh thu', 'Đã thu'],
-    aggregated.value.map((r) => {
-      const u = lookup.userById(r.sales_user_id);
-      return [u?.display_name ?? `User #${r.sales_user_id}`, u?.email ?? '', r.orders, r.revenue, r.paid];
-    })
-  );
+  try {
+    csv.downloadCsv(
+      `vie-by-sales-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Nhân viên', 'Email', 'Số đơn', 'Doanh thu', 'Đã thu'],
+      aggregated.value.map((r) => {
+        const u = lookup.userById(r.sales_user_id);
+        return [u?.display_name ?? `User #${r.sales_user_id}`, u?.email ?? '', r.orders, r.revenue, r.paid];
+      })
+    );
+    notify.success('Đã xuất CSV');
+  } catch (e) {
+    notify.apiError(e, 'Không xuất được CSV');
+  }
 }
 </script>
 

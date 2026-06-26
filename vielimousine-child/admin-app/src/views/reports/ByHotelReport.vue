@@ -74,11 +74,16 @@ const chartOptions = {
 };
 
 function exportCsv() {
-  csv.downloadCsv(
-    `vie-by-hotel-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Khách sạn', 'Số đơn', 'Doanh thu', 'Giá vốn', 'Lợi nhuận'],
-    rows.value.map((r) => [r.hotel_name, r.orders, r.revenue, r.cost, r.profit]),
-  );
+  try {
+    csv.downloadCsv(
+      `vie-by-hotel-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Khách sạn', 'Số đơn', 'Doanh thu', 'Giá vốn', 'Lợi nhuận'],
+      rows.value.map((r) => [r.hotel_name, r.orders, r.revenue, r.cost, r.profit]),
+    );
+    notify.success('Đã xuất CSV');
+  } catch (e) {
+    notify.apiError(e, 'Không xuất được CSV');
+  }
 }
 </script>
 
