@@ -44,6 +44,8 @@ final class RestRouter
 {
     public static function register(): void
     {
+        self::registerNoCacheControl();
+
         // Public routes — no auth required
         register_rest_route(VIE_API_NAMESPACE, '/health', [
             'methods'             => 'GET',
@@ -340,6 +342,34 @@ final class RestRouter
             ['methods' => 'PUT,PATCH',  'callback' => [MediaController::class, 'update'],  'permission_callback' => $manageMedia],
             ['methods' => 'DELETE',     'callback' => [MediaController::class, 'destroy'], 'permission_callback' => $manageMedia],
         ]);
+    }
+
+    /**
+     * Ngăn mọi tầng cache (LiteSpeed/Varnish/Cloudflare/browser + cache plugin)
+     * lưu response động của API vie/v1. SPA dùng JWT Bearer (không tạo cookie
+     * wordpress_logged_in_*) nên LiteSpeed coi request là "khách vãng lai" và
+     * cache theo URL → trả dữ liệu cũ và rò rỉ dữ liệu chéo giữa các user.
+     */
+    private static function registerNoCacheControl(): void
+    {
+        add_filter('rest_post_dispatch', static function ($response, $server, $request) {
+            $route = ltrim((string) $request->get_route(), '/');
+            if ($route !== VIE_API_NAMESPACE && !str_starts_with($route, VIE_API_NAMESPACE . '/')) {
+                return $response;
+            }
+            if ($response instanceof \WP_REST_Response) {
+                $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+                $response->header('Pragma', 'no-cache');
+                $response->header('Vary', 'Origin, Authorization');
+            }
+            // Tín hiệu authoritative cho LiteSpeed (server đọc X-LiteSpeed-Cache-Control).
+            do_action('litespeed_control_set_nocache', 'vie/v1 dynamic API');
+            // Tương thích W3TC / WP Rocket / WP Super Cache.
+            if (!defined('DONOTCACHEPAGE')) {
+                define('DONOTCACHEPAGE', true);
+            }
+            return $response;
+        }, 10, 3);
     }
 
     private static function crudWithCaps(string $resource, string $controller, string $manageCap, string $viewCap): void
