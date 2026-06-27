@@ -157,6 +157,9 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
               {{ formatDateVN(it.checkin) }} → {{ formatDateVN(it.checkout) }}
               · {{ it.adults }} người lớn<span v-if="it.children">, {{ it.children }} trẻ em</span>
             </div>
+            <div v-if="it.booking_type === 'combo' && (it.billable_seats ?? 0) > 0" class="vh-muted">
+              <i class="pi pi-ticket" /> {{ it.billable_seats }} vé khứ hồi<span v-if="(it.free_child_seats ?? 0) > 0"> (miễn {{ it.free_child_seats }} bé)</span>
+            </div>
             <div class="vh-muted">{{ formatVND(it.line_total) }}</div>
           </li>
         </ul>

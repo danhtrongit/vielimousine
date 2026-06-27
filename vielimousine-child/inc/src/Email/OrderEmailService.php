@@ -233,9 +233,17 @@ final class OrderEmailService
     {
         $items = $this->loadItemsWithNames($orderId);
 
+        // "Tổng số vé" = số vé TÍNH PHÍ (đã trừ bé được miễn — bé ngồi chung người lớn).
         $totalSeats = 0;
+        $totalFree  = 0;
         foreach ($items as $it) {
-            $totalSeats += (int) ($it['ticket_count'] ?? 0);
+            $ticketCount = (int) ($it['ticket_count'] ?? 0);
+            $free        = (int) ($it['free_child_seats'] ?? 0);
+            $billable    = isset($it['billable_seats'])
+                ? (int) $it['billable_seats']
+                : max(0, $ticketCount - $free);
+            $totalSeats += $billable;
+            $totalFree  += $free;
         }
 
         // Khách sạn chính của đơn (lấy theo item đầu) — nguồn thông tin + chính sách.
@@ -275,6 +283,7 @@ final class OrderEmailService
             'children'        => (int) ($order['children'] ?? 0),
             'child_ages'      => (string) ($order['child_ages'] ?? ''),
             'total_seats'     => $totalSeats,
+            'total_free_seats'=> $totalFree,
 
             // Đưa đón (đơn combo)
             'pickup'          => $this->formatLocation($order['pickup'] ?? null),
@@ -412,6 +421,17 @@ final class OrderEmailService
             }
             $item['hotel_name'] = $hotelCache[$hotelId]['name'] ?? '';
             $item['room_name']  = $roomCache[$roomId]['name']   ?? (string) ($item['name'] ?? '');
+
+            // Số vé TÍNH PHÍ và số bé được MIỄN chỉ nằm trong pricing_snapshot
+            // (order_item không có cột riêng). Nâng lên top-level để template hiển
+            // thị đúng "số vé tính phí" — nếu không, đơn thật luôn ra 0.
+            $snap = is_array($item['pricing_snapshot'] ?? null) ? $item['pricing_snapshot'] : [];
+            if (!isset($item['billable_seats']) && isset($snap['billable_seats'])) {
+                $item['billable_seats'] = (int) $snap['billable_seats'];
+            }
+            if (!isset($item['free_child_seats']) && isset($snap['free_child_seats'])) {
+                $item['free_child_seats'] = (int) $snap['free_child_seats'];
+            }
         }
         unset($item);
         return $items;

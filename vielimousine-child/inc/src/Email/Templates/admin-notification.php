@@ -12,7 +12,7 @@ require_once __DIR__ . '/_partials.php';
   </td></tr>
   <tr><td style="padding:6px 12px;color:#6b7280;">Nguồn</td><td style="padding:6px 12px;"><?php echo esc_html((string) ($ctx['source'] ?? '')); ?></td></tr>
   <tr><td style="padding:6px 12px;color:#6b7280;">Sales</td><td style="padding:6px 12px;"><?php echo esc_html((string) ($ctx['sales_user'] ?? '—')); ?></td></tr>
-  <tr><td style="padding:6px 12px;color:#6b7280;">Tổng số chỗ ngồi</td><td style="padding:6px 12px;"><strong><?php echo (int) ($ctx['total_seats'] ?? 0); ?></strong></td></tr>
+  <tr><td style="padding:6px 12px;color:#6b7280;">Tổng số vé xe</td><td style="padding:6px 12px;"><strong><?php echo (int) ($ctx['total_seats'] ?? 0); ?></strong> vé<?php $tf = (int) ($ctx['total_free_seats'] ?? 0); echo $tf > 0 ? " (miễn {$tf} bé)" : ''; ?></td></tr>
 </table>
 
 <?php echo vie_email_render_items($ctx['items'] ?? [], true); ?>

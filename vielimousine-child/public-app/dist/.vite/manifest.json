@@ -38,7 +38,7 @@
     "src": "node_modules/primeicons/fonts/primeicons.woff2"
   },
   "src/entries/hotel.ts": {
-    "file": "assets/hotel-CFRshiNI.js",
+    "file": "assets/hotel-Dvq25F7g.js",
     "name": "hotel",
     "src": "src/entries/hotel.ts",
     "isEntry": true,
@@ -50,7 +50,7 @@
     ]
   },
   "src/entries/success.ts": {
-    "file": "assets/success-BgpmfV6G.js",
+    "file": "assets/success-CGQUkvW2.js",
     "name": "success",
     "src": "src/entries/success.ts",
     "isEntry": true,

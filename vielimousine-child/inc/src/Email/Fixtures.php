@@ -55,7 +55,8 @@ final class Fixtures
             'adults'          => 2,
             'children'        => 1,
             'child_ages'      => '5',
-            'total_seats'     => 3,
+            'total_seats'     => 2,
+            'total_free_seats'=> 1,
 
             'items'           => $items,
 

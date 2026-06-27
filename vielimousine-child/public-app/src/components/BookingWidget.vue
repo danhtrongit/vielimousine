@@ -10,6 +10,11 @@ const room = computed(() => props.rooms.find((r) => r.id === selection.roomId));
 const quote = computed(() => (selection.roomId ? getQuote(selection.roomId, selection.bookingType) : null));
 const isCombo = computed(() => selection.bookingType === 'combo');
 
+// Vé hiển thị = số vé TÍNH PHÍ (bé nhỏ ngồi chung người lớn được miễn, không tính vé).
+// VD: 2 NL + 2 TE, 1 bé miễn → 3 vé.
+const comboSeats = computed(() => quote.value?.billable_seats ?? 0);
+const comboFreeSeats = computed(() => quote.value?.free_child_seats ?? 0);
+
 // Combo line = phòng + vé NGƯỜI LỚN (vé của bé chuyển sang phụ thu trẻ em).
 const baseLineTotal = computed(() => {
   const q = quote.value;
@@ -66,13 +71,13 @@ function scrollToCheckout() {
           <div><i class="pi pi-moon" /> {{ quote.nights }} đêm · {{ quote.num_rooms }} phòng</div>
           <div><i class="pi pi-users" /> {{ search.adults }} người lớn{{ childrenSummary }}</div>
           <div v-if="isCombo && quote.seat_count > 0">
-            <i class="pi pi-ticket" /> {{ quote.seat_count }} vé khứ hồi
+            <i class="pi pi-ticket" /> {{ comboSeats }} vé khứ hồi<span v-if="comboFreeSeats > 0"> (miễn {{ comboFreeSeats }} bé)</span>
           </div>
         </div>
 
         <ul class="vh-widget-benefits">
           <li><i class="pi pi-check-circle" /> Buffet sáng</li>
-          <li v-if="isCombo && quote.seat_count > 0"><i class="pi pi-check-circle" /> {{ quote.seat_count }} vé khứ hồi xe limousine</li>
+          <li v-if="isCombo && quote.seat_count > 0"><i class="pi pi-check-circle" /> {{ comboSeats }} vé khứ hồi xe limousine<span v-if="comboFreeSeats > 0"> (miễn {{ comboFreeSeats }} bé)</span></li>
         </ul>
 
         <div v-if="quote.requires_quote" class="vh-widget-lines vh-muted">

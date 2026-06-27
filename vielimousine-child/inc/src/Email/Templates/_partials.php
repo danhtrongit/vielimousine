@@ -40,9 +40,12 @@ if (!function_exists('vie_email_render_items')) {
             $out .= '<tr><td style="padding:6px 12px;color:#6b7280;">Nhận → Trả</td><td style="padding:6px 12px;">' . $checkin . ' → ' . $checkout . ($nights ? " ({$nights} đêm)" : '') . ($qty > 1 ? " × {$qty} {$unit}" : '') . '</td></tr>';
             $out .= '<tr><td style="padding:6px 12px;color:#6b7280;">Khách</td><td style="padding:6px 12px;">' . $adults . ' người lớn' . ($children > 0 ? ", {$children} trẻ em" : '') . ($childAges !== '' ? " ({$childAges})" : '') . '</td></tr>';
             if ($seats > 0) {
+                // Hiển thị số vé TÍNH PHÍ (bé được miễn ngồi chung người lớn nên không tính vé).
+                // VD: 2 NL + 2 TE, 1 bé miễn → "3 vé (miễn 1 bé)".
                 $billable = (int) ($item['billable_seats'] ?? $seats);
                 $free     = (int) ($item['free_child_seats'] ?? 0);
-                $out .= '<tr><td style="padding:6px 12px;color:#6b7280;">Số chỗ ngồi</td><td style="padding:6px 12px;"><strong>' . $seats . '</strong> (tính phí ' . $billable . ($free > 0 ? ", miễn {$free} bé" : '') . ')</td></tr>';
+                $seatVal  = '<strong>' . $billable . '</strong> vé' . ($free > 0 ? " (miễn {$free} bé)" : '');
+                $out .= '<tr><td style="padding:6px 12px;color:#6b7280;">Số vé xe</td><td style="padding:6px 12px;">' . $seatVal . '</td></tr>';
             }
             if ($showInternals) {
                 if ($partner !== '') {

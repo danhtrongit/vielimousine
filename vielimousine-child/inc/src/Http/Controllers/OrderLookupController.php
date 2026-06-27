@@ -52,6 +52,16 @@ final class OrderLookupController
         foreach ($items as $item) {
             $room  = $roomRepo->find((int) $item['room_id']);
             $hotel = $hotelRepo->find((int) $item['hotel_id']);
+
+            // Số vé tính phí / bé miễn nằm trong pricing_snapshot (không có cột riêng).
+            // Hiển thị số vé TÍNH PHÍ cho khớp với email (bé ngồi chung người lớn được miễn).
+            $snap          = is_array($item['pricing_snapshot'] ?? null) ? $item['pricing_snapshot'] : [];
+            $ticketCount   = (int) ($item['ticket_count'] ?? 0);
+            $freeChild     = (int) ($snap['free_child_seats'] ?? 0);
+            $billableSeats = isset($snap['billable_seats'])
+                ? (int) $snap['billable_seats']
+                : max(0, $ticketCount - $freeChild);
+
             $publicItems[] = [
                 'hotel_name'           => $hotel['name'] ?? null,
                 'room_name'            => $room['name']  ?? $item['name'],
@@ -61,7 +71,9 @@ final class OrderLookupController
                 'nights'               => $item['nights'],
                 'adults'               => $item['adults'],
                 'children'             => $item['children'],
-                'ticket_count'         => $item['ticket_count'],
+                'ticket_count'         => $ticketCount,
+                'billable_seats'       => $billableSeats,
+                'free_child_seats'     => $freeChild,
                 'line_total'           => $item['line_total'],
                 'partner_name'         => $item['partner_name'],
                 'supplier_booking_code'=> $item['supplier_booking_code'],

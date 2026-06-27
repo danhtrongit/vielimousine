@@ -107,13 +107,21 @@ $issueDate = wp_date('d/m/Y', strtotime((string) ($order['created_at'] ?? 'now')
     <?php foreach ($items as $idx => $it):
       $bookingType = (string) ($it['booking_type'] ?? '');
       $typeLabel   = $bookingType === 'combo' ? 'Combo phòng + vé xe' : 'Chỉ phòng';
+      $snap        = is_array($it['pricing_snapshot'] ?? null) ? $it['pricing_snapshot'] : [];
+      $billable    = isset($snap['billable_seats'])
+        ? (int) $snap['billable_seats']
+        : max(0, (int) ($it['ticket_count'] ?? 0) - (int) ($snap['free_child_seats'] ?? 0));
+      $freeChild   = (int) ($snap['free_child_seats'] ?? 0);
+      $seatNote    = ($bookingType === 'combo' && $billable > 0)
+        ? ' · ' . $billable . ' vé' . ($freeChild > 0 ? " (miễn {$freeChild} bé)" : '')
+        : '';
       ?>
       <tr>
         <td class="center"><?= $idx + 1 ?></td>
         <td>
           <strong><?= $esc($it['hotel_name'] ?? $it['name']) ?></strong><br>
           <span style="font-size:9pt; color:#4b5563;">
-            <?= $esc($it['name']) ?> · <?= $esc($typeLabel) ?> · <?= (int) $it['nights'] ?> đêm
+            <?= $esc($it['name']) ?> · <?= $esc($typeLabel) ?> · <?= (int) $it['nights'] ?> đêm<?= $esc($seatNote) ?>
           </span>
         </td>
         <td class="center"><?= (int) ($it['quantity'] ?? 1) ?></td>

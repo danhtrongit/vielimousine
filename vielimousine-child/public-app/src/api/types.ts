@@ -124,10 +124,14 @@ export interface OrderLookupItem {
   name?: string;
   room_name?: string;
   hotel_name?: string;
+  booking_type?: 'room' | 'combo';
   checkin: string;
   checkout: string;
   adults: number;
   children: number;
+  ticket_count?: number;
+  billable_seats?: number;
+  free_child_seats?: number;
   line_total: number;
 }
 
