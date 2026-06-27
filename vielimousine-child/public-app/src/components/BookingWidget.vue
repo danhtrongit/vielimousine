@@ -15,15 +15,41 @@ const isCombo = computed(() => selection.bookingType === 'combo');
 const comboSeats = computed(() => quote.value?.billable_seats ?? 0);
 const comboFreeSeats = computed(() => quote.value?.free_child_seats ?? 0);
 
-// Combo line = phòng + vé NGƯỜI LỚN (vé của bé chuyển sang phụ thu trẻ em).
+// Tiền vé được chia theo nhóm khách (tổng không đổi vì 3 phần vé cộng lại = ticket_subtotal):
+//  - Vé của người lớn NẰM TRONG GIÁ phòng → gộp vào dòng combo.
+//  - Vé của người lớn PHỤ THU (giường phụ thứ 3+) → gộp vào dòng "Phụ thu người lớn".
+//  - Vé của bé → gộp vào dòng "Phụ thu trẻ em".
+const ticketPerSeat = computed(() => {
+  const q = quote.value;
+  if (!q || !isCombo.value || q.billable_seats <= 0) return 0;
+  return q.ticket_subtotal / q.billable_seats;
+});
+// Tổng vé của tất cả người lớn (bé không bao giờ nằm trong nhóm này).
+const adultTicketsTotal = computed(() => {
+  const q = quote.value;
+  if (!q || !isCombo.value) return 0;
+  return q.ticket_subtotal - q.child_ticket_subtotal;
+});
+// Vé của người lớn phụ thu = số giường phụ × giá vé/ghế (chặn trên = tổng vé NL).
+const extraAdultTickets = computed(() =>
+  Math.min(adultTicketsTotal.value, (quote.value?.extra_adult_beds ?? 0) * ticketPerSeat.value),
+);
+
+// Dòng combo = tiền phòng + vé của người lớn nằm trong giá.
 const baseLineTotal = computed(() => {
   const q = quote.value;
   if (!q) return 0;
-  const adultTickets = isCombo.value ? q.ticket_subtotal - q.child_ticket_subtotal : 0;
-  return q.room_subtotal + adultTickets;
+  return q.room_subtotal + (adultTicketsTotal.value - extraAdultTickets.value);
 });
 
-// Phụ thu trẻ em = buffet (child_surcharge_total) + vé xe của bé.
+// Phụ thu người lớn = phụ thu giường phụ + vé xe của người lớn phụ thu.
+const extraAdultLine = computed(() => {
+  const q = quote.value;
+  if (!q) return 0;
+  return q.extra_adult_subtotal + extraAdultTickets.value;
+});
+
+// Phụ thu trẻ em = phụ thu phòng của bé + vé xe của bé.
 const childSurchargeLine = computed(() => {
   const q = quote.value;
   if (!q) return 0;
@@ -88,8 +114,8 @@ function scrollToCheckout() {
             <span>{{ quote.num_rooms }} phòng × {{ quote.nights }} đêm{{ isCombo ? ' (combo)' : '' }}</span>
             <span>{{ formatVND(baseLineTotal) }}</span>
           </div>
-          <div v-if="quote.extra_adult_subtotal" class="vh-line">
-            <span>Phụ thu người lớn</span><span>{{ formatVND(quote.extra_adult_subtotal) }}</span>
+          <div v-if="extraAdultLine > 0" class="vh-line">
+            <span>Phụ thu người lớn</span><span>{{ formatVND(extraAdultLine) }}</span>
           </div>
           <div v-if="childSurchargeLine" class="vh-line">
             <span>Phụ thu trẻ em</span><span>{{ formatVND(childSurchargeLine) }}</span>
