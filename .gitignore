@@ -32,3 +32,6 @@ backup_*.sql
 
 # Composer (commit composer.json + composer.lock, not vendor/)
 vendor/
+
+# Parent theme — chỉ push vielimousine-child, không push vielimousine
+/vielimousine/
