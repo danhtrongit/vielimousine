@@ -54,6 +54,13 @@ const orderId = computed(() => Number(route.params.id));
 function locationAddress(loc: Record<string, unknown> | null | undefined): string {
   return loc && typeof loc.address === 'string' ? loc.address : '';
 }
+
+// Hiển thị số trẻ em kèm tuổi, vd: "2 (5, 7 tuổi)". Không có tuổi → chỉ số lượng.
+function childrenLabel(count: number, ages: number[] | null | undefined): string {
+  if (!count) return '0';
+  const list = (ages ?? []).filter((a) => a !== null && a !== undefined);
+  return list.length ? `${count} (${list.join(', ')} tuổi)` : String(count);
+}
 const pickupAddress = computed(() => locationAddress(order.value?.pickup));
 const dropoffAddress = computed(() => locationAddress(order.value?.dropoff));
 const vat = computed(() => {
@@ -420,7 +427,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
           <div class="kv"><span>Check-out:</span><strong>{{ formatDate(order.checkout) }}</strong></div>
           <div class="kv"><span>Số đêm:</span><strong>{{ order.nights }}</strong></div>
           <div class="kv"><span>Người lớn:</span><strong>{{ order.adults }}</strong></div>
-          <div class="kv"><span>Trẻ em:</span><strong>{{ order.children }}</strong></div>
+          <div class="kv"><span>Trẻ em:</span><strong>{{ childrenLabel(order.children, order.child_ages) }}</strong></div>
           <div v-if="pickupAddress" class="kv"><span>Điểm đón:</span><strong>{{ pickupAddress }}</strong></div>
           <div v-if="dropoffAddress" class="kv"><span>Điểm trả:</span><strong>{{ dropoffAddress }}</strong></div>
         </template>
@@ -495,7 +502,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
             <template #body="{ data }">{{ data.adults }}</template>
           </Column>
           <Column header="Trẻ em">
-            <template #body="{ data }">{{ data.children }}</template>
+            <template #body="{ data }">{{ childrenLabel(data.children, data.child_ages) }}</template>
           </Column>
           <Column field="ticket_count" header="Vé" />
           <Column field="line_total" header="Tổng dòng">
