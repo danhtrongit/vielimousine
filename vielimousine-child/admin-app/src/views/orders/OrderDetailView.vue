@@ -63,6 +63,8 @@ function childrenLabel(count: number, ages: number[] | null | undefined): string
 }
 const pickupAddress = computed(() => locationAddress(order.value?.pickup));
 const dropoffAddress = computed(() => locationAddress(order.value?.dropoff));
+// Khách sạn chính của đơn (lấy theo item đầu tiên có tên).
+const primaryHotel = computed(() => order.value?.items?.find((it) => it.hotel_name)?.hotel_name ?? '');
 const vat = computed(() => {
   const v = order.value?.customer_vat as Record<string, string> | null | undefined;
   if (!v || typeof v !== 'object') return null;
@@ -423,6 +425,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
       <Card>
         <template #title>Lịch trình</template>
         <template #content>
+          <div v-if="primaryHotel" class="kv"><span>Khách sạn:</span><strong>{{ primaryHotel }}</strong></div>
           <div class="kv"><span>Check-in:</span><strong>{{ formatDate(order.checkin) }}</strong></div>
           <div class="kv"><span>Check-out:</span><strong>{{ formatDate(order.checkout) }}</strong></div>
           <div class="kv"><span>Số đêm:</span><strong>{{ order.nights }}</strong></div>
@@ -489,7 +492,12 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
       <TabPanels>
       <TabPanel value="items">
         <DataTable :value="order.items" data-key="id">
-          <Column field="name" header="Phòng" />
+          <Column header="Phòng">
+            <template #body="{ data }">
+              <div>{{ data.name }}</div>
+              <div v-if="data.hotel_name" class="muted" style="font-size: 0.85em;">{{ data.hotel_name }}</div>
+            </template>
+          </Column>
           <Column field="booking_type" header="Loại">
             <template #body="{ data }">{{ labelBookingType(data.booking_type) }}</template>
           </Column>

@@ -11,6 +11,7 @@ use Vie\Repository\OrderItemRepository;
 use Vie\Repository\OrderRepository;
 use Vie\Repository\PaymentLogRepository;
 use Vie\Repository\RoomPriceRepository;
+use Vie\Repository\HotelRepository;
 use Vie\Repository\RoomRepository;
 use Vie\DTO\PaymentRequest;
 use Vie\Service\Coupon\CouponService;
@@ -26,6 +27,7 @@ final class OrderService
         private readonly OrderItemRepository $itemRepo,
         private readonly CustomerRepository $customerRepo,
         private readonly RoomRepository $roomRepo,
+        private readonly HotelRepository $hotelRepo,
         private readonly RoomPriceRepository $roomPriceRepo,
         private readonly PaymentLogRepository $paymentRepo,
         private readonly ActivityLogRepository $activityRepo,
@@ -502,7 +504,21 @@ final class OrderService
             'order_id' => $orderId,
             'per_page' => 100,
         ]);
-        return $result['data'] ?? [];
+        $items = $result['data'] ?? [];
+
+        // Bổ sung tên khách sạn cho từng item (item chỉ lưu hotel_id).
+        $hotelNames = [];
+        foreach ($items as &$item) {
+            $hotelId = (int) ($item['hotel_id'] ?? 0);
+            if ($hotelId > 0 && !array_key_exists($hotelId, $hotelNames)) {
+                $hotel = $this->hotelRepo->find($hotelId);
+                $hotelNames[$hotelId] = (string) ($hotel['name'] ?? '');
+            }
+            $item['hotel_name'] = $hotelNames[$hotelId] ?? '';
+        }
+        unset($item);
+
+        return $items;
     }
 
     private function loadPayments(int $orderId): array

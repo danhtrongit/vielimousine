@@ -47,6 +47,7 @@ export interface OrderItem {
   hotel_id: number;
   room_id: number;
   name: string;
+  hotel_name?: string;
   booking_type: string;
   quantity: number;
   checkin: string;
