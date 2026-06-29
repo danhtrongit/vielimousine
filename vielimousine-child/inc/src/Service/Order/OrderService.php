@@ -515,6 +515,8 @@ final class OrderService
                 $hotelNames[$hotelId] = (string) ($hotel['name'] ?? '');
             }
             $item['hotel_name'] = $hotelNames[$hotelId] ?? '';
+            // Tên phòng là snapshot trong order_item — decode HTML entity cho client.
+            $item['name'] = html_entity_decode((string) ($item['name'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
         unset($item);
 

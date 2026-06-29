@@ -40,6 +40,19 @@ final class HotelRepository extends AbstractRepository
         ];
     }
 
+    /**
+     * Tên KS được đồng bộ từ post_title nên có thể chứa HTML entity (vd "&amp;").
+     * Decode khi đọc để client hiển thị đúng "&" (phía email/HTML vẫn esc_html lại an toàn).
+     */
+    protected function castRow(array $row): array
+    {
+        $row = parent::castRow($row);
+        if (isset($row['name']) && is_string($row['name'])) {
+            $row['name'] = html_entity_decode($row['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        return $row;
+    }
+
     protected function searchableColumns(): array
     {
         return ['name', 'slug', 'city', 'address'];
