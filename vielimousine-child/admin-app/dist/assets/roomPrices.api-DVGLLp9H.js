@@ -1,0 +1,1 @@
+import{Z as o}from"./index-CL3n1zny.js";const p={list:(t={})=>o.get("/room-prices",{params:t}).then(e=>e.data),get:t=>o.get(`/room-prices/${t}`).then(e=>e.data),create:t=>o.post("/room-prices",t).then(e=>e.data),update:(t,e)=>o.put(`/room-prices/${t}`,e).then(r=>r.data),bulk:(t,e)=>o.post("/room-prices/bulk",{scope:t,values:e}).then(r=>r.data)};export{p as r};

@@ -63,8 +63,9 @@ function childrenLabel(count: number, ages: number[] | null | undefined): string
 }
 const pickupAddress = computed(() => locationAddress(order.value?.pickup));
 const dropoffAddress = computed(() => locationAddress(order.value?.dropoff));
-// Khách sạn chính của đơn (lấy theo item đầu tiên có tên).
+// Khách sạn + phòng chính của đơn (lấy theo item đầu tiên).
 const primaryHotel = computed(() => order.value?.items?.find((it) => it.hotel_name)?.hotel_name ?? '');
+const primaryRoom = computed(() => order.value?.items?.find((it) => it.name)?.name ?? '');
 const vat = computed(() => {
   const v = order.value?.customer_vat as Record<string, string> | null | undefined;
   if (!v || typeof v !== 'object') return null;
@@ -426,6 +427,7 @@ async function doTransition(target: 'confirmed' | 'completed' | 'no_show', confi
         <template #title>Lịch trình</template>
         <template #content>
           <div v-if="primaryHotel" class="kv"><span>Khách sạn:</span><strong>{{ primaryHotel }}</strong></div>
+          <div v-if="primaryRoom" class="kv"><span>Phòng:</span><strong>{{ primaryRoom }}</strong></div>
           <div class="kv"><span>Check-in:</span><strong>{{ formatDate(order.checkin) }}</strong></div>
           <div class="kv"><span>Check-out:</span><strong>{{ formatDate(order.checkout) }}</strong></div>
           <div class="kv"><span>Số đêm:</span><strong>{{ order.nights }}</strong></div>
