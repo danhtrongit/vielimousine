@@ -38,7 +38,8 @@ final class QuoteController
         try {
             $req       = QuoteRequest::fromArray($v->validated());
             $calc      = Container::get(PriceCalculator::class);
-            $breakdown = $calc->quote($req);
+            // checkStock=true: thiếu quỹ phòng → "Liên hệ báo giá" (báo giá hiển thị).
+            $breakdown = $calc->quote($req, true);
             // KHÔNG lộ cost_total (giá vốn) ra response public — chỉ trả bản công khai.
             return ResponseEnvelope::success($breakdown->toPublicArray());
         } catch (RepositoryException $e) {

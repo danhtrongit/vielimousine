@@ -25,7 +25,12 @@ final class PriceCalculator
     ) {
     }
 
-    public function quote(QuoteRequest $req): PriceBreakdown
+    /**
+     * @param bool $checkStock Khi true (báo giá hiển thị), thiếu quỹ phòng (stock) →
+     *   coi như chưa bán online (requires_quote). Khi tạo đơn để false: tồn kho được
+     *   khóa FOR UPDATE riêng trong OrderService (StockUnavailableException).
+     */
+    public function quote(QuoteRequest $req, bool $checkStock = false): PriceBreakdown
     {
         $room  = $this->roomRepo->findOrFail($req->roomId);
         $hotel = $this->hotelRepo->findOrFail((int) $room['hotel_id']);
@@ -96,9 +101,15 @@ final class PriceCalculator
 
         foreach ($nights as $date) {
             $row = $priceMap[$date] ?? null;
-            if ($row === null || (int) ($row['is_active'] ?? 0) !== 1) {
+            $noPrice = $row === null || (int) ($row['is_active'] ?? 0) !== 1;
+            // Quỹ phòng (stock) không đủ cho số phòng cần → chưa bán online được.
+            // Chỉ áp dụng khi báo giá hiển thị; tạo đơn dùng khóa tồn kho riêng.
+            $noStock = $checkStock && !$noPrice && (int) ($row['stock'] ?? 0) < $allocation->numRooms();
+            if ($noPrice || $noStock) {
                 $unavailableDate = $date;
-                $messages[]      = "Hết phòng đêm {$date}";
+                $messages[]      = $noStock
+                    ? "Chưa đủ quỹ phòng cho đêm {$date}"
+                    : "Hết phòng đêm {$date}";
                 break;
             }
 

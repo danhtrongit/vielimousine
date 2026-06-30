@@ -38,20 +38,22 @@ interface OptionState {
   state: 'loading' | 'unavailable' | 'requires-quote' | 'quote' | 'idle' | 'error';
   total: string;
   hint?: string;
-  unavailable: boolean;
+  contact: boolean; // không đặt online được (hết quỹ / chưa cài giá / vượt sức chứa) → "Liên hệ báo giá"
 }
 
 function buildOption(type: BookingType): OptionState {
   const q = getQuote(props.room.id, type);
   const e = getError(props.room.id, type);
   const loading = isLoading(props.room.id, type);
-  if (loading && !q) return { loading: true, state: 'loading', total: '', unavailable: false };
-  if (e) return { loading: false, error: e, state: 'error', total: '', unavailable: false, hint: e };
-  if (!q) return { loading: false, state: 'idle', total: formatVND(props.room.base_price) + '/đêm', unavailable: false };
-  if (q.unavailable_date) return { loading: false, state: 'unavailable', total: 'Hết phòng', unavailable: true, hint: 'Hết phòng đêm ' + q.unavailable_date };
-  if (q.requires_quote) return { loading: false, state: 'requires-quote', total: 'Liên hệ báo giá', unavailable: false };
+  if (loading && !q) return { loading: true, state: 'loading', total: '', contact: false };
+  if (e) return { loading: false, error: e, state: 'error', total: '', contact: false, hint: e };
+  if (!q) return { loading: false, state: 'idle', total: formatVND(props.room.base_price) + '/đêm', contact: false };
+  // Hết quỹ phòng / chưa cài giá cho ngày đã chọn → liên hệ báo giá
+  if (q.unavailable_date) return { loading: false, state: 'unavailable', total: 'Liên hệ báo giá', contact: true, hint: 'Chưa có quỹ phòng — vui lòng liên hệ báo giá' };
+  // Vượt sức chứa thông thường → liên hệ báo giá
+  if (q.requires_quote) return { loading: false, state: 'requires-quote', total: 'Liên hệ báo giá', contact: true };
   return {
-    loading: false, state: 'quote', total: formatVND(q.total), unavailable: false,
+    loading: false, state: 'quote', total: formatVND(q.total), contact: false,
     hint: q.num_rooms > 1
       ? `${q.num_rooms} phòng × ${q.nights} đêm`
       : `${q.nights} đêm`,
@@ -167,13 +169,7 @@ function pick(type: BookingType) {
             aria-label="Đang tính giá phòng"
           ></span>
           <template v-else>
-            <span
-              :class="[
-                'vh-price-amount',
-                roomOpt.state === 'unavailable' && 'vh-price-na',
-                roomOpt.state === 'requires-quote' && 'vh-price-contact',
-              ]"
-            >
+            <span :class="['vh-price-amount', roomOpt.contact && 'vh-price-contact']">
               {{ roomOpt.total }}
             </span>
             <small v-if="roomOpt.hint && roomOpt.state === 'quote'" class="vh-price-hint">{{ roomOpt.hint }}</small>
@@ -181,12 +177,12 @@ function pick(type: BookingType) {
           </template>
         </div>
         <Button
-          :label="pickedType === 'room' ? 'Đã chọn' : (roomOpt.unavailable ? 'Liên hệ đặt phòng' : (priceChecked ? 'Chọn phòng' : 'Kiểm tra giá trước'))"
-          :icon="pickedType === 'room' ? 'pi pi-check' : (roomOpt.unavailable ? 'pi pi-phone' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock'))"
+          :label="pickedType === 'room' ? 'Đã chọn' : (roomOpt.contact ? 'Liên hệ báo giá' : (priceChecked ? 'Chọn phòng' : 'Kiểm tra giá trước'))"
+          :icon="pickedType === 'room' ? 'pi pi-check' : (roomOpt.contact ? 'pi pi-phone' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock'))"
           :icon-pos="pickedType === 'room' ? 'left' : 'right'"
-          :severity="pickedType === 'room' ? 'success' : (roomOpt.unavailable ? 'secondary' : undefined)"
+          :severity="pickedType === 'room' ? 'success' : (roomOpt.contact ? 'secondary' : undefined)"
           :disabled="!priceChecked || roomOpt.loading"
-          :aria-label="pickedType === 'room' ? `Đã chọn phòng ${room.name}` : (roomOpt.unavailable ? `Liên hệ đặt phòng ${room.name}` : `Chọn phòng ${room.name}`)"
+          :aria-label="pickedType === 'room' ? `Đã chọn phòng ${room.name}` : (roomOpt.contact ? `Liên hệ báo giá phòng ${room.name}` : `Chọn phòng ${room.name}`)"
           size="small"
           fluid
           @click="pick('room')"
@@ -209,13 +205,7 @@ function pick(type: BookingType) {
             aria-label="Đang tính giá combo"
           ></span>
           <template v-else>
-            <span
-              :class="[
-                'vh-price-amount',
-                comboOpt.state === 'unavailable' && 'vh-price-na',
-                comboOpt.state === 'requires-quote' && 'vh-price-contact',
-              ]"
-            >
+            <span :class="['vh-price-amount', comboOpt.contact && 'vh-price-contact']">
               {{ comboOpt.total }}
             </span>
             <small v-if="comboOpt.hint && comboOpt.state === 'quote'" class="vh-price-hint">{{ comboOpt.hint }}</small>
@@ -223,12 +213,12 @@ function pick(type: BookingType) {
           </template>
         </div>
         <Button
-          :label="pickedType === 'combo' ? 'Đã chọn' : (comboOpt.unavailable ? 'Liên hệ đặt combo' : (priceChecked ? 'Chọn combo' : 'Kiểm tra giá trước'))"
-          :icon="pickedType === 'combo' ? 'pi pi-check' : (comboOpt.unavailable ? 'pi pi-phone' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock'))"
+          :label="pickedType === 'combo' ? 'Đã chọn' : (comboOpt.contact ? 'Liên hệ báo giá' : (priceChecked ? 'Chọn combo' : 'Kiểm tra giá trước'))"
+          :icon="pickedType === 'combo' ? 'pi pi-check' : (comboOpt.contact ? 'pi pi-phone' : (priceChecked ? 'pi pi-arrow-right' : 'pi pi-lock'))"
           :icon-pos="pickedType === 'combo' ? 'left' : 'right'"
-          :severity="pickedType === 'combo' ? 'success' : (comboOpt.unavailable ? 'secondary' : 'warn')"
+          :severity="pickedType === 'combo' ? 'success' : (comboOpt.contact ? 'secondary' : 'warn')"
           :disabled="!priceChecked || comboOpt.loading"
-          :aria-label="pickedType === 'combo' ? `Đã chọn combo cho ${room.name}` : (comboOpt.unavailable ? `Liên hệ đặt combo cho ${room.name}` : `Chọn combo cho ${room.name}`)"
+          :aria-label="pickedType === 'combo' ? `Đã chọn combo cho ${room.name}` : (comboOpt.contact ? `Liên hệ báo giá combo ${room.name}` : `Chọn combo cho ${room.name}`)"
           size="small"
           fluid
           @click="pick('combo')"
