@@ -123,14 +123,16 @@ final class RestRouter
             'permission_callback' => AuthMiddleware::requireLogin(),
         ]);
 
-        // Inventory — needs vie_manage_inventory
-        $inv = 'vie_manage_inventory';
+        // Inventory (khách sạn + loại phòng) — cần vie_manage_inventory.
+        // Giá (bảng giá/phụ thu/vé) tách riêng — cần vie_manage_pricing (chỉ admin).
+        $inv   = 'vie_manage_inventory';
+        $price = 'vie_manage_pricing';
         self::crudWithCaps('hotels', HotelController::class, $inv, $inv);
         self::crudWithCaps('rooms', RoomController::class, $inv, $inv);
-        self::crudWithCaps('room-prices', RoomPriceController::class, $inv, $inv);
-        self::crudWithCaps('surcharges', SurchargeController::class, $inv, $inv);
-        self::crudWithCaps('surcharge-prices', SurchargePriceController::class, $inv, $inv);
-        self::crudWithCaps('ticket-prices', TicketPriceController::class, $inv, $inv);
+        self::crudWithCaps('room-prices', RoomPriceController::class, $price, $price);
+        self::crudWithCaps('surcharges', SurchargeController::class, $price, $price);
+        self::crudWithCaps('surcharge-prices', SurchargePriceController::class, $price, $price);
+        self::crudWithCaps('ticket-prices', TicketPriceController::class, $price, $price);
 
         // Customers
         self::crudWithCaps('customers', CustomerController::class, 'vie_manage_customers', 'vie_manage_customers');
@@ -215,7 +217,7 @@ final class RestRouter
         register_rest_route(VIE_API_NAMESPACE, '/room-prices/bulk', [
             'methods'             => 'POST',
             'callback'            => [RoomPriceBulkController::class, 'bulk'],
-            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_pricing'),
         ]);
 
         // Backup & Restore (admin only)
@@ -239,22 +241,22 @@ final class RestRouter
         register_rest_route(VIE_API_NAMESPACE, '/pricing/matrix', [
             'methods'             => 'GET',
             'callback'            => [PricingMatrixController::class, 'index'],
-            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_pricing'),
         ]);
         register_rest_route(VIE_API_NAMESPACE, '/pricing/cells', [
             'methods'             => 'POST',
             'callback'            => [PricingCellsController::class, 'save'],
-            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_pricing'),
         ]);
         register_rest_route(VIE_API_NAMESPACE, '/surcharge-prices/bulk', [
             'methods'             => 'POST',
             'callback'            => [SurchargePriceBulkController::class, 'bulk'],
-            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_pricing'),
         ]);
         register_rest_route(VIE_API_NAMESPACE, '/ticket-prices/bulk', [
             'methods'             => 'POST',
             'callback'            => [TicketPriceBulkController::class, 'bulk'],
-            'permission_callback' => AuthMiddleware::requireCap('vie_manage_inventory'),
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_pricing'),
         ]);
 
         // Phase 18: reports + users lookup

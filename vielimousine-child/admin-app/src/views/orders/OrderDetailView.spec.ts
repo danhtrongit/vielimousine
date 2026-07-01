@@ -55,14 +55,15 @@ async function mountView() {
 describe('OrderDetailView cost/profit card', () => {
   beforeEach(() => { caps.value = []; });
 
-  it('hides the "Giá vốn & Lợi nhuận" card when lacking vie_view_reports', async () => {
-    caps.value = ['vie_view_own_orders'];
+  it('hides the "Giá vốn & Lợi nhuận" card when lacking vie_manage_pricing', async () => {
+    // hotel_manager: xem báo cáo nhưng không thấy giá vốn/lợi nhuận
+    caps.value = ['vie_view_reports', 'vie_manage_inventory'];
     const html = (await mountView()).html();
     expect(html).not.toContain('Lợi nhuận');
   });
 
-  it('shows the card when holding vie_view_reports', async () => {
-    caps.value = ['vie_view_reports'];
+  it('shows the card when holding vie_manage_pricing (admin)', async () => {
+    caps.value = ['vie_manage_pricing'];
     const html = (await mountView()).html();
     expect(html).toContain('Lợi nhuận');
   });

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Vie\Http\Controllers;
 
+use Vie\Support\CostVisibility;
 use Vie\Support\ResponseEnvelope;
 
 final class ReportsController
@@ -95,14 +96,21 @@ final class ReportsController
 
         $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
 
-        $data = array_map(static fn(array $r) => [
-            'hotel_id'   => (int) $r['hotel_id'],
-            'hotel_name' => (string) $r['hotel_name'],
-            'orders'     => (int) $r['orders_count'],
-            'revenue'    => (int) $r['revenue'],
-            'cost'       => (int) $r['cost'],
-            'profit'     => (int) $r['profit'],
-        ], $rows ?? []);
+        $canCost = CostVisibility::canView();
+        $data = array_map(static function (array $r) use ($canCost) {
+            $row = [
+                'hotel_id'   => (int) $r['hotel_id'],
+                'hotel_name' => (string) $r['hotel_name'],
+                'orders'     => (int) $r['orders_count'],
+                'revenue'    => (int) $r['revenue'],
+            ];
+            // Giá vốn / lợi nhuận chỉ hiện cho người có quyền (admin).
+            if ($canCost) {
+                $row['cost']   = (int) $r['cost'];
+                $row['profit'] = (int) $r['profit'];
+            }
+            return $row;
+        }, $rows ?? []);
 
         return ResponseEnvelope::success($data);
     }
@@ -321,6 +329,14 @@ final class ReportsController
                 'pay_payment_sum'       => (int) $pay['payment_sum'],
             ];
         }, $rows);
+
+        // Ẩn giá vốn / lợi nhuận cho người không có quyền giá (chỉ admin thấy).
+        if (!CostVisibility::canView()) {
+            foreach ($data as &$row) {
+                unset($row['item_cost'], $row['item_profit']);
+            }
+            unset($row);
+        }
 
         return ResponseEnvelope::success($data);
     }

@@ -50,6 +50,11 @@ final class HotelController
 
         $clean = $v->validated();
 
+        // Không có quyền giá → không cho đặt giá vé/chính sách vé (dùng mặc định).
+        if (!current_user_can('vie_manage_pricing')) {
+            unset($clean['default_ticket_price'], $clean['ticket_free_children_count'], $clean['ticket_free_children_max_age']);
+        }
+
         // Auto-create WP post nếu SPA không truyền post_id
         if (empty($clean['post_id'])) {
             $sync = Container::get(HotelSyncService::class);
@@ -83,7 +88,13 @@ final class HotelController
             return ResponseEnvelope::error($v->errors(), 422);
         }
 
-        $hotel = $repo->update($id, $v->validated());
+        // Không có quyền giá → bỏ qua thay đổi giá vé/chính sách vé.
+        $clean = $v->validated();
+        if (!current_user_can('vie_manage_pricing')) {
+            unset($clean['default_ticket_price'], $clean['ticket_free_children_count'], $clean['ticket_free_children_max_age']);
+        }
+
+        $hotel = $repo->update($id, $clean);
 
         // Push lên WP post (no-op nếu post_id rỗng hoặc đang trong vòng sync)
         Container::get(HotelSyncService::class)->pushToPost($hotel);

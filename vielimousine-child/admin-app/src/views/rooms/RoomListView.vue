@@ -13,6 +13,7 @@ import FilterBar, { type FilterDef } from '@/components/FilterBar.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { useUIStore } from '@/stores/ui.store';
 import { useLookupStore } from '@/stores/lookup.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { useNotify } from '@/composables/useNotify';
 import { formatVND } from '@/composables/useFormat';
 import { roomsApi } from '@/api/rooms.api';
@@ -20,7 +21,12 @@ import { roomsApi } from '@/api/rooms.api';
 const router = useRouter();
 const ui = useUIStore();
 const lookup = useLookupStore();
+const auth = useAuthStore();
 const notify = useNotify();
+
+// Chỉ người có quyền giá (admin) mới thấy ô giá khi tạo phòng.
+// Không có quyền → giữ giá mặc định 0, admin đặt giá sau qua Bảng giá.
+const canEditPricing = computed(() => auth.can('vie_manage_pricing'));
 
 const createDialog = ref(false);
 const creating = ref(false);
@@ -187,14 +193,16 @@ function hotelName(hotelId: number): string {
           <label>Bé miễn / phòng</label>
           <InputNumber v-model="form.free_children_count" :min="0" show-buttons />
         </div>
-        <div class="field">
-          <label>Giá phòng (VND)</label>
-          <InputNumber v-model="form.base_price" :min="0" fluid />
-        </div>
-        <div class="field">
-          <label>Phụ thu người lớn (VND)</label>
-          <InputNumber v-model="form.extra_adult_price" :min="0" fluid />
-        </div>
+        <template v-if="canEditPricing">
+          <div class="field">
+            <label>Giá phòng (VND)</label>
+            <InputNumber v-model="form.base_price" :min="0" fluid />
+          </div>
+          <div class="field">
+            <label>Phụ thu người lớn (VND)</label>
+            <InputNumber v-model="form.extra_adult_price" :min="0" fluid />
+          </div>
+        </template>
         <div class="field">
           <label>Tuổi tối đa bé miễn</label>
           <InputNumber v-model="form.free_children_max_age" :min="0" :max="17" show-buttons />

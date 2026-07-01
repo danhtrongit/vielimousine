@@ -5,8 +5,9 @@ namespace Vie\Support;
 
 /**
  * Controls visibility of financial fields (cost_total / profit_total) at the
- * REST boundary. Authorized = current user holds the vie_view_reports capability.
- * Strip helpers are no-ops for authorized users.
+ * REST boundary. Authorized = current user holds the vie_manage_pricing capability
+ * (admin only). "Quản lý khách sạn" xem được báo cáo doanh thu nhưng KHÔNG thấy
+ * giá vốn / lợi nhuận. Strip helpers are no-ops for authorized users.
  */
 final class CostVisibility
 {
@@ -15,7 +16,7 @@ final class CostVisibility
 
     public static function canView(): bool
     {
-        return current_user_can('vie_view_reports');
+        return current_user_can('vie_manage_pricing');
     }
 
     /** Strip cost/profit from one order row and its nested items[] (if any). */

@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 /**
  * Cost/profit visibility — cost_total/profit_total must be stripped for users
- * WITHOUT vie_view_reports (e.g. vie_sales) and preserved for users WITH it.
+ * WITHOUT vie_manage_pricing (e.g. vie_sales, and vie_hotel_manager which CAN view
+ * reports/revenue but MUST NOT see giá vốn/lợi nhuận) and preserved for admin.
  * Mirrors the inc/tests pattern: $assert closure + shared $pass/$fail counters.
  * Runnable standalone (focused eval seeds $pass/$fail) or via run.php.
  */
@@ -211,5 +212,18 @@ $dresp = \Vie\Http\Controllers\OrderController::storeDraft($dreq)->get_data();
 $ddata = $dresp['data'] ?? null;
 $assert('sales storeDraft has no cost_total', is_array($ddata) && !array_key_exists('cost_total', $ddata));
 $assert('sales storeDraft has no profit_total', is_array($ddata) && !array_key_exists('profit_total', $ddata));
+
+echo "Scenario G: vie_hotel_manager xem báo cáo/doanh thu nhưng KHÔNG thấy giá vốn/lợi nhuận\n";
+$hmId = username_exists('cost_vis_hm')
+    ?: wp_insert_user(['user_login' => 'cost_vis_hm', 'user_pass' => wp_generate_password(), 'role' => 'vie_hotel_manager']);
+$hmId = (int) $hmId;
+wp_set_current_user($hmId);
+$assert('hotel_manager có vie_view_reports', current_user_can('vie_view_reports'));
+$assert('hotel_manager KHÔNG có vie_manage_pricing', !current_user_can('vie_manage_pricing'));
+$assert('canView() === false cho hotel_manager', CostVisibility::canView() === false);
+$hmView = CostVisibility::stripOrder($sample);
+$assert('hotel_manager order.cost_total bị gỡ', !array_key_exists('cost_total', $hmView));
+$assert('hotel_manager order.profit_total bị gỡ', !array_key_exists('profit_total', $hmView));
+$assert('hotel_manager items bị gỡ cost_total', !array_key_exists('cost_total', $hmView['items'][0]));
 
 wp_set_current_user(0);

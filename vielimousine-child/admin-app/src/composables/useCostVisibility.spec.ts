@@ -11,12 +11,17 @@ function setCaps(caps: string[]): void {
 describe('useCostVisibility', () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it('is true when the user has vie_view_reports', () => {
-    setCaps(['vie_view_reports', 'vie_view_own_orders']);
+  it('is true when the user has vie_manage_pricing (admin)', () => {
+    setCaps(['vie_manage_pricing', 'vie_view_reports', 'vie_view_own_orders']);
     expect(useCostVisibility().canViewCost.value).toBe(true);
   });
 
-  it('is false for a sales user lacking vie_view_reports', () => {
+  it('is false for hotel_manager (has vie_view_reports but not vie_manage_pricing)', () => {
+    setCaps(['vie_view_reports', 'vie_manage_inventory', 'vie_manage_media']);
+    expect(useCostVisibility().canViewCost.value).toBe(false);
+  });
+
+  it('is false for a sales user lacking vie_manage_pricing', () => {
     setCaps(['vie_view_own_orders', 'vie_create_orders']);
     expect(useCostVisibility().canViewCost.value).toBe(false);
   });

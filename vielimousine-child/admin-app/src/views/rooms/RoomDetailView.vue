@@ -12,6 +12,7 @@ import { mediaApi } from '@/api/media.api';
 import { surchargesApi, type Surcharge } from '@/api/surcharges.api';
 import { useUIStore } from '@/stores/ui.store';
 import { useLookupStore } from '@/stores/lookup.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { useNotify } from '@/composables/useNotify';
 import { decodeEntities } from '@/composables/useFormat';
 import type { Room } from '@/types/hotel';
@@ -23,7 +24,11 @@ import PageHeader from '@/components/PageHeader.vue';
 const route = useRoute();
 const ui = useUIStore();
 const lookup = useLookupStore();
+const auth = useAuthStore();
 const notify = useNotify();
+
+// Chỉ người có quyền giá (admin) mới thấy & sửa được ô giá phòng.
+const canEditPricing = computed(() => auth.can('vie_manage_pricing'));
 
 const room = ref<Room | null>(null);
 const loading = ref(true);
@@ -213,11 +218,13 @@ async function save() {
       included_adults: room.value.included_adults,
       max_adults: room.value.max_adults,
       max_children: room.value.max_children,
-      base_price: room.value.base_price,
-      extra_adult_price: room.value.extra_adult_price,
       free_children_count: room.value.free_children_count,
       free_children_max_age: room.value.free_children_max_age,
       is_active: room.value.is_active,
+      // Ô giá chỉ gửi khi có quyền (backend cũng chặn ghi giá nếu thiếu quyền).
+      ...(canEditPricing.value
+        ? { base_price: room.value.base_price, extra_adult_price: room.value.extra_adult_price }
+        : {}),
     });
     notify.success('Đã lưu');
     await lookup.refresh();
@@ -257,14 +264,16 @@ async function save() {
             <label>Trẻ em tối đa</label>
             <InputNumber v-model="room.max_children" :min="0" show-buttons />
           </div>
-          <div class="field">
-            <label>Giá phòng / đêm (VND)</label>
-            <InputNumber v-model="room.base_price" :min="0" />
-          </div>
-          <div class="field">
-            <label>Phụ thu người lớn / đêm (VND)</label>
-            <InputNumber v-model="room.extra_adult_price" :min="0" />
-          </div>
+          <template v-if="canEditPricing">
+            <div class="field">
+              <label>Giá phòng / đêm (VND)</label>
+              <InputNumber v-model="room.base_price" :min="0" />
+            </div>
+            <div class="field">
+              <label>Phụ thu người lớn / đêm (VND)</label>
+              <InputNumber v-model="room.extra_adult_price" :min="0" />
+            </div>
+          </template>
           <div class="field">
             <label>Số bé miễn phí / phòng</label>
             <InputNumber v-model="room.free_children_count" :min="0" show-buttons />

@@ -56,8 +56,15 @@ final class RoomController
             return ResponseEnvelope::error($v->errors(), 422);
         }
 
+        // Không có quyền giá → ép giá về 0 (giá do admin đặt qua Bảng giá).
+        $clean = $v->validated();
+        if (!current_user_can('vie_manage_pricing')) {
+            $clean['base_price']        = 0;
+            $clean['extra_adult_price'] = 0;
+        }
+
         $repo = Container::get(RoomRepository::class);
-        $row  = $repo->create($v->validated());
+        $row  = $repo->create($clean);
 
         return ResponseEnvelope::success($row, [], 201);
     }
@@ -78,7 +85,13 @@ final class RoomController
             return ResponseEnvelope::error($v->errors(), 422);
         }
 
-        $row = $repo->update($id, $v->validated());
+        // Không có quyền giá → bỏ qua thay đổi giá (giữ nguyên giá hiện có).
+        $clean = $v->validated();
+        if (!current_user_can('vie_manage_pricing')) {
+            unset($clean['base_price'], $clean['extra_adult_price']);
+        }
+
+        $row = $repo->update($id, $clean);
 
         return ResponseEnvelope::success($row);
     }

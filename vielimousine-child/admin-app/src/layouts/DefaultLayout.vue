@@ -37,7 +37,7 @@ const navItems = computed<NavItem[]>(() => [
   { label: 'Phòng', icon: 'pi pi-th-large', to: '/rooms',
     show: auth.can('vie_manage_inventory'), group: 'inventory' },
   { label: 'Bảng giá', icon: 'pi pi-dollar', to: '/pricing',
-    show: auth.can('vie_manage_inventory'), group: 'inventory' },
+    show: auth.can('vie_manage_pricing'), group: 'inventory' },
   { label: 'Thư viện ảnh', icon: 'pi pi-images', to: '/media',
     show: auth.can('vie_manage_media'), group: 'inventory' },
   { label: 'Mã giảm giá', icon: 'pi pi-ticket', to: '/coupons',

@@ -1,1 +1,0 @@
-import{d as c,u as a,G as u,g as p,W as s}from"./index-CL3n1zny.js";const _=c({__name:"Can",props:{cap:{},capAny:{}},setup(t){const e=t,n=a(),o=s(()=>e.cap?n.can(e.cap):e.capAny?n.canAny(e.capAny):!0);return(r,i)=>o.value?u(r.$slots,"default",{key:0}):p("",!0)}});function d(){const t=a();return{canViewCost:s(()=>t.can("vie_view_reports"))}}export{_,d as u};

@@ -17,6 +17,7 @@ import ProgressSpinner from 'primevue/progressspinner';
 import { hotelsApi, roomsApi } from '@/api/hotels.api';
 import { mediaApi } from '@/api/media.api';
 import { useUIStore } from '@/stores/ui.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { useNotify } from '@/composables/useNotify';
 import { formatVND, decodeEntities } from '@/composables/useFormat';
 import type { Hotel, Room } from '@/types/hotel';
@@ -27,7 +28,11 @@ import PageHeader from '@/components/PageHeader.vue';
 
 const route = useRoute();
 const ui = useUIStore();
+const auth = useAuthStore();
 const notify = useNotify();
+
+// Chỉ người có quyền giá (admin) mới thấy & sửa giá vé / chính sách vé.
+const canEditPricing = computed(() => auth.can('vie_manage_pricing'));
 
 const hotel = ref<Hotel | null>(null);
 const rooms = ref<Room[]>([]);
@@ -146,9 +151,14 @@ async function saveInfo() {
       contact_phone: hotel.value.contact_phone,
       contact_email: hotel.value.contact_email,
       star_rating: hotel.value.star_rating,
-      default_ticket_price: hotel.value.default_ticket_price,
-      ticket_free_children_count: hotel.value.ticket_free_children_count,
-      ticket_free_children_max_age: hotel.value.ticket_free_children_max_age,
+      // Giá vé / chính sách vé chỉ gửi khi có quyền (backend cũng chặn ghi nếu thiếu quyền).
+      ...(canEditPricing.value
+        ? {
+            default_ticket_price: hotel.value.default_ticket_price,
+            ticket_free_children_count: hotel.value.ticket_free_children_count,
+            ticket_free_children_max_age: hotel.value.ticket_free_children_max_age,
+          }
+        : {}),
     });
     notify.success('Đã lưu thông tin');
   } catch (e) {
@@ -217,18 +227,20 @@ async function savePolicy() {
                 <label>Hạng sao (1–5)</label>
                 <InputNumber v-model="hotel.star_rating" :min="1" :max="5" show-buttons />
               </div>
-              <div class="field">
-                <label>Giá vé mặc định (VND)</label>
-                <InputNumber v-model="hotel.default_ticket_price" :min="0" />
-              </div>
-              <div class="field">
-                <label>Số bé miễn vé / booking</label>
-                <InputNumber v-model="hotel.ticket_free_children_count" :min="0" show-buttons />
-              </div>
-              <div class="field">
-                <label>Tuổi tối đa bé miễn vé</label>
-                <InputNumber v-model="hotel.ticket_free_children_max_age" :min="0" :max="17" show-buttons />
-              </div>
+              <template v-if="canEditPricing">
+                <div class="field">
+                  <label>Giá vé mặc định (VND)</label>
+                  <InputNumber v-model="hotel.default_ticket_price" :min="0" />
+                </div>
+                <div class="field">
+                  <label>Số bé miễn vé / booking</label>
+                  <InputNumber v-model="hotel.ticket_free_children_count" :min="0" show-buttons />
+                </div>
+                <div class="field">
+                  <label>Tuổi tối đa bé miễn vé</label>
+                  <InputNumber v-model="hotel.ticket_free_children_max_age" :min="0" :max="17" show-buttons />
+                </div>
+              </template>
             </div>
           </template>
         </Card>

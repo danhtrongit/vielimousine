@@ -46,15 +46,16 @@ function mountView() {
 describe('OrderListView cost/profit columns', () => {
   beforeEach(() => { caps.value = []; });
 
-  it('hides the cost & profit columns when lacking vie_view_reports', () => {
-    caps.value = ['vie_view_own_orders'];
+  it('hides the cost & profit columns when lacking vie_manage_pricing', () => {
+    // hotel_manager: xem đơn/báo cáo nhưng không thấy giá vốn/lợi nhuận
+    caps.value = ['vie_view_reports', 'vie_view_all_orders'];
     const html = mountView().html();
     expect(html).not.toContain('Tổng giá vốn');
     expect(html).not.toContain('Lợi nhuận dự kiến');
   });
 
-  it('shows the cost & profit columns when holding vie_view_reports', () => {
-    caps.value = ['vie_view_reports', 'vie_view_own_orders'];
+  it('shows the cost & profit columns when holding vie_manage_pricing (admin)', () => {
+    caps.value = ['vie_manage_pricing', 'vie_view_all_orders'];
     const html = mountView().html();
     expect(html).toContain('Tổng giá vốn');
     expect(html).toContain('Lợi nhuận dự kiến');

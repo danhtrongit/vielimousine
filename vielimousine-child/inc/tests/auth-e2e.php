@@ -169,10 +169,23 @@ wp_set_current_user($salesAId);
 $assert('sales can create_orders', current_user_can('vie_create_orders'));
 $assert('sales cannot manage_inventory', !current_user_can('vie_manage_inventory'));
 $assert('sales cannot view_all_orders', !current_user_can('vie_view_all_orders'));
+$assert('sales cannot manage_pricing', !current_user_can('vie_manage_pricing'));
 
 wp_set_current_user($adminId);
 $assert('admin can manage_inventory', current_user_can('vie_manage_inventory'));
 $assert('admin can view_all_orders', current_user_can('vie_view_all_orders'));
+$assert('admin can manage_pricing', current_user_can('vie_manage_pricing'));
+
+// Quản lý khách sạn = nội dung (khách sạn/phòng/ảnh/báo cáo) nhưng KHÔNG có giá.
+$hmAuthId = username_exists('auth_e2e_hm')
+    ?: wp_insert_user(['user_login' => 'auth_e2e_hm', 'user_pass' => wp_generate_password(), 'role' => 'vie_hotel_manager']);
+wp_set_current_user((int) $hmAuthId);
+$assert('hotel_manager can manage_inventory', current_user_can('vie_manage_inventory'));
+$assert('hotel_manager can manage_media', current_user_can('vie_manage_media'));
+$assert('hotel_manager can view_reports', current_user_can('vie_view_reports'));
+$assert('hotel_manager CANNOT manage_pricing', !current_user_can('vie_manage_pricing'));
+$assert('hotel_manager CANNOT manage_orders', !current_user_can('vie_manage_orders'));
+$assert('hotel_manager CANNOT manage_settings', !current_user_can('vie_manage_settings'));
 
 // --- Scenario 12 & 13: OrderRepository scope ---
 echo "\nScenario 12-13: OrderRepository queryScope\n";
