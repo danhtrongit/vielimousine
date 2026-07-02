@@ -431,6 +431,93 @@
 }
 .vh-room-dot.active { background: #fff; transform: scale(1.25); }
 
+/* Ảnh chính bấm để phóng to (lightbox) */
+.vh-room-thumb-zoom { cursor: zoom-in; }
+.vh-room-zoom-hint {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: rgba(15, 23, 42, 0.5);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s var(--ease-out);
+  pointer-events: none;
+  z-index: 2;
+}
+.vh-room-media:hover .vh-room-zoom-hint { opacity: 1; }
+
+/* Lightbox toàn màn hình */
+.vh-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 1rem;
+  box-sizing: border-box;
+}
+.vh-lightbox-img {
+  max-width: 92vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+}
+.vh-lightbox-close,
+.vh-lightbox-nav {
+  position: absolute;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  transition: background 0.2s var(--ease-out);
+}
+.vh-lightbox-close:hover,
+.vh-lightbox-nav:hover { background: rgba(255, 255, 255, 0.3); }
+.vh-lightbox-close {
+  top: 1.1rem;
+  right: 1.1rem;
+  width: 42px;
+  height: 42px;
+  font-size: 1.1rem;
+}
+.vh-lightbox-nav {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  font-size: 1.3rem;
+}
+.vh-lightbox-nav.prev { left: 1.1rem; }
+.vh-lightbox-nav.next { right: 1.1rem; }
+.vh-lightbox-count {
+  position: absolute;
+  bottom: 1.2rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+@media (max-width: 640px) {
+  .vh-lightbox-nav { width: 40px; height: 40px; }
+  .vh-lightbox-nav.prev { left: 0.5rem; }
+  .vh-lightbox-nav.next { right: 0.5rem; }
+}
+
 .vh-room-body {
   padding: var(--space-4) var(--space-5);
   display: flex;

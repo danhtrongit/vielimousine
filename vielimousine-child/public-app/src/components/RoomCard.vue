@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch, onBeforeUnmount } from 'vue';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import {
@@ -46,6 +46,31 @@ function goImg(i: number) {
   if (n === 0) return;
   activeIdx.value = ((i % n) + n) % n;
 }
+
+// Lightbox: bấm ảnh để phóng to toàn màn hình, điều hướng bằng nút hoặc phím ← → Esc.
+const lightboxOpen = ref(false);
+function openLightbox() {
+  if (images.value.length) lightboxOpen.value = true;
+}
+function closeLightbox() {
+  lightboxOpen.value = false;
+}
+function onLightboxKey(e: KeyboardEvent) {
+  if (!lightboxOpen.value) return;
+  if (e.key === 'Escape') closeLightbox();
+  else if (e.key === 'ArrowLeft') goImg(activeIdx.value - 1);
+  else if (e.key === 'ArrowRight') goImg(activeIdx.value + 1);
+}
+watch(lightboxOpen, (open) => {
+  // Khóa cuộn nền + bắt phím khi lightbox mở.
+  document.body.style.overflow = open ? 'hidden' : '';
+  if (open) window.addEventListener('keydown', onLightboxKey);
+  else window.removeEventListener('keydown', onLightboxKey);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onLightboxKey);
+  document.body.style.overflow = '';
+});
 
 interface OptionState {
   loading: boolean;
@@ -105,9 +130,14 @@ function pick(type: BookingType) {
     <div class="vh-room-media">
       <template v-if="images.length">
         <div
-          class="vh-room-thumb"
+          class="vh-room-thumb vh-room-thumb-zoom"
+          role="button"
+          tabindex="0"
+          aria-label="Phóng to ảnh"
           :style="{ backgroundImage: `url('${images[activeIdx] ?? images[0]}')` }"
-        ></div>
+          @click="openLightbox()"
+          @keydown.enter.prevent="openLightbox()"
+        ><span class="vh-room-zoom-hint"><i class="pi pi-search-plus" /></span></div>
         <template v-if="images.length > 1">
           <button
             type="button" class="vh-room-nav vh-room-nav-prev"
@@ -260,4 +290,24 @@ function pick(type: BookingType) {
       </div>
     </aside>
   </article>
+
+  <Teleport to="body">
+    <div v-if="lightboxOpen" class="vh-lightbox" role="dialog" aria-modal="true" @click.self="closeLightbox()">
+      <button type="button" class="vh-lightbox-close" aria-label="Đóng" @click="closeLightbox()">
+        <i class="pi pi-times" />
+      </button>
+      <button
+        v-if="images.length > 1"
+        type="button" class="vh-lightbox-nav prev" aria-label="Ảnh trước"
+        @click.stop="goImg(activeIdx - 1)"
+      ><i class="pi pi-chevron-left" /></button>
+      <img class="vh-lightbox-img" :src="images[activeIdx] ?? images[0]" :alt="room.name" />
+      <button
+        v-if="images.length > 1"
+        type="button" class="vh-lightbox-nav next" aria-label="Ảnh sau"
+        @click.stop="goImg(activeIdx + 1)"
+      ><i class="pi pi-chevron-right" /></button>
+      <div v-if="images.length > 1" class="vh-lightbox-count">{{ activeIdx + 1 }}/{{ images.length }}</div>
+    </div>
+  </Teleport>
 </template>
