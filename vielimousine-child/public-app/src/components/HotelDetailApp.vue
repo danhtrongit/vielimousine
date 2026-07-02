@@ -12,6 +12,7 @@ interface RoomData {
   name: string;
   description?: string | null;
   thumbnail_url?: string | null;
+  images?: string[] | null;
   included_adults: number;
   max_adults: number;
   max_children: number;

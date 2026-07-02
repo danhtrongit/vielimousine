@@ -15,6 +15,7 @@ interface Props {
     name: string;
     description?: string | null;
     thumbnail_url?: string | null;
+    images?: string[] | null;
     included_adults: number;
     max_adults: number;
     max_children: number;
@@ -31,6 +32,20 @@ interface Props {
 
 const props = defineProps<Props>();
 const showCalendar = ref(false);
+
+// Album ảnh phòng: danh sách images từ server (đại diện + gallery); fallback về
+// ảnh đại diện đơn lẻ nếu chưa có album.
+const images = computed<string[]>(() => {
+  const list = props.room.images ?? [];
+  if (list.length) return list;
+  return props.room.thumbnail_url ? [props.room.thumbnail_url] : [];
+});
+const activeIdx = ref(0);
+function goImg(i: number) {
+  const n = images.value.length;
+  if (n === 0) return;
+  activeIdx.value = ((i % n) + n) % n;
+}
 
 interface OptionState {
   loading: boolean;
@@ -88,11 +103,30 @@ function pick(type: BookingType) {
     :aria-labelledby="`room-${room.id}-name`"
   >
     <div class="vh-room-media">
-      <div
-        v-if="room.thumbnail_url"
-        class="vh-room-thumb"
-        :style="{ backgroundImage: `url('${room.thumbnail_url}')` }"
-      ></div>
+      <template v-if="images.length">
+        <div
+          class="vh-room-thumb"
+          :style="{ backgroundImage: `url('${images[activeIdx] ?? images[0]}')` }"
+        ></div>
+        <template v-if="images.length > 1">
+          <button
+            type="button" class="vh-room-nav vh-room-nav-prev"
+            aria-label="Ảnh trước" @click.stop="goImg(activeIdx - 1)"
+          ><i class="pi pi-chevron-left" /></button>
+          <button
+            type="button" class="vh-room-nav vh-room-nav-next"
+            aria-label="Ảnh sau" @click.stop="goImg(activeIdx + 1)"
+          ><i class="pi pi-chevron-right" /></button>
+          <div class="vh-room-count"><i class="pi pi-images" /> {{ activeIdx + 1 }}/{{ images.length }}</div>
+          <div class="vh-room-dots">
+            <button
+              v-for="n in images.length" :key="n"
+              type="button" class="vh-room-dot" :class="{ active: n - 1 === activeIdx }"
+              :aria-label="`Ảnh ${n}`" @click.stop="goImg(n - 1)"
+            />
+          </div>
+        </template>
+      </template>
       <div v-else class="vh-room-thumb vh-room-thumb-empty"><i class="pi pi-home" /></div>
       <span v-if="room.view" class="vh-room-badge"><i class="pi pi-eye" /> {{ room.view }}</span>
     </div>

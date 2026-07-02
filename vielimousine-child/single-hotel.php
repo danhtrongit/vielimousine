@@ -51,15 +51,39 @@ if ($hotelId > 0) {
             $amenities = is_array($decoded) ? $decoded : [];
         }
         $amenities = is_array($amenities) ? array_values(array_filter($amenities, 'is_string')) : [];
-        $thumb = '';
+        // Album ảnh: ảnh đại diện (nếu có) + gallery → resolve ra URL, bỏ trùng/rỗng.
+        $imageIds = [];
         if (!empty($r['thumbnail_id'])) {
-            $thumb = (string) wp_get_attachment_image_url((int) $r['thumbnail_id'], 'medium_large');
+            $imageIds[] = (int) $r['thumbnail_id'];
         }
+        $gallery = $r['gallery'] ?? [];
+        if (is_string($gallery)) {
+            $decoded = json_decode($gallery, true);
+            $gallery = is_array($decoded) ? $decoded : [];
+        }
+        if (is_array($gallery)) {
+            foreach ($gallery as $gid) {
+                $imageIds[] = (int) $gid;
+            }
+        }
+        $imageIds = array_values(array_unique(array_filter($imageIds)));
+
+        $images = [];
+        foreach ($imageIds as $gid) {
+            $url = wp_get_attachment_image_url($gid, 'medium_large');
+            if ($url) {
+                $images[] = (string) $url;
+            }
+        }
+        // Ảnh đại diện = thumbnail đã đặt, hoặc ảnh đầu tiên của album.
+        $thumb = $images[0] ?? '';
+
         return [
             'id'                => (int) $r['id'],
             'name'              => (string) $r['name'],
             'description'       => $r['description'] ?: null,
             'thumbnail_url'     => $thumb ?: null,
+            'images'            => $images,
             'included_adults'   => (int) $r['included_adults'],
             'max_adults'        => (int) $r['max_adults'],
             'max_children'      => (int) $r['max_children'],
