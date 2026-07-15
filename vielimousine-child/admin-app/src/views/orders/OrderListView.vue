@@ -101,6 +101,9 @@ async function exportAll() {
         <FilterBar :schema="filterSchema" @apply="update" />
       </template>
 
+      <Column field="created_at" header="Ngày nhận đơn" sortable>
+        <template #body="{ data }">{{ formatDateTime(data.created_at) }}</template>
+      </Column>
       <Column field="code" header="Mã đơn" sortable>
         <template #body="{ data }">
           <a v-if="data.status === 'draft'" class="link link-draft" @click="rowClick(data)">Nháp #{{ data.id }}</a>
@@ -145,9 +148,6 @@ async function exportAll() {
         <template #body="{ data }">
           <StatusTag :value="data.status" />
         </template>
-      </Column>
-      <Column field="created_at" header="Tạo lúc" sortable>
-        <template #body="{ data }">{{ formatDateTime(data.created_at) }}</template>
       </Column>
       <Column header="" :exportable="false" style="width: 100px">
         <template #body="{ data }">

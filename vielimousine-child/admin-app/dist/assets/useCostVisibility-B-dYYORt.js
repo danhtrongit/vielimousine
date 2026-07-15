@@ -1,0 +1,1 @@
+import{d as r,u as a,G as u,g as p,W as s}from"./index-CJ0Bbkco.js";const _=r({__name:"Can",props:{cap:{},capAny:{}},setup(n){const e=n,t=a(),c=s(()=>e.cap?t.can(e.cap):e.capAny?t.canAny(e.capAny):!0);return(o,i)=>c.value?u(o.$slots,"default",{key:0}):p("",!0)}});function d(){const n=a();return{canViewCost:s(()=>n.can("vie_manage_pricing"))}}export{_,d as u};
