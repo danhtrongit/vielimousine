@@ -18,10 +18,6 @@ function apiRoot(): string {
   return (window.VieRest?.root) || '/wp-json/vie/v1/';
 }
 
-function nonce(): string {
-  return window.VieRest?.nonce || '';
-}
-
 interface FetchOpts {
   method?: string;
   body?: unknown;
@@ -31,9 +27,12 @@ interface FetchOpts {
 }
 
 export async function request<T>(path: string, opts: FetchOpts = {}): Promise<T> {
+  // KHÔNG gửi X-WP-Nonce: các endpoint vie/v1 công khai đều __return_true, không dùng
+  // cookie auth. Gửi nonce cache trong HTML (LiteSpeed full-page cache) sẽ bị hết hạn/
+  // lệch user → WP core trả 403 rest_cookie_invalid_nonce. Bỏ nonce → coi như request
+  // ẩn danh (đúng bản chất công khai).
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-WP-Nonce': nonce(),
   };
   if (opts.idempotencyKey) headers['X-Idempotency-Key'] = opts.idempotencyKey;
 

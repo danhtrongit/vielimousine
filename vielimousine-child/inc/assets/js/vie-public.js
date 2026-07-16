@@ -14,9 +14,11 @@
   Vie.api = {
     async fetch(path, opts) {
       opts = opts || {};
+      // Không gửi X-WP-Nonce: endpoint vie/v1 công khai (__return_true), không cần
+      // cookie auth. Nonce bị cache trong HTML (LiteSpeed) sẽ hết hạn/lệch user →
+      // WP trả 403 rest_cookie_invalid_nonce. Bỏ đi → request ẩn danh hợp lệ.
       const headers = {
         'Content-Type': 'application/json',
-        'X-WP-Nonce': (window.VieRest && window.VieRest.nonce) || '',
       };
       if (opts.headers) Object.assign(headers, opts.headers);
       if (opts.idempotencyKey) headers['X-Idempotency-Key'] = opts.idempotencyKey;
@@ -573,9 +575,9 @@
         const url = ((window.VieRest && window.VieRest.root) || '/wp-json/vie/v1/') + 'quote';
         const resp = await fetch(url, {
           method: 'POST',
+          // Không gửi X-WP-Nonce (endpoint /quote công khai) — tránh 403 do nonce cache hết hạn.
           headers: {
             'Content-Type': 'application/json',
-            'X-WP-Nonce': (window.VieRest && window.VieRest.nonce) || '',
           },
           body: JSON.stringify(body),
           signal: ac.signal,
