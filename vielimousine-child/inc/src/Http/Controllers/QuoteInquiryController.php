@@ -6,6 +6,7 @@ namespace Vie\Http\Controllers;
 use Vie\Container;
 use Vie\Email\MailService;
 use Vie\Http\RateLimiter;
+use Vie\Repository\HotelRepository;
 use Vie\Repository\QuoteInquiryRepository;
 use Vie\Repository\RoomRepository;
 use Vie\Service\Settings\EmailSettings;
@@ -94,7 +95,17 @@ final class QuoteInquiryController
             }
 
             $roomName = (string) ($room['name'] ?? ('#' . $inquiry['room_id']));
-            $subject  = sprintf('[Vielimousine] Yêu cầu báo giá mới — %s', $roomName);
+
+            // Tên khách sạn: item chỉ có hotel_id → tra HotelRepository (name đã decode entity).
+            $hotelId   = (int) ($room['hotel_id'] ?? $inquiry['hotel_id'] ?? 0);
+            $hotel     = $hotelId > 0 ? Container::get(HotelRepository::class)->find($hotelId) : null;
+            $hotelName = (string) ($hotel['name'] ?? '');
+
+            $subject  = sprintf(
+                '[Vielimousine] Yêu cầu báo giá mới — %s%s',
+                $hotelName !== '' ? $hotelName . ' · ' : '',
+                $roomName
+            );
 
             $bodyLines = [
                 '<p>Có yêu cầu báo giá mới:</p>',
@@ -104,6 +115,9 @@ final class QuoteInquiryController
             ];
             if (!empty($inquiry['customer_email'])) {
                 $bodyLines[] = '<li><strong>Email:</strong> ' . esc_html((string) $inquiry['customer_email']) . '</li>';
+            }
+            if ($hotelName !== '') {
+                $bodyLines[] = '<li><strong>Khách sạn:</strong> ' . esc_html($hotelName) . '</li>';
             }
             $bodyLines[] = '<li><strong>Phòng:</strong> ' . esc_html($roomName) . '</li>';
             $bodyLines[] = '<li><strong>Loại:</strong> ' . ($inquiry['booking_type'] === 'combo' ? 'Combo (phòng + vé)' : 'Chỉ phòng') . '</li>';
