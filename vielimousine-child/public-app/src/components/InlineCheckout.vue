@@ -18,6 +18,7 @@ import type {
 import { search, selection, getQuote, clearSelectionBack, appliedCoupon, resetCoupon, DROPOFF_OPTIONS, setSelection, type BookingType } from '@/composables/useBookingState';
 import { fetchQuoteForRoom } from '@/composables/useQuotes';
 import { submitCheckoutForm } from '@/composables/useCheckout';
+import { fbTrack } from '@/composables/useFbPixel';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const props = defineProps<{ rooms: Array<{ id: number; name: string }> }>();
@@ -213,6 +214,12 @@ async function submitInquiry() {
   try {
     await api.post<QuoteInquiryResponse>('public/quote-inquiries', body);
     inquirySent.value = true;
+    // Meta Pixel: khách gửi yêu cầu báo giá → Lead.
+    fbTrack('Lead', {
+      content_category: 'quote_inquiry',
+      content_name: room.value?.name || '',
+      content_type: selection.bookingType === 'combo' ? 'combo' : 'room',
+    });
   } catch (e: any) {
     errorMsg.value = (e?.errors || []).map((er: any) => er.message).join('. ') || 'Gửi yêu cầu thất bại';
   } finally {

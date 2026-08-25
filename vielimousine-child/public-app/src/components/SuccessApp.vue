@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
 import { api } from '@/api/client';
 import type { OrderLookup, CheckoutForm } from '@/api/types';
 import { submitCheckoutForm } from '@/composables/useCheckout';
+import { fbTrack } from '@/composables/useFbPixel';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const params = new URLSearchParams(window.location.search);
@@ -16,6 +17,26 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 let pollCount = 0;
 const MAX_POLLS = 15;
 
+// Meta Pixel: chỉ fire Purchase khi đơn ĐÃ thanh toán (paid), 1 lần/mã đơn.
+// (InitiateCheckout đã fire lúc bắt đầu thanh toán ở useCheckout.)
+function firePurchaseIfPaid(o: OrderLookup): void {
+  if (o.payment_status !== 'paid') return;
+  const items = o.items || [];
+  const isCombo = items.some((it) => it.booking_type === 'combo');
+  const first = items[0];
+  const contentName = first
+    ? [first.hotel_name, first.room_name || first.name].filter(Boolean).join(' — ')
+    : o.code;
+  fbTrack('Purchase', {
+    value: o.total,
+    currency: 'VND',
+    content_type: isCombo ? 'combo' : 'room',
+    content_name: contentName,
+    content_ids: [o.code],
+    num_items: items.length || 1,
+  }, { dedupKey: `vie_fb_purchase_${o.code}` });
+}
+
 async function fetchOnce() {
   if (!code || !phone) {
     error.value = 'Thiếu mã đơn hoặc số điện thoại. Vui lòng kiểm tra email.';
@@ -25,6 +46,7 @@ async function fetchOnce() {
     const data = await api.get<OrderLookup>('orders/lookup', { code, phone });
     order.value = data;
     error.value = '';
+    firePurchaseIfPaid(data);
     return data;
   } catch (e: any) {
     error.value = e?.errors?.[0]?.message || 'Không tìm thấy đơn';
