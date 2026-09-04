@@ -32,6 +32,39 @@ export interface CouponUsage {
   used_at: string;
 }
 
+/** Cấu hình dùng chung cho mọi mã trong lô sinh hàng loạt. */
+export type CouponTemplate = Pick<
+  Coupon,
+  | 'description'
+  | 'type'
+  | 'value'
+  | 'min_order'
+  | 'max_discount'
+  | 'usage_limit'
+  | 'usage_limit_per_user'
+  | 'valid_from'
+  | 'valid_to'
+  | 'hotel_ids'
+  | 'room_ids'
+  | 'booking_types'
+  | 'is_active'
+  | 'sales_only'
+>;
+
+export interface CouponBulkGenerateRequest {
+  quantity: number;
+  prefix?: string;
+  suffix?: string;
+  random_length?: number;
+  template: CouponTemplate;
+}
+
+export interface CouponBulkGenerateResult {
+  created_count: number;
+  requested_count: number;
+  coupons: Coupon[];
+}
+
 export const couponsApi = {
   list: (params: Record<string, unknown> = {}) =>
     api.get<Envelope<Coupon[]>>('/coupons', { params }).then((r) => r.data),
@@ -43,6 +76,10 @@ export const couponsApi = {
     api.put<Envelope<Coupon>>(`/coupons/${id}`, body).then((r) => r.data),
   destroy: (id: number) =>
     api.delete<Envelope<null>>(`/coupons/${id}`).then((r) => r.data),
+  bulkGenerate: (body: CouponBulkGenerateRequest) =>
+    api
+      .post<Envelope<CouponBulkGenerateResult>>('/coupons/bulk-generate', body)
+      .then((r) => r.data),
 };
 
 export const couponUsageApi = {

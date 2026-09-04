@@ -7,6 +7,7 @@ use Vie\Http\Controllers\ActivityLogController;
 use Vie\Http\Controllers\AuthController;
 use Vie\Http\Controllers\BackupController;
 use Vie\Http\Controllers\CouponActionController;
+use Vie\Http\Controllers\CouponBulkController;
 use Vie\Http\Controllers\CouponController;
 use Vie\Http\Controllers\CouponUsageController;
 use Vie\Http\Controllers\CustomerController;
@@ -170,6 +171,14 @@ final class RestRouter
 
         // Coupons
         self::crudWithCaps('coupons', CouponController::class, 'vie_manage_coupons', 'vie_manage_coupons');
+
+        // Coupons — sinh mã hàng loạt (đăng ký trước /coupons/{id} không cần thiết:
+        // pattern id chỉ khớp chữ số nên 'bulk-generate' không đụng route CRUD).
+        register_rest_route(VIE_API_NAMESPACE, '/coupons/bulk-generate', [
+            'methods'             => 'POST',
+            'callback'            => [CouponBulkController::class, 'generate'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_manage_coupons'),
+        ]);
 
         // Payments — view all caps, manage caps
         self::readAndCreateWithCaps('payments', PaymentLogController::class, 'vie_manage_payments', 'vie_view_all_orders');

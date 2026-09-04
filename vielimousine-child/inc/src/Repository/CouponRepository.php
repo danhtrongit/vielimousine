@@ -76,6 +76,56 @@ final class CouponRepository extends AbstractRepository
     }
 
     /**
+     * Set mã đã tồn tại trong tập cần kiểm tra (key = code in hoa).
+     *
+     * Dùng cho sinh mã hàng loạt: 1 query cho cả lô ứng viên thay vì N lần
+     * findByCode. Key in hoa vì collation của cột là case-insensitive.
+     *
+     * @param string[] $codes
+     * @return array<string,true>
+     */
+    public function existingCodes(array $codes): array
+    {
+        if ($codes === []) {
+            return [];
+        }
+
+        global $wpdb;
+        $placeholders = implode(', ', array_fill(0, count($codes), '%s'));
+        $rows = $wpdb->get_col($wpdb->prepare(
+            "SELECT code FROM {$this->table()} WHERE code IN ({$placeholders})",
+            ...$codes
+        ));
+
+        $map = [];
+        foreach ($rows as $code) {
+            $map[strtoupper((string) $code)] = true;
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param string[] $codes
+     * @return array<int,array<string,mixed>>
+     */
+    public function findManyByCodes(array $codes): array
+    {
+        if ($codes === []) {
+            return [];
+        }
+
+        global $wpdb;
+        $placeholders = implode(', ', array_fill(0, count($codes), '%s'));
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table()} WHERE code IN ({$placeholders}) ORDER BY id ASC",
+            ...$codes
+        ), ARRAY_A);
+
+        return array_map([$this, 'castRow'], $rows ?: []);
+    }
+
+    /**
      * Atomic increment với guard `used_count < usage_limit`. Trả về true nếu thành
      * công (đã claim 1 slot), false nếu mã đã đạt giới hạn sử dụng.
      *

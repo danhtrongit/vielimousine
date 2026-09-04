@@ -37,6 +37,7 @@ function fmtValue(type: string, value: number): string {
 <template>
   <div>
     <PageHeader title="Mã giảm giá" subtitle="Quản lý khuyến mãi" icon="pi pi-ticket">
+      <Button label="Tạo hàng loạt" icon="pi pi-bolt" severity="warn" outlined @click="router.push('/coupons/bulk')" />
       <Button label="Tạo mới" icon="pi pi-plus" @click="router.push('/coupons/new')" />
     </PageHeader>
 
