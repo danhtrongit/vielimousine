@@ -5,9 +5,38 @@ namespace Vie\Frontend;
 
 final class PublicAssets
 {
+    /** Entry Vue của request hiện tại (null = trang này không mount app khách). */
+    private static ?string $vueEntry = null;
+
     public static function register(): void
     {
         add_action('wp_enqueue_scripts', [self::class, 'enqueue']);
+        add_action('litespeed_optm', [self::class, 'bypassLiteSpeedOptimization']);
+    }
+
+    /**
+     * Trang có Vue app: tắt UCSS / CCSS / CSS-combine và JS defer-delay-combine
+     * của LiteSpeed Cache cho đúng request đó.
+     *
+     * UCSS chỉ giữ selector NHÌN THẤY được trong HTML do server render. Toàn bộ UI
+     * đặt phòng (.vh-*, .p-* của PrimeVue) chỉ tồn tại sau khi khách bấm chọn phòng
+     * → bộ sinh UCSS không thấy nên cắt sạch, tới bước "Liên hệ đặt phòng" là mất
+     * CSS/layout. Đây là hạn chế được LiteSpeed ghi rõ: selector cần user interaction
+     * không được UCSS nhận diện.
+     *
+     * JS: entry là ES module (`type="module"`); defer/delay/combine của LiteSpeed
+     * dựng lại thẻ script và mất `type="module"` → app không chạy. Tắt luôn để cấu
+     * hình plugin sau này không làm gãy luồng đặt phòng.
+     */
+    public static function bypassLiteSpeedOptimization(): void
+    {
+        if (self::$vueEntry === null) {
+            return;
+        }
+
+        foreach (['optm-ucss', 'optm-css_comb', 'optm-css_async', 'optm-js_defer', 'optm-js_delay', 'optm-js_comb'] as $key) {
+            do_action('litespeed_conf_force', $key, false);
+        }
     }
 
     public static function enqueue(): void
@@ -50,6 +79,7 @@ final class PublicAssets
         if ($entry === null) {
             return;
         }
+        self::$vueEntry = $entry;
 
         $manifest = self::loadManifest();
         if ($manifest === null) {
