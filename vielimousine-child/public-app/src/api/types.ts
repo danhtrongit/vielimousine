@@ -147,6 +147,8 @@ export interface OrderLookup {
   pickup?: { address?: string } | null;
   dropoff?: { address?: string } | null;
   customer_vat?: { company_name?: string; tax_code?: string; address?: string; email?: string } | null;
+  /** Có khi đơn còn nợ và admin đã cấu hình tài khoản nhận CK. */
+  bank_transfer?: { bank_name: string; bank_account: string; bank_holder: string; memo: string } | null;
 }
 
 export interface QuoteInquiryRequest {

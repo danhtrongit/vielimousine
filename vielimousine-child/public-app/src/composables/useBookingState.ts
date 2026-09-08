@@ -28,6 +28,14 @@ export const search = reactive<SearchState>({
   userRooms: 1,
 });
 
+// Meta khách sạn của trang hiện tại (từ data-attr mount) — dùng cho tracking
+// (content_id = slug bài, content_name = tên bài) mà không hardcode từng combo.
+export const hotel = reactive<{ id: number; slug: string; name: string }>({
+  id: 0,
+  slug: '',
+  name: '',
+});
+
 // Keyed by `${roomId}:${bookingType}` so we can show both prices per room.
 export function quoteKey(roomId: number, type: BookingType): string {
   return `${roomId}:${type}`;

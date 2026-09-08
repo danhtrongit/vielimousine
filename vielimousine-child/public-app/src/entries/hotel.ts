@@ -2,6 +2,7 @@ import { createApp } from 'vue';
 import HotelDetailApp from '@/components/HotelDetailApp.vue';
 import BookingWidget from '@/components/BookingWidget.vue';
 import { installPrimeVue } from '@/plugins/primevue';
+import { hotel } from '@/composables/useBookingState';
 import '@/styles/tokens.css';
 import '@/styles/main.css';
 
@@ -12,6 +13,9 @@ let hotelId = 0;
 
 mainMounts.forEach((el) => {
   hotelId = parseInt(el.getAttribute('data-hotel-id') || '0', 10);
+  hotel.id = hotelId;
+  hotel.slug = el.getAttribute('data-hotel-slug') || '';
+  hotel.name = el.getAttribute('data-hotel-name') || '';
   const dataScript = el.querySelector('script[type="application/json"]');
   if (dataScript) {
     try {

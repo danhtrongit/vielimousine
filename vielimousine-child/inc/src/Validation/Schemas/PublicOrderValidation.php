@@ -25,6 +25,7 @@ final class PublicOrderValidation
             'items.*.child_ages'    => 'nullable|array|max_items:10',
             'items.*.user_rooms'    => 'nullable|int|min:0|max:10',
             'coupon_code'           => 'nullable|string|max:50',
+            'payment_method'        => 'nullable|string|in:sepay,bank_transfer',
         ];
     }
 

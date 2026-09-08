@@ -51,10 +51,10 @@ final class PublicOrderController
         }
 
         $clean = $v->validated();
-        $clean['source']        = 'website';
-        $clean['sales_user_id'] = null;
-        $clean['voucher_code']  = null;
-        $clean['payment_method'] = null;
+        $clean['source']         = 'website';
+        $clean['sales_user_id']  = null;
+        $clean['voucher_code']   = null;
+        $clean['payment_method'] = (string) ($clean['payment_method'] ?? 'sepay');
 
         $idemKey = $request->get_header('X-Idempotency-Key');
         $ua      = $_SERVER['HTTP_USER_AGENT'] ?? null;
@@ -64,11 +64,16 @@ final class PublicOrderController
             $orderSvc = Container::get(OrderService::class);
             $detail   = $orderSvc->create($req);
 
-            try {
-                $checkout            = Container::get(SepayCheckout::class);
-                $detail['checkout']  = $checkout->buildCheckoutForm((int) $detail['id']);
-            } catch (\Throwable) {
-                $detail['checkout']  = null;
+            // Chỉ đẩy sang SePay khi khách CHỌN SePay và đơn còn tiền phải trả.
+            // Chuyển khoản → về trang xem đơn (kèm thông tin CK). Đơn 0đ (mã giảm 100%)
+            // đã được đánh dấu paid lúc tạo — không có gì để thanh toán.
+            $detail['checkout'] = null;
+            if ($clean['payment_method'] === 'sepay' && (int) ($detail['total'] ?? 0) > 0) {
+                try {
+                    $detail['checkout'] = Container::get(SepayCheckout::class)->buildCheckoutForm((int) $detail['id']);
+                } catch (\Throwable) {
+                    $detail['checkout'] = null;
+                }
             }
 
             return ResponseEnvelope::success(self::publicView($detail), [], 201);

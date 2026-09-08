@@ -1,6 +1,6 @@
 {
-  "_main-DU5vL4OK.js": {
-    "file": "assets/main-DU5vL4OK.js",
+  "_main-IygBKNLy.js": {
+    "file": "assets/main-IygBKNLy.js",
     "name": "main",
     "css": [
       "assets/main-zlPw0db9.css"
@@ -38,24 +38,24 @@
     "src": "node_modules/primeicons/fonts/primeicons.woff2"
   },
   "src/entries/hotel.ts": {
-    "file": "assets/hotel-Byf5yo7v.js",
+    "file": "assets/hotel-ByGH0EIE.js",
     "name": "hotel",
     "src": "src/entries/hotel.ts",
     "isEntry": true,
     "imports": [
-      "_main-DU5vL4OK.js"
+      "_main-IygBKNLy.js"
     ],
     "css": [
       "assets/hotel-BsOrsDaW.css"
     ]
   },
   "src/entries/success.ts": {
-    "file": "assets/success-B-DPGVBK.js",
+    "file": "assets/success-B50VZBBA.js",
     "name": "success",
     "src": "src/entries/success.ts",
     "isEntry": true,
     "imports": [
-      "_main-DU5vL4OK.js"
+      "_main-IygBKNLy.js"
     ]
   }
 }

@@ -1,12 +1,5 @@
 import type { CheckoutForm } from '@/api/types';
-import { fbTrack } from '@/composables/useFbPixel';
-
-/**
- * fbevents đẩy beacon `facebook.com/tr` sau ~20 ms kể từ lúc gọi `fbq('track')`
- * (đo trên production). Điều hướng ngay trong cùng tick huỷ request → mất
- * InitiateCheckout. Chờ ngắn trước khi POST sang SePay, chỉ khi event thật sự fire.
- */
-const PIXEL_FLUSH_MS = 350;
+import { afterTrackingFlush, fbTrack } from '@/composables/useFbPixel';
 
 /** Cho phép fire lại InitiateCheckout cho cùng mã đơn sau 30 phút (khách bỏ dở rồi trả lại). */
 const IC_DEDUP_TTL_MS = 30 * 60 * 1000;
@@ -14,8 +7,10 @@ const IC_DEDUP_TTL_MS = 30 * 60 * 1000;
 /**
  * SePay Cổng thanh toán nhận POST bằng HTML form (không phải GET redirect).
  * Dựng form ẩn từ {action, fields} rồi auto-submit sang trang thanh toán SePay.
+ *
+ * @param alreadyTracked caller vừa bắn event khác (vd dataLayer) → vẫn chờ flush dù pixel không fire.
  */
-export function submitCheckoutForm(checkout: CheckoutForm): void {
+export function submitCheckoutForm(checkout: CheckoutForm, alreadyTracked = false): void {
   // Meta Pixel: bắt đầu thanh toán → InitiateCheckout (mọi lần chuyển sang SePay:
   // đặt đơn mới hoặc "Thanh toán ngay" cho đơn còn nợ).
   const f = checkout.fields || {};
@@ -40,6 +35,5 @@ export function submitCheckoutForm(checkout: CheckoutForm): void {
   }
   document.body.appendChild(form);
 
-  if (tracked) setTimeout(() => form.submit(), PIXEL_FLUSH_MS);
-  else form.submit();
+  afterTrackingFlush(tracked || alreadyTracked, () => form.submit());
 }

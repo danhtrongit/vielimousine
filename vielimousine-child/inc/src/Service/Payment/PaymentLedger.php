@@ -177,6 +177,10 @@ final class PaymentLedger
 
     private function derivePaymentStatus(int $paid, int $total): string
     {
+        // Đơn 0đ (mã giảm 100%): không có gì để thu → luôn paid, kể cả sau void/refund.
+        if ($total <= 0) {
+            return 'paid';
+        }
         if ($paid <= 0) {
             return 'pending';
         }

@@ -9,6 +9,9 @@ import { formatVND, formatDateVN } from '@/composables/useFormat';
 const params = new URLSearchParams(window.location.search);
 const code = params.get('code') || '';
 const phone = params.get('phone') || '';
+// SePay redirect về kèm state=success|error|cancel — chỉ là kết quả PHIÊN thanh toán,
+// không phải bằng chứng đã trả tiền; nguồn sự thật vẫn là payment_status từ server.
+const gatewayState = params.get('state') || '';
 
 const order = ref<OrderLookup | null>(null);
 const error = ref('');
@@ -88,6 +91,17 @@ const paymentLabel = computed(() => ({
   paid: 'Đã thanh toán', refunded: 'Đã hoàn tiền',
 } as Record<string, string>)[order.value?.payment_status || ''] || order.value?.payment_status || '');
 
+/** Tiêu đề + banner đi theo trạng thái THẬT của đơn — không mặc định "thành công". */
+const heading = computed(() => {
+  const o = order.value;
+  if (!o) return 'Thông tin đơn đặt phòng';
+  if (o.status === 'cancelled') return 'Đơn đã bị hủy';
+  if (o.payment_status === 'paid') return 'Đặt phòng thành công';
+  if (gatewayState === 'error') return 'Thanh toán chưa thành công';
+  if (gatewayState === 'cancel') return 'Bạn đã hủy thanh toán';
+  return 'Đã nhận đơn — chờ thanh toán';
+});
+
 const banner = computed(() => {
   if (!order.value) return null;
   const ps = order.value.payment_status;
@@ -101,11 +115,25 @@ const banner = computed(() => {
   if (order.value.status === 'cancelled') {
     return { cls: 'vh-success-banner-err', icon: 'pi-times-circle', text: 'Đơn đã bị hủy.' };
   }
-  if (ps === 'pending') {
+  if (gatewayState === 'error') {
+    return {
+      cls: 'vh-success-banner-err',
+      icon: 'pi-times-circle',
+      text: 'Thanh toán không thành công. Đơn vẫn được giữ — bạn có thể thanh toán lại bên dưới.',
+    };
+  }
+  if (gatewayState === 'cancel') {
     return {
       cls: 'vh-success-banner-warn',
       icon: 'pi-clock',
-      text: 'Đang chờ thanh toán. Trang này sẽ tự cập nhật khi có kết quả.',
+      text: 'Bạn đã hủy phiên thanh toán. Đơn vẫn được giữ — thanh toán lại khi sẵn sàng.',
+    };
+  }
+  if (ps === 'pending' || ps === 'partial') {
+    return {
+      cls: 'vh-success-banner-warn',
+      icon: 'pi-clock',
+      text: 'Đơn đã được ghi nhận, đang chờ thanh toán. Trang này sẽ tự cập nhật khi có kết quả.',
     };
   }
   return { cls: 'vh-success-banner-ok', icon: 'pi-check-circle', text: 'Đặt phòng thành công!' };
@@ -143,7 +171,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
 
 <template>
   <div class="vh-page">
-    <h1>Cảm ơn bạn đã đặt phòng</h1>
+    <h1>{{ heading }}</h1>
 
     <div v-if="error" class="vh-error">{{ error }}</div>
 
@@ -200,6 +228,15 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
           <div><span>Tổng cộng</span><strong>{{ formatVND(order.total) }}</strong></div>
           <div><span>Đã thanh toán</span><strong>{{ formatVND(order.paid_amount) }}</strong></div>
           <div v-if="remaining > 0" class="vh-line-warn"><span>Còn lại</span><strong>{{ formatVND(remaining) }}</strong></div>
+        </div>
+
+        <div v-if="order.bank_transfer && remaining > 0" class="vh-success-extra vh-bank-box">
+          <div><strong>Chuyển khoản ngân hàng</strong> <span class="vh-muted">— hoặc bấm "Thanh toán ngay" để trả qua SePay</span></div>
+          <div v-if="order.bank_transfer.bank_name"><span class="vh-muted">Ngân hàng:</span> <strong>{{ order.bank_transfer.bank_name }}</strong></div>
+          <div><span class="vh-muted">Số tài khoản:</span> <strong>{{ order.bank_transfer.bank_account }}</strong></div>
+          <div v-if="order.bank_transfer.bank_holder"><span class="vh-muted">Chủ tài khoản:</span> <strong>{{ order.bank_transfer.bank_holder }}</strong></div>
+          <div><span class="vh-muted">Số tiền:</span> <strong>{{ formatVND(remaining) }}</strong></div>
+          <div><span class="vh-muted">Nội dung CK:</span> <strong>{{ order.bank_transfer.memo }}</strong></div>
         </div>
 
         <div v-if="payError" class="vh-error">{{ payError }}</div>

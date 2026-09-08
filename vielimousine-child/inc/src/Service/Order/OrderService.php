@@ -184,8 +184,10 @@ final class OrderService
                 'currency'              => 'VND',
                 'coupon_id'             => $couponData !== null ? (int) $couponData['id'] : null,
                 'coupon_code'           => $couponData !== null ? (string) $couponData['code'] : null,
-                'payment_status'        => 'pending',
+                // Đơn 0đ (mã giảm 100%) không có gì để thu → paid ngay, không đẩy sang cổng.
+                'payment_status'        => $this->derivePaymentStatus(0, $total),
                 'paid_amount'           => 0,
+                'paid_at'               => $total <= 0 ? current_time('mysql') : null,
                 'partner_payment_status'=> 'not_created',
                 'voucher_code'          => $req->voucherCode,
                 'status'                => 'pending',
@@ -274,6 +276,7 @@ final class OrderService
                     'total'          => $total,
                     'code'           => $code,
                     'coupon_code'    => $couponData['code'] ?? null,
+                    'payment_method' => $req->paymentMethod,
                 ],
                 'ip'            => $req->ip,
                 'user_agent'    => $req->userAgent,
@@ -649,6 +652,7 @@ final class OrderService
 
     private function derivePaymentStatus(int $paid, int $total): string
     {
+        if ($total <= 0)       { return 'paid'; }
         if ($paid <= 0)        { return 'pending'; }
         if ($paid >= $total)   { return 'paid'; }
         return 'partial';

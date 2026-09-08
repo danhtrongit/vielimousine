@@ -15,10 +15,11 @@ import type {
   QuoteInquiryRequest,
   QuoteInquiryResponse,
 } from '@/api/types';
-import { search, selection, getQuote, clearSelectionBack, appliedCoupon, resetCoupon, DROPOFF_OPTIONS, setSelection, type BookingType } from '@/composables/useBookingState';
+import { search, selection, hotel, getQuote, clearSelectionBack, appliedCoupon, resetCoupon, DROPOFF_OPTIONS, setSelection, type BookingType } from '@/composables/useBookingState';
 import { fetchQuoteForRoom } from '@/composables/useQuotes';
 import { submitCheckoutForm } from '@/composables/useCheckout';
-import { fbTrack } from '@/composables/useFbPixel';
+import { afterTrackingFlush, fbTrack } from '@/composables/useFbPixel';
+import { pushBookingComboSuccess } from '@/composables/useDataLayer';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const props = defineProps<{ rooms: Array<{ id: number; name: string }> }>();
@@ -162,17 +163,27 @@ async function submitOrder(ev: Event) {
   submitting.value = true;
   try {
     const data = await api.post<CreateOrderResponse>('public/orders', body, { idempotencyKey: idemKey });
+
+    // GTM: đơn combo đã được server xác nhận (201) → booking_combo_success, 1 lần/mã đơn.
+    const pushed = isCombo.value && pushBookingComboSuccess({
+      orderCode: data.code,
+      hotelSlug: hotel.slug,
+      hotelName: hotel.name,
+      value: Number(data.total || 0),
+    });
+
     if (data.checkout) {
       // Đẩy khách sang trang thanh toán SePay bằng POST form.
-      submitCheckoutForm(data.checkout);
+      submitCheckoutForm(data.checkout, pushed);
       return;
     }
-    // Không có cổng thanh toán (vd chỉ chuyển khoản) → về trang xem đơn.
+    // Chuyển khoản / đơn 0đ → về trang xem đơn (chờ beacon kịp gửi nếu vừa bắn event).
     const successUrl = window.VieRest?.successUrl || '/dat-phong-thanh-cong/';
-    window.location.href = successUrl + '?' + new URLSearchParams({
+    const target = successUrl + '?' + new URLSearchParams({
       code: data.code,
       phone: form.phone.trim(),
     }).toString();
+    afterTrackingFlush(pushed, () => { window.location.href = target; });
   } catch (e: any) {
     const errs = e?.errors || [];
     // Hết phòng lúc tạo đơn → KHÔNG báo lỗi cụt, chuyển form sang "yêu cầu đặt phòng"

@@ -11,6 +11,25 @@ final class ShortcodeRegistry
         add_shortcode('vie_hotel_rooms',   [self::class, 'hotelRooms']);
         add_shortcode('vie_checkout',      [self::class, 'checkout']);
         add_shortcode('vie_order_success', [self::class, 'success']);
+        add_filter('the_title', [self::class, 'neutralSuccessTitle'], 10, 2);
+    }
+
+    /**
+     * Trang chứa [vie_order_success] được đặt tên "Đặt phòng thành công" trong WP, nhưng
+     * server render chưa biết đơn đã trả tiền hay chưa → khách thanh toán lỗi vẫn thấy
+     * "THÀNH CÔNG". Dùng tiêu đề trung tính; trạng thái thật do SuccessApp hiển thị.
+     */
+    public static function neutralSuccessTitle(mixed $title, mixed $postId = 0): mixed
+    {
+        // Plugin bên thứ ba có thể gọi filter thiếu id / id dạng chuỗi → không được TypeError.
+        $postId = (int) $postId;
+        if (is_admin() || $postId === 0 || !is_page($postId)) {
+            return $title;
+        }
+        if (!has_shortcode((string) get_post_field('post_content', $postId), 'vie_order_success')) {
+            return $title;
+        }
+        return 'Thông tin đơn đặt phòng';
     }
 
     public static function hotelSearch($atts): string

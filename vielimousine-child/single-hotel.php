@@ -210,6 +210,8 @@ if ($hotelId > 0) {
                                     class="vie-booking-main"
                                     data-vie-public-hotel
                                     data-hotel-id="<?php echo (int) $hotelId; ?>"
+                                    data-hotel-slug="<?php echo esc_attr((string) get_post_field('post_name', $postId)); ?>"
+                                    data-hotel-name="<?php echo esc_attr(get_the_title($postId)); ?>"
                                 >
                                     <script type="application/json"><?php
                                         echo wp_json_encode($roomsData, JSON_UNESCAPED_UNICODE);

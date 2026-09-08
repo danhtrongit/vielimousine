@@ -10,6 +10,7 @@ use Vie\Repository\HotelRepository;
 use Vie\Repository\OrderItemRepository;
 use Vie\Repository\OrderRepository;
 use Vie\Repository\RoomRepository;
+use Vie\Service\Settings\InvoiceSettings;
 use Vie\Support\ResponseEnvelope;
 
 final class OrderLookupController
@@ -81,6 +82,20 @@ final class OrderLookupController
             ];
         }
 
+        // Đơn còn nợ → kèm thông tin chuyển khoản (khách chọn CK sẽ tự chuyển theo mã đơn).
+        $bankTransfer = null;
+        if ((int) $order['total'] - (int) $order['paid_amount'] > 0) {
+            $inv = Container::get(InvoiceSettings::class)->all();
+            if ($inv['bank_account'] !== '') {
+                $bankTransfer = [
+                    'bank_name'    => $inv['bank_name'],
+                    'bank_account' => $inv['bank_account'],
+                    'bank_holder'  => $inv['bank_holder'],
+                    'memo'         => (string) $order['code'],
+                ];
+            }
+        }
+
         return ResponseEnvelope::success([
             'code'           => $order['code'],
             'status'         => $order['status'],
@@ -101,6 +116,7 @@ final class OrderLookupController
             'pickup'         => is_array($order['pickup'] ?? null) ? $order['pickup'] : null,
             'dropoff'        => is_array($order['dropoff'] ?? null) ? $order['dropoff'] : null,
             'customer_vat'   => is_array($order['customer_vat'] ?? null) ? $order['customer_vat'] : null,
+            'bank_transfer'  => $bankTransfer,
             'items'          => $publicItems,
         ]);
     }

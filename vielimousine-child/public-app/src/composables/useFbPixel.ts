@@ -50,3 +50,15 @@ export function fbTrack(
     return false;
   }
 }
+
+/**
+ * fbevents/GTM đẩy beacon sau ~20 ms kể từ lúc gọi track/push (đo trên production).
+ * Điều hướng ngay trong cùng tick huỷ request → mất event. Chờ ngắn rồi mới đi.
+ */
+export const TRACKING_FLUSH_MS = 350;
+
+/** Chạy `go` sau khi beacon kịp gửi; không có event nào fire thì đi ngay (không làm chậm khách). */
+export function afterTrackingFlush(fired: boolean, go: () => void): void {
+  if (fired) setTimeout(go, TRACKING_FLUSH_MS);
+  else go();
+}
