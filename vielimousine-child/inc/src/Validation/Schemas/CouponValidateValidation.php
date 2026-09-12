@@ -14,7 +14,6 @@ final class CouponValidateValidation
             'room_id'        => 'nullable|int|exists:vie_room,id',
             'booking_type'   => 'nullable|string|in:room,combo',
             'user_email'     => 'nullable|email',
-            'user_phone'     => 'nullable|phone',
         ];
     }
 }

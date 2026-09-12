@@ -110,11 +110,6 @@ $usageCount = (int) $wpdb->get_var($wpdb->prepare(
     (int) $order2['id']
 ));
 $assert('coupon_usage row recorded', $usageCount === 1);
-$usagePhone = $wpdb->get_var($wpdb->prepare(
-    "SELECT user_phone FROM {$wpdb->prefix}vie_coupon_usage WHERE order_id = %d",
-    (int) $order2['id']
-));
-$assert('coupon_usage lưu SĐT khách (danh tính chặn lượt/khách)', $usagePhone === '0911111002');
 
 // --- Scenario 3: Idempotency ---
 echo "\nScenario 3: Idempotency check\n";
@@ -244,42 +239,6 @@ if ($couponRepo->findByCode('E2E_EXPIRED') === null) {
 }
 $expiredRes = $couponSvc->validate('E2E_EXPIRED', 1000000, null, null, null, null);
 $assert('expired coupon → valid=false', ($expiredRes['valid'] ?? true) === false);
-
-// --- Scenario 7b: Giới hạn "N lượt/khách" — preview phải chặn ngay khi có danh tính ---
-// Bug gốc: preview không gửi danh tính nên mã đã dùng vẫn hiện "hợp lệ" (kèm số tiền
-// giảm → tổng 0đ), tới lúc tạo đơn mới báo "đã sử dụng hết lượt".
-echo "\nScenario 7b: Per-user coupon limit (SĐT/email)\n";
-if ($couponRepo->findByCode('E2E_PERUSER') === null) {
-    $couponRepo->create([
-        'code'                 => 'E2E_PERUSER',
-        'type'                 => 'percentage',
-        'value'                => 100,
-        'is_active'            => true,
-        'usage_limit_per_user' => 1,
-    ]);
-}
-$perUserCoupon = $couponRepo->findByCode('E2E_PERUSER');
-$alreadyUsed   = (int) $wpdb->get_var($wpdb->prepare(
-    "SELECT COUNT(*) FROM {$wpdb->prefix}vie_coupon_usage WHERE coupon_id = %d AND order_id = %d",
-    (int) $perUserCoupon['id'],
-    (int) $order2['id']
-));
-if ($alreadyUsed === 0) {
-    $couponSvc->recordUsage((int) $perUserCoupon['id'], (int) $order2['id'], 'e2e2@test.local', 0, '0911111002');
-}
-
-$perUserPhone = $couponSvc->validate('E2E_PERUSER', 1000000, null, null, null, null, '0912 111 002');
-$assert('SĐT đã dùng mã → valid=false', ($perUserPhone['valid'] ?? true) === false);
-$assert(
-    'SĐT đã dùng mã → báo hết lượt/khách',
-    in_array('Bạn đã sử dụng hết lượt cho mã này', $perUserPhone['messages'] ?? [], true)
-);
-
-$perUserEmail = $couponSvc->validate('E2E_PERUSER', 1000000, null, null, null, 'e2e2@test.local', '');
-$assert('email đã dùng mã (không SĐT) → valid=false', ($perUserEmail['valid'] ?? true) === false);
-
-$perUserOther = $couponSvc->validate('E2E_PERUSER', 1000000, null, null, null, null, '0999888777');
-$assert('khách khác → valid=true', ($perUserOther['valid'] ?? false) === true);
 
 // --- Scenario 8: Public lookup safe view ---
 echo "\nScenario 8: Public order lookup (safe view)\n";

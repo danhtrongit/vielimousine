@@ -81,22 +81,24 @@ async function applyCoupon() {
     couponStatus.value = { text: 'Chọn phòng + chờ tính giá trước.', kind: 'err' };
     return;
   }
-  // Giới hạn "N lượt/khách" đếm theo SĐT/email → thiếu danh tính thì mã đã dùng
-  // vẫn hiện "hợp lệ" (kèm số tiền giảm) rồi mới chặn ở bước tạo đơn.
-  const phone = form.phone.trim();
-  if (!phone) {
-    couponStatus.value = { text: 'Nhập số điện thoại trước khi áp mã.', kind: 'err' };
-    return;
-  }
+  // Giới hạn "N lượt/khách" của mã đếm theo email — gửi kèm để preview khớp với
+  // lúc tạo đơn (OrderService), tránh cảnh mã hết lượt vẫn hiện "hợp lệ".
   try {
     const data = await api.post<CouponValidateResponse>('coupons/validate', {
       code,
       order_subtotal: quote.value.subtotal,
       room_id: selection.roomId,
       booking_type: selection.bookingType,
-      user_phone: phone,
       user_email: form.email.trim() || undefined,
     });
+    // Endpoint trả HTTP 200 kèm valid=false (mã hết lượt / hết hạn / đã bị dùng).
+    // Không đọc `valid` thì mã đã dùng vẫn hiện "Đã áp dụng: −0đ" (discount=0) và
+    // chỉ bị chặn ở bước tạo đơn.
+    if (!data.valid) {
+      resetCoupon();
+      couponStatus.value = { text: data.messages.join('. ') || 'Mã không hợp lệ', kind: 'err' };
+      return;
+    }
     appliedCoupon.code = code;
     appliedCoupon.discount = data.discount;
     couponStatus.value = { text: 'Đã áp dụng: −' + formatVND(data.discount), kind: 'ok' };
@@ -187,10 +189,12 @@ async function submitOrder(ev: Event) {
       return;
     }
     // Chuyển khoản / đơn 0đ → về trang xem đơn (chờ beacon kịp gửi nếu vừa bắn event).
-    // Kèm slug combo để trang thành công giữ được danh tính sản phẩm cho tracking.
+    // Kèm slug khách sạn để trang thành công giữ được danh tính sản phẩm cho tracking.
+    // KHÔNG dùng tên `hotel`: WP coi `?hotel=<slug>` là query var của CPT hotel →
+    // redirect_canonical 301 thẳng sang trang khách sạn, trang thành công không load.
     const successUrl = window.VieRest?.successUrl || '/dat-phong-thanh-cong/';
     const params: Record<string, string> = { code: data.code, phone: form.phone.trim() };
-    if (hotel.slug) params.hotel = hotel.slug;
+    if (hotel.slug) params.hotel_slug = hotel.slug;
     const target = successUrl + '?' + new URLSearchParams(params).toString();
     afterTrackingFlush(pushed, () => { window.location.href = target; });
   } catch (e: any) {

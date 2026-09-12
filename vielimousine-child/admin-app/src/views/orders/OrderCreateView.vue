@@ -161,10 +161,6 @@ async function validateCoupon() {
       order_subtotal: quote.value.subtotal,
       room_id: wizard.value.item.room_id ?? undefined,
       booking_type: wizard.value.item.booking_type,
-      // Cùng danh tính với lúc tạo đơn (OrderService) — nếu không, mã đã dùng hết
-      // lượt/khách vẫn báo "hợp lệ" ở đây rồi mới bị chặn lúc lưu đơn.
-      user_phone: wizard.value.customer.phone.trim() || undefined,
-      user_email: wizard.value.customer.email.trim() || undefined,
     });
     couponValid.value = resp.data.valid;
     couponDiscount.value = resp.data.discount;

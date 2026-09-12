@@ -42,6 +42,6 @@ export const quoteApi = {
 };
 
 export const couponsApi = {
-  validate: (body: { code: string; order_subtotal: number; hotel_id?: number; room_id?: number; booking_type?: string; user_email?: string; user_phone?: string }) =>
+  validate: (body: { code: string; order_subtotal: number; hotel_id?: number; room_id?: number; booking_type?: string; user_email?: string }) =>
     api.post<Envelope<{ valid: boolean; discount: number; messages: string[]; coupon: unknown }>>('/coupons/validate', body).then(r => r.data),
 };

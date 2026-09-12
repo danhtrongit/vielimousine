@@ -72,6 +72,7 @@ export interface RoomPricesResponse {
 export interface CouponValidateResponse {
   discount: number;
   valid: boolean;
+  messages: string[];
 }
 
 export interface CreateOrderItem {

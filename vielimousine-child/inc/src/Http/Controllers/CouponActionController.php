@@ -37,7 +37,6 @@ final class CouponActionController
             isset($clean['room_id'])  ? (int) $clean['room_id']  : null,
             isset($clean['booking_type']) ? (string) $clean['booking_type'] : null,
             isset($clean['user_email'])   ? (string) $clean['user_email']   : null,
-            isset($clean['user_phone'])   ? (string) $clean['user_phone']   : null,
         );
 
         return ResponseEnvelope::success($result);

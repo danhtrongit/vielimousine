@@ -204,23 +204,25 @@
         if (couponStatus) { couponStatus.textContent = 'Đợi tính giá xong rồi mới áp mã.'; couponStatus.className = 'vie-public__coupon-status vie-public__coupon-status--err'; }
         return;
       }
-      // Giới hạn "N lượt/khách" của mã đếm theo SĐT/email → thiếu danh tính thì mã
-      // đã dùng vẫn hiện hợp lệ rồi mới chặn ở bước tạo đơn.
       const fd = new FormData(form);
-      const phone = String(fd.get('phone') || '').trim();
-      if (!phone) {
-        if (couponStatus) { couponStatus.textContent = 'Nhập số điện thoại trước khi áp mã.'; couponStatus.className = 'vie-public__coupon-status vie-public__coupon-status--err'; }
-        return;
-      }
       try {
         const data = await Vie.api.post('coupons/validate', {
           code,
           order_subtotal: currentQuote.subtotal,
           room_id: item.room_id,
           booking_type: item.booking_type,
-          user_phone: phone,
           user_email: String(fd.get('email') || '').trim() || undefined,
         });
+        // Endpoint trả HTTP 200 kèm valid=false (mã hết lượt / hết hạn / đã dùng)
+        // → không đọc `valid` thì mã đã dùng vẫn hiện "Đã áp dụng: −0đ".
+        if (!data.valid) {
+          appliedCoupon = null;
+          if (couponStatus) {
+            couponStatus.textContent = (data.messages || []).join('. ') || 'Mã không hợp lệ';
+            couponStatus.className = 'vie-public__coupon-status vie-public__coupon-status--err';
+          }
+          return;
+        }
         appliedCoupon = code;
         if (couponStatus) {
           couponStatus.textContent = 'Đã áp dụng mã: −' + Vie.format.vnd(data.discount || 0);
@@ -752,24 +754,23 @@
         couponStatus.className = 'vh-coupon-status vh-coupon-err';
         return;
       }
-      // Giới hạn "N lượt/khách" của mã đếm theo SĐT/email → thiếu danh tính thì mã
-      // đã dùng vẫn hiện hợp lệ rồi mới chặn ở bước tạo đơn.
       const fd = new FormData(checkoutForm);
-      const phone = String(fd.get('phone') || '').trim();
-      if (!phone) {
-        couponStatus.textContent = 'Nhập số điện thoại trước khi áp mã.';
-        couponStatus.className = 'vh-coupon-status vh-coupon-err';
-        return;
-      }
       try {
         const data = await Vie.api.post('coupons/validate', {
           code,
           order_subtotal: quote.subtotal,
           room_id: selectedRoomId,
           booking_type: (readSearch() || {}).booking_type || 'room',
-          user_phone: phone,
           user_email: String(fd.get('email') || '').trim() || undefined,
         });
+        // Endpoint trả HTTP 200 kèm valid=false (mã hết lượt / hết hạn / đã dùng)
+        // → không đọc `valid` thì mã đã dùng vẫn hiện "Áp dụng thành công: −0đ".
+        if (!data.valid) {
+          appliedCoupon = null;
+          couponStatus.textContent = (data.messages || []).join('. ') || 'Mã không hợp lệ';
+          couponStatus.className = 'vh-coupon-status vh-coupon-err';
+          return;
+        }
         appliedCoupon = code;
         couponStatus.textContent = 'Áp dụng thành công: −' + Vie.format.vnd(data.discount || 0);
         couponStatus.className = 'vh-coupon-status vh-coupon-ok';
@@ -819,10 +820,12 @@
         if (data.redirect_url) {
           window.location.href = data.redirect_url;
         } else {
-          // Kèm slug combo để trang thành công giữ danh tính sản phẩm cho tracking.
+          // Kèm slug khách sạn để trang thành công giữ danh tính sản phẩm cho tracking.
+          // KHÔNG dùng tên `hotel`: WP coi `?hotel=<slug>` là query var của CPT hotel
+          // → redirect_canonical 301 sang trang khách sạn.
           const successUrl = (window.VieRest && window.VieRest.successUrl) || '/dat-phong-thanh-cong/';
           const params = { code: data.code, phone };
-          if (hotelSlug) params.hotel = hotelSlug;
+          if (hotelSlug) params.hotel_slug = hotelSlug;
           window.location.href = successUrl + '?' + new URLSearchParams(params).toString();
         }
       } catch (e) {

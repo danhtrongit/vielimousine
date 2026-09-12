@@ -97,7 +97,6 @@ final class OrderService
                 $first['request']->roomId,
                 $bookingType,
                 $req->customer['email'] ?? null,
-                $req->customer['phone'] ?? null,
             );
             if (!$couponResult['valid']) {
                 throw new \Vie\Service\Coupon\CouponException($couponResult['messages']);
@@ -259,7 +258,6 @@ final class OrderService
                     $orderId,
                     $req->customer['email'] ?? null,
                     $totalDiscount,
-                    $req->customer['phone'] ?? null,
                 );
             }
 
