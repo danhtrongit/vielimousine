@@ -81,12 +81,21 @@ async function applyCoupon() {
     couponStatus.value = { text: 'Chọn phòng + chờ tính giá trước.', kind: 'err' };
     return;
   }
+  // Giới hạn "N lượt/khách" đếm theo SĐT/email → thiếu danh tính thì mã đã dùng
+  // vẫn hiện "hợp lệ" (kèm số tiền giảm) rồi mới chặn ở bước tạo đơn.
+  const phone = form.phone.trim();
+  if (!phone) {
+    couponStatus.value = { text: 'Nhập số điện thoại trước khi áp mã.', kind: 'err' };
+    return;
+  }
   try {
     const data = await api.post<CouponValidateResponse>('coupons/validate', {
       code,
       order_subtotal: quote.value.subtotal,
       room_id: selection.roomId,
       booking_type: selection.bookingType,
+      user_phone: phone,
+      user_email: form.email.trim() || undefined,
     });
     appliedCoupon.code = code;
     appliedCoupon.discount = data.discount;
@@ -178,14 +187,26 @@ async function submitOrder(ev: Event) {
       return;
     }
     // Chuyển khoản / đơn 0đ → về trang xem đơn (chờ beacon kịp gửi nếu vừa bắn event).
+    // Kèm slug combo để trang thành công giữ được danh tính sản phẩm cho tracking.
     const successUrl = window.VieRest?.successUrl || '/dat-phong-thanh-cong/';
-    const target = successUrl + '?' + new URLSearchParams({
-      code: data.code,
-      phone: form.phone.trim(),
-    }).toString();
+    const params: Record<string, string> = { code: data.code, phone: form.phone.trim() };
+    if (hotel.slug) params.hotel = hotel.slug;
+    const target = successUrl + '?' + new URLSearchParams(params).toString();
     afterTrackingFlush(pushed, () => { window.location.href = target; });
   } catch (e: any) {
     const errs = e?.errors || [];
+    // Mã bị server từ chối ở bước tạo đơn (hết lượt / vừa bị dùng) → bỏ mã và
+    // tính lại tổng, không để khách nhìn thấy mức giá 0đ của mã không còn hiệu lực.
+    if (errs.some((er: any) => er.code === 'coupon_invalid')) {
+      resetCoupon();
+      couponStatus.value = {
+        text: errs
+          .filter((er: any) => er.code === 'coupon_invalid')
+          .map((er: any) => er.message)
+          .join('. '),
+        kind: 'err',
+      };
+    }
     // Hết phòng lúc tạo đơn → KHÔNG báo lỗi cụt, chuyển form sang "yêu cầu đặt phòng"
     // (giữ nguyên thông tin khách đã nhập). Lần bấm tiếp theo sẽ gửi qua quote-inquiry.
     if (errs.some((er: any) => er.code === 'stock_unavailable')) {

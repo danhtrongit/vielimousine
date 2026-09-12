@@ -60,6 +60,7 @@ final class SchemaManager
 
         self::dropProductCode();
         self::backfillCustomerBookingCount();
+        self::migrateCouponUsagePhone();
         self::migrateOrderDraftColumns();
     }
 
@@ -79,6 +80,67 @@ final class SchemaManager
         } catch (\Throwable $e) {
             error_log('[vie] backfill booking_count failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * One-shot migration: thêm `vie_coupon_usage.user_phone` + backfill SĐT từ đơn
+     * tương ứng.
+     *
+     * Cột dùng cho giới hạn "N lượt/khách" — email ở form đặt phòng là tùy chọn nên
+     * chỉ đếm theo email sẽ bỏ sót lượt đã dùng. dbDelta không đáng tin khi thêm
+     * cột/index vào bảng đã có dữ liệu → ALTER tường minh, idempotent.
+     */
+    private static function migrateCouponUsagePhone(): void
+    {
+        if (get_option('vie_coupon_usage_phone_v1') === 'done') {
+            return;
+        }
+        global $wpdb;
+
+        $usage = $wpdb->prefix . 'vie_coupon_usage';
+
+        $hasColumn = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'user_phone'",
+            DB_NAME,
+            $usage
+        ));
+        if ($hasColumn === 0) {
+            $wpdb->query("ALTER TABLE {$usage} ADD COLUMN user_phone VARCHAR(20) DEFAULT NULL AFTER user_email");
+
+            // Bảng chưa sẵn sàng (vd chưa tạo xong) → để lần chạy sau làm lại.
+            $hasColumn = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'user_phone'",
+                DB_NAME,
+                $usage
+            ));
+            if ($hasColumn === 0) {
+                return;
+            }
+        }
+
+        $hasIndex = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.STATISTICS
+              WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = 'idx_user_phone'",
+            DB_NAME,
+            $usage
+        ));
+        if ($hasIndex === 0) {
+            $wpdb->query("ALTER TABLE {$usage} ADD INDEX idx_user_phone (user_phone)");
+        }
+
+        $order = $wpdb->prefix . 'vie_order';
+        $wpdb->query(
+            "UPDATE {$usage} u
+               JOIN {$order} o ON o.id = u.order_id
+                SET u.user_phone = o.customer_phone
+              WHERE u.user_phone IS NULL
+                AND o.customer_phone IS NOT NULL
+                AND o.customer_phone <> ''"
+        );
+
+        update_option('vie_coupon_usage_phone_v1', 'done', false);
     }
 
     /**

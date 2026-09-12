@@ -204,12 +204,22 @@
         if (couponStatus) { couponStatus.textContent = 'Đợi tính giá xong rồi mới áp mã.'; couponStatus.className = 'vie-public__coupon-status vie-public__coupon-status--err'; }
         return;
       }
+      // Giới hạn "N lượt/khách" của mã đếm theo SĐT/email → thiếu danh tính thì mã
+      // đã dùng vẫn hiện hợp lệ rồi mới chặn ở bước tạo đơn.
+      const fd = new FormData(form);
+      const phone = String(fd.get('phone') || '').trim();
+      if (!phone) {
+        if (couponStatus) { couponStatus.textContent = 'Nhập số điện thoại trước khi áp mã.'; couponStatus.className = 'vie-public__coupon-status vie-public__coupon-status--err'; }
+        return;
+      }
       try {
         const data = await Vie.api.post('coupons/validate', {
           code,
           order_subtotal: currentQuote.subtotal,
           room_id: item.room_id,
           booking_type: item.booking_type,
+          user_phone: phone,
+          user_email: String(fd.get('email') || '').trim() || undefined,
         });
         appliedCoupon = code;
         if (couponStatus) {
@@ -261,7 +271,20 @@
           }).toString();
         }
       } catch (e) {
-        const msg = (e.errors || []).map((er) => er.message).join('. ') || 'Đặt phòng thất bại';
+        const errs = e.errors || [];
+        // Mã bị server từ chối ở bước tạo đơn (hết lượt / vừa bị dùng) → bỏ mã để
+        // lần bấm sau không gửi lại mã đã chết.
+        if (errs.some((er) => er.code === 'coupon_invalid')) {
+          appliedCoupon = null;
+          if (couponStatus) {
+            couponStatus.textContent = errs
+              .filter((er) => er.code === 'coupon_invalid')
+              .map((er) => er.message)
+              .join('. ');
+            couponStatus.className = 'vie-public__coupon-status vie-public__coupon-status--err';
+          }
+        }
+        const msg = errs.map((er) => er.message).join('. ') || 'Đặt phòng thất bại';
         showError(root, msg);
         submitBtn.disabled = false;
         submitBtn.textContent = 'Đặt phòng';
@@ -458,6 +481,7 @@
   function initHotelDetail(root) {
     const hotelId = parseInt(root.getAttribute('data-hotel-id') || '0', 10);
     const hotelName = root.getAttribute('data-hotel-name') || '';
+    const hotelSlug = root.getAttribute('data-hotel-slug') || '';
 
     const searchForm = root.querySelector('[data-vie-search] form');
     const roomsWrap = root.querySelector('[data-vie-rooms]');
@@ -728,12 +752,23 @@
         couponStatus.className = 'vh-coupon-status vh-coupon-err';
         return;
       }
+      // Giới hạn "N lượt/khách" của mã đếm theo SĐT/email → thiếu danh tính thì mã
+      // đã dùng vẫn hiện hợp lệ rồi mới chặn ở bước tạo đơn.
+      const fd = new FormData(checkoutForm);
+      const phone = String(fd.get('phone') || '').trim();
+      if (!phone) {
+        couponStatus.textContent = 'Nhập số điện thoại trước khi áp mã.';
+        couponStatus.className = 'vh-coupon-status vh-coupon-err';
+        return;
+      }
       try {
         const data = await Vie.api.post('coupons/validate', {
           code,
           order_subtotal: quote.subtotal,
           room_id: selectedRoomId,
           booking_type: (readSearch() || {}).booking_type || 'room',
+          user_phone: phone,
+          user_email: String(fd.get('email') || '').trim() || undefined,
         });
         appliedCoupon = code;
         couponStatus.textContent = 'Áp dụng thành công: −' + Vie.format.vnd(data.discount || 0);
@@ -784,11 +819,24 @@
         if (data.redirect_url) {
           window.location.href = data.redirect_url;
         } else {
+          // Kèm slug combo để trang thành công giữ danh tính sản phẩm cho tracking.
           const successUrl = (window.VieRest && window.VieRest.successUrl) || '/dat-phong-thanh-cong/';
-          window.location.href = successUrl + '?' + new URLSearchParams({ code: data.code, phone }).toString();
+          const params = { code: data.code, phone };
+          if (hotelSlug) params.hotel = hotelSlug;
+          window.location.href = successUrl + '?' + new URLSearchParams(params).toString();
         }
       } catch (e) {
-        const msg = (e.errors || []).map((er) => er.message).join('. ') || 'Đặt phòng thất bại';
+        const errs = e.errors || [];
+        // Mã bị server từ chối ở bước tạo đơn → bỏ mã để lần bấm sau không gửi lại.
+        if (errs.some((er) => er.code === 'coupon_invalid')) {
+          appliedCoupon = null;
+          couponStatus.textContent = errs
+            .filter((er) => er.code === 'coupon_invalid')
+            .map((er) => er.message)
+            .join('. ');
+          couponStatus.className = 'vh-coupon-status vh-coupon-err';
+        }
+        const msg = errs.map((er) => er.message).join('. ') || 'Đặt phòng thất bại';
         showErr(msg);
         submitBtn.disabled = false;
         submitBtn.textContent = oldLabel;

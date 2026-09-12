@@ -13,7 +13,7 @@ final class CouponUsageRepository extends AbstractRepository
     protected function fillable(): array
     {
         return [
-            'coupon_id', 'order_id', 'user_email', 'discount',
+            'coupon_id', 'order_id', 'user_email', 'user_phone', 'discount',
         ];
     }
 
@@ -48,6 +48,38 @@ final class CouponUsageRepository extends AbstractRepository
             'coupon_id' => ['type' => 'exact', 'column' => 'coupon_id'],
             'order_id'  => ['type' => 'exact', 'column' => 'order_id'],
         ];
+    }
+
+    /**
+     * Đếm số lượt đã dùng mã theo danh tính khách (SĐT hoặc email).
+     *
+     * Khớp cả hai vì dữ liệu cũ có thể chỉ có email (email là tùy chọn ở form
+     * đặt phòng). Chuỗi rỗng bị loại để các row thiếu dữ liệu không bị tính
+     * thành "cùng một khách".
+     */
+    public function countForIdentity(int $couponId, ?string $phone, ?string $email): int
+    {
+        $phone = trim((string) $phone);
+        $email = trim((string) $email);
+        if ($phone === '' && $email === '') {
+            return 0;
+        }
+
+        $conditions = [];
+        $params     = [$couponId];
+        if ($phone !== '') {
+            $conditions[] = 'user_phone = %s';
+            $params[]     = $phone;
+        }
+        if ($email !== '') {
+            $conditions[] = 'user_email = %s';
+            $params[]     = $email;
+        }
+
+        global $wpdb;
+        $sql = "SELECT COUNT(*) FROM {$this->table()} WHERE coupon_id = %d AND (" . implode(' OR ', $conditions) . ')';
+
+        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params));
     }
 
     public function create(array $data): array

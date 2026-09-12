@@ -5,6 +5,7 @@ namespace Vie\Service\Coupon;
 
 use Vie\Repository\CouponRepository;
 use Vie\Repository\CouponUsageRepository;
+use Vie\Repository\CustomerRepository;
 
 final class CouponService
 {
@@ -17,6 +18,10 @@ final class CouponService
     /**
      * Validate coupon for a preview/checkout context. Never increments usage.
      *
+     * `$userPhone` là danh tính chính (email tùy chọn ở form đặt phòng) — preview
+     * và lúc tạo đơn PHẢI truyền cùng danh tính, nếu không giới hạn "N lượt/khách"
+     * chỉ lộ ra ở bước thanh toán.
+     *
      * @return array{valid: bool, coupon: ?array, discount: int, messages: string[]}
      */
     public function validate(
@@ -25,7 +30,8 @@ final class CouponService
         ?int $hotelId,
         ?int $roomId,
         ?string $bookingType,
-        ?string $userEmail,
+        ?string $userEmail = null,
+        ?string $userPhone = null,
     ): array {
         $messages = [];
         $coupon = $this->couponRepo->findByCode($code);
@@ -62,8 +68,12 @@ final class CouponService
         }
 
         $perUser = $coupon['usage_limit_per_user'] ?? null;
-        if ($perUser !== null && (int) $perUser > 0 && $userEmail !== null && $userEmail !== '') {
-            $used = $this->countUsageForEmail((int) $coupon['id'], $userEmail);
+        if ($perUser !== null && (int) $perUser > 0) {
+            $used = $this->usageRepo->countForIdentity(
+                (int) $coupon['id'],
+                $userPhone !== null ? CustomerRepository::normalizePhone($userPhone) : null,
+                $userEmail,
+            );
             if ($used >= (int) $perUser) {
                 $messages[] = 'Bạn đã sử dụng hết lượt cho mã này';
             }
@@ -127,10 +137,18 @@ final class CouponService
      * Order trong transaction: increment TRƯỚC (compare-and-swap), nếu fail throw
      * CouponException → outer TX rollback toàn bộ order. Insert usage record SAU.
      *
+     * `$phone` bắt buộc trên thực tế (đơn nào cũng có SĐT khách) và là danh tính
+     * để đếm giới hạn "N lượt/khách".
+     *
      * @throws CouponException khi đã đạt usage_limit.
      */
-    public function recordUsage(int $couponId, int $orderId, ?string $email, int $discount): void
-    {
+    public function recordUsage(
+        int $couponId,
+        int $orderId,
+        ?string $email,
+        int $discount,
+        ?string $phone = null,
+    ): void {
         $claimed = $this->couponRepo->incrementUsedAtomic($couponId);
         if (!$claimed) {
             throw new CouponException(['Mã giảm giá đã hết lượt sử dụng.']);
@@ -139,18 +157,8 @@ final class CouponService
             'coupon_id'  => $couponId,
             'order_id'   => $orderId,
             'user_email' => $email,
+            'user_phone' => $phone !== null ? CustomerRepository::normalizePhone($phone) : null,
             'discount'   => $discount,
         ]);
-    }
-
-    private function countUsageForEmail(int $couponId, string $email): int
-    {
-        global $wpdb;
-        $table = $wpdb->prefix . 'vie_coupon_usage';
-        return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE coupon_id = %d AND user_email = %s",
-            $couponId,
-            $email
-        ));
     }
 }
