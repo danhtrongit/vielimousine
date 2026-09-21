@@ -17,8 +17,10 @@ final class OrderLookupController
 {
     public static function lookup(\WP_REST_Request $request): \WP_REST_Response
     {
-        // Rate-limit chống brute-force code+phone (endpoint công khai, không auth).
-        if ($denied = RateLimiter::check('order_lookup', 10, 300)) {
+        // Cho phép poll mỗi 8 giây và kiểm tra thủ công; chỉ chặn burst tối đa 15 giây.
+        // Bucket mới không kế thừa thời gian khóa 5 phút từ cấu hình cũ.
+        // Vẫn giới hạn theo IP trước khi tra cứu để chống brute-force code+phone.
+        if ($denied = RateLimiter::check('order_lookup_15s', 10, 15)) {
             return $denied;
         }
 

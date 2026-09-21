@@ -894,7 +894,17 @@
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-vie-hotel]').forEach(initHotelDetail);
     document.querySelectorAll('[data-vie-checkout]').forEach(initCheckout);
-    document.querySelectorAll('[data-vie-success]').forEach(initSuccess);
+    // The success template includes a hidden legacy renderer alongside the Vue
+    // mount point. Vue replaces the NOSCRIPT placeholder when it mounts; use
+    // the same state check as success.php's fallback so a missing/failed dist
+    // bundle still gets the legacy lookup/poll.
+    const successMount = document.querySelector('[data-vie-public-success]');
+    const vueNotMounted = !successMount
+      || !successMount.firstElementChild
+      || successMount.firstElementChild.tagName === 'NOSCRIPT';
+    if (vueNotMounted) {
+      document.querySelectorAll('[data-vie-success]').forEach(initSuccess);
+    }
     document.querySelectorAll('[data-vie-search]:not([data-vie-hotel] *)').forEach(initSearch);
     document.querySelectorAll('[data-vie-rooms]:not([data-vie-hotel] *)').forEach(initRooms);
   });

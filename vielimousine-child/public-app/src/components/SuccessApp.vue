@@ -15,9 +15,11 @@ const gatewayState = params.get('state') || '';
 
 const order = ref<OrderLookup | null>(null);
 const error = ref('');
+const refreshError = ref('');
 const refreshing = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let pollCount = 0;
+let lookupInFlight: Promise<OrderLookup | null> | null = null;
 const MAX_POLLS = 15;
 
 // Meta Pixel: chỉ fire Purchase khi đơn ĐÃ thanh toán (paid), 1 lần/mã đơn.
@@ -41,24 +43,41 @@ function firePurchaseIfPaid(o: OrderLookup): void {
 }
 
 async function fetchOnce() {
+  if (lookupInFlight) return lookupInFlight;
+
   if (!code || !phone) {
-    error.value = 'Thiếu mã đơn hoặc số điện thoại. Vui lòng kiểm tra email.';
+    const message = 'Thiếu mã đơn hoặc số điện thoại. Vui lòng kiểm tra email.';
+    if (order.value) refreshError.value = message;
+    else error.value = message;
     return null;
   }
-  try {
-    const data = await api.get<OrderLookup>('orders/lookup', { code, phone });
-    order.value = data;
-    error.value = '';
-    firePurchaseIfPaid(data);
-    return data;
-  } catch (e: any) {
-    error.value = e?.errors?.[0]?.message || 'Không tìm thấy đơn';
-    return null;
-  }
+
+  lookupInFlight = (async () => {
+    try {
+      const data = await api.get<OrderLookup>('orders/lookup', { code, phone });
+      order.value = data;
+      error.value = '';
+      refreshError.value = '';
+      firePurchaseIfPaid(data);
+      return data;
+    } catch (e: any) {
+      const message = e?.errors?.[0]?.message || 'Không tìm thấy đơn';
+      // Keep an already loaded order visible when a refresh/poll is temporary
+      // (including the API's short rate-limit response).
+      if (order.value) refreshError.value = message;
+      else error.value = message;
+      return null;
+    } finally {
+      lookupInFlight = null;
+    }
+  })();
+
+  return lookupInFlight;
 }
 
 async function refresh() {
   refreshing.value = true;
+  if (order.value) refreshError.value = '';
   try { await fetchOnce(); } finally { refreshing.value = false; }
 }
 
@@ -151,15 +170,19 @@ const vat = computed(() => {
   return v && (v.company_name || v.tax_code) ? v : null;
 });
 const canPay = computed(() => !!order.value && order.value.status !== 'cancelled' && order.value.payment_status !== 'paid');
+const isPendingOrder = (o: OrderLookup): boolean =>
+  o.status !== 'cancelled' && (o.payment_status === 'pending' || o.status === 'pending');
 
 onMounted(async () => {
   await fetchOnce();
-  if (order.value && (order.value.payment_status === 'pending' || order.value.status === 'pending')) {
+  if (order.value && isPendingOrder(order.value)) {
     pollTimer = setInterval(async () => {
       pollCount++;
       const next = await fetchOnce();
-      if (!next || pollCount >= MAX_POLLS) { if (pollTimer) clearInterval(pollTimer); return; }
-      if (next.payment_status !== 'pending' && next.status !== 'pending') {
+      // A temporary lookup failure should not stop polling or hide the order.
+      if (pollCount >= MAX_POLLS) { if (pollTimer) clearInterval(pollTimer); return; }
+      if (!next) return;
+      if (!isPendingOrder(next)) {
         if (pollTimer) clearInterval(pollTimer);
       }
     }, 8000);
@@ -174,12 +197,19 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
     <h1>{{ heading }}</h1>
 
     <div v-if="error" class="vh-error">{{ error }}</div>
+    <div v-if="error && !order" class="vh-success-actions">
+      <button type="button" class="vh-btn vh-btn-secondary" :disabled="refreshing" @click="refresh">
+        <i :class="['pi', refreshing ? 'pi-spin pi-spinner' : 'pi-refresh']" aria-hidden="true" />
+        {{ refreshing ? 'Đang kiểm tra…' : 'Thử lại' }}
+      </button>
+    </div>
 
     <div v-else-if="!order" class="vh-empty">
       <p>Đang tải thông tin đơn hàng…</p>
     </div>
 
     <template v-else>
+      <div v-if="refreshError" class="vh-error">{{ refreshError }}</div>
       <div :class="['vh-success-banner', banner?.cls]" role="status">
         <i :class="['pi', banner?.icon]" aria-hidden="true" />
         <span>{{ banner?.text }}</span>

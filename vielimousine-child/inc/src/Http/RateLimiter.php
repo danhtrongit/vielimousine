@@ -41,7 +41,7 @@ final class RateLimiter
         $now = time();
 
         $state = get_transient($key);
-        if (!is_array($state) || ($state['reset'] ?? 0) < $now) {
+        if (!is_array($state) || ($state['reset'] ?? 0) <= $now) {
             $state = ['count' => 0, 'reset' => $now + $windowSec];
         }
 
