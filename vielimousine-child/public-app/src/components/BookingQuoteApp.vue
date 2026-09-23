@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
+import vieLogo from '@/assets/logo-vie.png';
 import {
   createBookingQuoteCheckout,
   getPublicBookingQuote,
@@ -250,7 +251,7 @@ async function copyValue(value: string, field: string): Promise<void> {
 }
 
 const coverImage = computed(() => safeSameOriginImage(quote.value?.image_url || ''));
-const logoImage = computed(() => safeSameOriginImage(quote.value?.brand?.logo_url || ''));
+const logoImage = computed(() => safeSameOriginImage(quote.value?.brand?.logo_url || '') || vieLogo);
 const advisorName = computed(() => quote.value?.contact_name || 'Đội ngũ Vie Limo');
 const customerInitials = computed(() => initials(quote.value?.customer_name));
 const advisorInitials = computed(() => initials(advisorName.value));
@@ -347,7 +348,7 @@ onBeforeUnmount(() => {
         <a class="bq-brand" :href="homeUrl" aria-label="Về trang chủ">
           <img v-if="logoImage" :src="logoImage" :alt="quote.brand.company_name || 'Vie Limo'">
           <span v-else class="bq-brand-mark" aria-hidden="true">V</span>
-          <span>{{ quote.brand.company_name || 'Vie Limo' }}</span>
+          <span v-if="!logoImage">{{ quote.brand.company_name || 'Vie Limo' }}</span>
         </a>
         <div class="bq-header-actions">
           <span class="bq-code">{{ quote.code }}</span>

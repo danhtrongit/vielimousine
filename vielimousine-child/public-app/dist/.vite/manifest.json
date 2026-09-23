@@ -48,8 +48,12 @@
     "file": "assets/primeicons-C6QP2o4f.woff2",
     "src": "node_modules/primeicons/fonts/primeicons.woff2"
   },
+  "src/assets/logo-vie.png": {
+    "file": "assets/logo-vie-IeGyDQ51.png",
+    "src": "src/assets/logo-vie.png"
+  },
   "src/entries/booking.ts": {
-    "file": "assets/booking-DWhq7JKU.js",
+    "file": "assets/booking-Bw1XnlJ7.js",
     "name": "booking",
     "src": "src/entries/booking.ts",
     "isEntry": true,
@@ -57,7 +61,10 @@
       "_tokens-C_ykwzRD.js"
     ],
     "css": [
-      "assets/booking-WqBvHL8-.css"
+      "assets/booking-DzRbXXIZ.css"
+    ],
+    "assets": [
+      "assets/logo-vie-IeGyDQ51.png"
     ]
   },
   "src/entries/hotel.ts": {
