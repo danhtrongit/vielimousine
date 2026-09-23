@@ -41,4 +41,11 @@ export interface Room {
   thumbnail_url?: string | null;
   gallery: number[] | null;
   is_active: boolean;
+  description?: string | null;
+  area?: number | null;
+  bed_type?: string | null;
+  bed_count?: number | null;
+  view?: string | null;
+  floor?: string | null;
+  amenities?: Array<string | { label?: string; name?: string }> | Record<string, unknown> | null;
 }

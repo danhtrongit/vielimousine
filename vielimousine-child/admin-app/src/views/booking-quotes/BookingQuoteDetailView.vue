@@ -58,6 +58,7 @@ function emptyItem(): BookingQuoteItemPayload {
   return { room_id: 0, booking_type: 'room', checkin: '', checkout: '', adults: 2, child_ages: [], user_rooms: 0 };
 }
 const selection = ref<BookingQuoteItemPayload>(emptyItem());
+let autoFilledRoomId: number | null = null;
 
 const isNew = computed(() => route.name === 'booking-quotes-new');
 const quoteId = computed(() => isNew.value ? null : Number(route.params.id));
@@ -127,6 +128,7 @@ async function load() {
     quote.value = null;
     form.value = createDefaultQuote();
     selection.value = emptyItem();
+    autoFilledRoomId = null;
     pricing.value = null;
     void lookup.ensureLoaded();
     viewMode.value = 'edit';
@@ -144,6 +146,7 @@ async function load() {
     quote.value = { ...response.data, payments: response.data.payments ?? [] };
     form.value = quoteToPayload(response.data);
     selection.value = form.value.items[0] ? { ...form.value.items[0], child_ages: [...form.value.items[0].child_ages] } : emptyItem();
+    autoFilledRoomId = selection.value.room_id || null;
     pricing.value = null;
     void lookup.ensureLoaded();
     viewMode.value = response.data.status === 'draft' ? 'edit' : 'preview';
@@ -172,10 +175,40 @@ function syncSelection() {
     .map((age) => typeof age === 'number' ? age : Number(age))
     .filter((age) => Number.isInteger(age) && age >= 0 && age <= 17);
   if (multiItemQuote.value) return;
+  applyRoomDefaults();
   const first = selection.value.room_id && selection.value.checkin && selection.value.checkout
     ? { ...selection.value, child_ages: [...selection.value.child_ages] }
     : null;
+  if (first) {
+    // The public quote trip dates must describe the selected room stay.
+    form.value.trip_start = first.checkin;
+    form.value.trip_end = first.checkout;
+  }
   form.value.items = first ? [first, ...form.value.items.slice(1)] : form.value.items.slice(1);
+}
+
+function applyRoomDefaults(): void {
+  const roomId = selection.value.room_id;
+  if (!roomId || roomId === autoFilledRoomId) return;
+  const room = lookup.roomById(roomId);
+  const hotel = room ? lookup.hotelById(room.hotel_id) : undefined;
+  if (!room) return;
+  const amenities = Array.isArray(room.amenities)
+    ? room.amenities.map((item) => typeof item === 'string' ? item : item.label || item.name || '').filter(Boolean)
+    : [];
+  form.value.title = `${hotel?.name ? `${hotel.name} — ` : ''}${room.name}`;
+  form.value.image_url = room.thumbnail_url || '';
+  form.value.description = [
+    room.description,
+    room.area ? `${room.area} m²` : '',
+    room.bed_type ? `Giường: ${room.bed_type}` : '',
+    room.bed_count ? `${room.bed_count} giường` : '',
+    room.view ? `View: ${room.view}` : '',
+    amenities.length ? `Tiện nghi: ${amenities.join(', ')}` : '',
+  ].filter(Boolean).join('\n');
+  form.value.inclusions = hotel?.pricing_policy?.text || '';
+  form.value.terms = hotel?.cancellation_policy?.text || '';
+  autoFilledRoomId = roomId;
 }
 
 async function runQuote() {
@@ -401,10 +434,9 @@ async function revokeQuote() {
         <section class="form-card" aria-labelledby="trip-heading">
           <div class="section-heading"><span>2</span><div><h2 id="trip-heading">Chuyến đi / dịch vụ</h2><p>Nội dung khách sẽ thấy khi mở link.</p></div></div>
           <div class="field-grid">
-            <div class="field span-2"><label for="quote-title">Tên dịch vụ / chuyến đi <em>*</em></label><InputText id="quote-title" v-model="form.title" placeholder="Ví dụ: Combo Hà Nội – Hạ Long 3N2Đ" /></div>
+            <div class="field span-2"><label for="quote-title">Phòng / dịch vụ <em>*</em></label><InputText id="quote-title" v-model="form.title" readonly /><small class="muted">Tên và ảnh được lấy tự động từ phòng đã chọn.</small></div>
             <div class="field"><label for="trip-start">Ngày đi</label><DatePicker input-id="trip-start" v-model="tripStartDate" date-format="dd/mm/yy" show-icon /></div>
             <div class="field"><label for="trip-end">Ngày về</label><DatePicker input-id="trip-end" v-model="tripEndDate" date-format="dd/mm/yy" show-icon /></div>
-            <div class="field span-2"><label for="quote-image">Ảnh đại diện (URL cùng website)</label><InputText id="quote-image" v-model="form.image_url" placeholder="/wp-content/uploads/..." /></div>
             <div class="field span-2"><label for="quote-greeting">Lời chào</label><Textarea id="quote-greeting" v-model="form.greeting" rows="3" auto-resize /></div>
             <div class="field span-2"><label for="quote-description">Mô tả</label><Textarea id="quote-description" v-model="form.description" rows="4" auto-resize /></div>
           </div>
@@ -454,7 +486,7 @@ async function revokeQuote() {
         </section>
 
         <section class="form-card" aria-labelledby="content-heading">
-          <div class="section-heading"><span>4</span><div><h2 id="content-heading">Nội dung & điều kiện</h2><p>Mỗi ý nên xuống dòng để khách dễ đọc trên điện thoại.</p></div></div>
+          <div class="section-heading"><span>4</span><div><h2 id="content-heading">Nội dung & điều kiện</h2><p>Chính sách phòng được điền sẵn từ khách sạn; bạn có thể chỉnh sửa trước khi lưu.</p></div></div>
           <div class="field-grid">
             <div class="field"><label for="quote-inclusions">Dịch vụ bao gồm</label><Textarea id="quote-inclusions" v-model="form.inclusions" rows="5" auto-resize /></div>
             <div class="field"><label for="quote-exclusions">Không bao gồm</label><Textarea id="quote-exclusions" v-model="form.exclusions" rows="5" auto-resize /></div>

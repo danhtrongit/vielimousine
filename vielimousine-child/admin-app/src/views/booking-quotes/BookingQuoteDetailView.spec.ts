@@ -29,7 +29,7 @@ vi.mock('@/composables/useNotify', () => ({
 }));
 vi.mock('@/stores/ui.store', () => ({ useUIStore: () => ({ setBreadcrumb: vi.fn() }) }));
 vi.mock('@/stores/auth.store', () => ({ useAuthStore: () => ({ can: () => true }) }));
-vi.mock('@/stores/lookup.store', () => ({ useLookupStore: () => ({ rooms: [], hotelById: () => undefined, ensureLoaded: vi.fn() }) }));
+vi.mock('@/stores/lookup.store', () => ({ useLookupStore: () => ({ rooms: [], roomById: () => undefined, hotelById: () => undefined, ensureLoaded: vi.fn() }) }));
 
 import BookingQuoteDetailView from './BookingQuoteDetailView.vue';
 

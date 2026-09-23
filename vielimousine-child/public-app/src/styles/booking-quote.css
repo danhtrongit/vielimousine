@@ -1,15 +1,15 @@
 /* Standalone quotation page. It intentionally does not depend on the parent theme. */
-html, body { margin: 0; min-height: 100%; background: #f4eee6; }
+html, body { margin: 0; min-height: 100%; background: #f4f8fc; }
 [data-vie-public-booking] { min-height: 100vh; }
 .bq-page {
-  --bq-orange: #bd5638;
-  --bq-orange-dark: #91402b;
-  --bq-ink: #292520;
-  --bq-muted: #746d65;
-  --bq-line: #e8ddd1;
-  --bq-soft: #f7f2ec;
-  --bq-success: #25735b;
-  --bq-warning: #96600f;
+  --bq-orange: #0b67a3;
+  --bq-orange-dark: #084b78;
+  --bq-ink: #12304a;
+  --bq-muted: #607589;
+  --bq-line: #d8e5ef;
+  --bq-soft: #f1f7fb;
+  --bq-success: #17795c;
+  --bq-warning: #98620b;
   max-width: 1180px;
   margin: 0 auto;
   padding: 0 20px 80px;
@@ -31,7 +31,7 @@ html, body { margin: 0; min-height: 100%; background: #f4eee6; }
 .bq-print:hover, .bq-check-status:hover { color: var(--bq-orange-dark); }
 .bq-shell { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 28px; align-items: start; padding-top: 34px; }
 .bq-main { min-width: 0; display: grid; gap: 18px; }
-.bq-card { padding: 26px; border: 1px solid var(--bq-line); border-radius: 18px; background: #fffdfa; box-shadow: 0 12px 32px rgba(61, 43, 31, .07); }
+.bq-card { padding: 26px; border: 1px solid var(--bq-line); border-radius: 18px; background: #ffffff; box-shadow: 0 12px 32px rgba(61, 43, 31, .07); }
 .bq-hero { min-height: 200px; display: flex; justify-content: space-between; gap: 24px; overflow: hidden; background: linear-gradient(135deg, #fff9f5, #fff); }
 .bq-hero-copy { align-self: center; min-width: 0; }
 .bq-kicker, .bq-eyebrow { display: block; color: var(--bq-muted); font-size: .74rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
@@ -53,7 +53,7 @@ html, body { margin: 0; min-height: 100%; background: #f4eee6; }
 .bq-room-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .bq-room-heading > div { min-width: 0; }
 .bq-room-heading h3 { margin: 4px 0 0; font-size: 1.08rem; line-height: 1.35; overflow-wrap: anywhere; }
-.bq-room-type { flex-shrink: 0; padding: 5px 9px; border-radius: 8px; color: var(--bq-orange-dark); background: #f6e4d9; font-size: .73rem; font-weight: 700; }
+.bq-room-type { flex-shrink: 0; padding: 5px 9px; border-radius: 8px; color: var(--bq-orange-dark); background: #e2f1fb; font-size: .73rem; font-weight: 700; }
 .bq-room-facts { display: grid; gap: 10px; margin: 16px 0; }
 .bq-room-facts dt { color: var(--bq-muted); font-size: .76rem; }
 .bq-room-facts dd { margin: 2px 0 0; font-weight: 600; font-size: .88rem; }
@@ -201,9 +201,9 @@ html, body { margin: 0; min-height: 100%; background: #f4eee6; }
   .bq-spinner { animation: none; }
 }
 .bq-guest-summary { display: flex; flex-wrap: wrap; gap: 9px; margin: 16px 0; }
-.bq-guest-summary span { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 7px 11px; color: #675c51; border: 1px solid var(--bq-line); border-radius: 999px; background: #fffaf4; font-size: .85rem; font-weight: 700; }
+.bq-guest-summary span { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 7px 11px; color: #675c51; border: 1px solid var(--bq-line); border-radius: 999px; background: #f5faff; font-size: .85rem; font-weight: 700; }
 .bq-guest-summary i { color: var(--bq-orange); }
-.bq-transfer { margin: 16px 0; padding: 17px; border: 1px solid #e8c8b8; border-radius: 15px; background: linear-gradient(150deg, #fff8f2, #fffdfa); scroll-margin: 20px; }
+.bq-transfer { margin: 16px 0; padding: 17px; border: 1px solid #b8d8ed; border-radius: 15px; background: linear-gradient(150deg, #eef7fd, #ffffff); scroll-margin: 20px; }
 .bq-transfer:focus { outline: none; }
 .bq-transfer:focus-visible { outline: 3px solid rgba(189, 86, 56, .35); outline-offset: 3px; }
 .bq-transfer-heading { display: flex; align-items: center; gap: 10px; }
@@ -215,14 +215,14 @@ html, body { margin: 0; min-height: 100%; background: #f4eee6; }
 .bq-transfer-details dt { color: var(--bq-muted); font-size: .8rem; }
 .bq-transfer-details dd { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; font-size: .84rem; font-weight: 800; text-align: right; overflow-wrap: anywhere; }
 .bq-transfer-details dd small { color: var(--bq-muted); font-size: .75rem; }
-.bq-transfer-details code { padding: 4px 7px; color: #753922; border-radius: 5px; background: #f7e9df; font-size: .82rem; }
-.bq-copy { min-height: 35px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 8px; color: var(--bq-orange-dark); border: 1px solid #e8c8b8; border-radius: 8px; background: #fff; font-size: .74rem; font-weight: 800; cursor: pointer; }
+.bq-transfer-details code { padding: 4px 7px; color: #0b4f7e; border-radius: 5px; background: #e2f1fb; font-size: .82rem; }
+.bq-copy { min-height: 35px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 8px; color: var(--bq-orange-dark); border: 1px solid #b8d8ed; border-radius: 8px; background: #fff; font-size: .74rem; font-weight: 800; cursor: pointer; }
 .bq-copy:hover { background: #fff4ec; }
 .bq-transfer-hint { margin: 12px 0 0; color: var(--bq-muted); font-size: .77rem; line-height: 1.45; }
 .bq-identity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.bq-identity-card { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 14px 16px; border: 1px solid var(--bq-line); border-radius: 15px; background: #fffaf4; }
+.bq-identity-card { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 14px 16px; border: 1px solid var(--bq-line); border-radius: 15px; background: #f5faff; }
 .bq-identity-avatar { flex: 0 0 42px; width: 42px; height: 42px; display: grid; place-items: center; color: #fff; border-radius: 50%; background: var(--bq-orange); font-size: .94rem; font-weight: 900; letter-spacing: .03em; }
-.bq-identity-card--advisor .bq-identity-avatar { color: var(--bq-orange-dark); background: #f6d9ca; }
+.bq-identity-card--advisor .bq-identity-avatar { color: var(--bq-orange-dark); background: #d9edf9; }
 .bq-identity-copy { min-width: 0; display: grid; gap: 2px; }
 .bq-identity-copy span { color: var(--bq-muted); font-size: .7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .bq-identity-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; }
@@ -242,7 +242,7 @@ html, body { margin: 0; min-height: 100%; background: #f4eee6; }
   .bq-service-hero .bq-cover img { min-height: 0; }
   .bq-service-meta { margin-top: 14px; }
   .bq-lines { border: 0; overflow: visible; }
-  .bq-line { margin: 8px 0; border: 1px solid var(--bq-line); border-radius: 13px; background: #fffaf4; box-shadow: 0 4px 12px rgba(61, 43, 31, .04); }
+  .bq-line { margin: 8px 0; border: 1px solid var(--bq-line); border-radius: 13px; background: #f5faff; box-shadow: 0 4px 12px rgba(12, 67, 108, .05); }
   .bq-line:first-child { border-top: 0; }
   .bq-line-name { gap: 4px; }
   .bq-line-name strong { font-size: .96rem; }
