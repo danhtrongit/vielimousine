@@ -123,14 +123,6 @@ const reviewReceipts = computed(() => (quote.value?.payments ?? [])
   .flatMap((payment) => payment.receipts ?? [])
   .filter((receipt) => receipt.outcome === 'review'));
 
-const tripStartDate = computed({
-  get: () => form.value.trip_start ? new Date(`${form.value.trip_start}T00:00:00`) : null,
-  set: (value: Date | null) => { form.value.trip_start = value ? ymdLocal(value) : null; },
-});
-const tripEndDate = computed({
-  get: () => form.value.trip_end ? new Date(`${form.value.trip_end}T00:00:00`) : null,
-  set: (value: Date | null) => { form.value.trip_end = value ? ymdLocal(value) : null; },
-});
 const validUntilDate = computed({
   get: () => form.value.valid_until ? new Date(form.value.valid_until.replace(' ', 'T')) : null,
   set: (value: Date | null) => { form.value.valid_until = value ? toLocalDateTime(value) : ''; },
@@ -526,19 +518,8 @@ async function revokeQuote() {
           </div>
         </section>
 
-        <section class="form-card" aria-labelledby="trip-heading">
-          <div class="section-heading"><span>2</span><div><h2 id="trip-heading">Chuyến đi / dịch vụ</h2><p>Nội dung khách sẽ thấy khi mở link.</p></div></div>
-          <div class="field-grid">
-            <div class="field span-2"><label for="quote-title">Phòng / dịch vụ <em>*</em></label><InputText id="quote-title" v-model="form.title" readonly /><small class="muted">Tên và ảnh được lấy tự động từ phòng đã chọn.</small></div>
-            <div class="field"><label for="trip-start">Ngày đi</label><DatePicker input-id="trip-start" v-model="tripStartDate" date-format="dd/mm/yy" show-icon /></div>
-            <div class="field"><label for="trip-end">Ngày về</label><DatePicker input-id="trip-end" v-model="tripEndDate" date-format="dd/mm/yy" show-icon /></div>
-            <div class="field span-2"><label for="quote-greeting">Lời chào</label><Textarea id="quote-greeting" v-model="form.greeting" rows="3" auto-resize /></div>
-            <div class="field span-2"><label for="quote-description">Mô tả</label><Textarea id="quote-description" v-model="form.description" rows="4" auto-resize /></div>
-          </div>
-        </section>
-
         <section class="form-card" aria-labelledby="pricing-heading">
-          <div class="section-heading"><span>3</span><div><h2 id="pricing-heading">Phòng và bảng giá</h2><p>Chọn đúng thông tin như khi tạo đơn. Giá và thành tiền do máy chủ tính.</p></div></div>
+          <div class="section-heading"><span>2</span><div><h2 id="pricing-heading">Phòng và bảng giá</h2><p>Chọn đúng thông tin như khi tạo đơn. Giá và thành tiền do máy chủ tính.</p></div></div>
           <div class="field-grid">
             <div class="field span-2"><label for="quote-room">Phòng <em>*</em></label><Select input-id="quote-room" v-model="selection.room_id" :options="roomOptions" option-label="label" option-value="value" filter placeholder="Chọn phòng" @change="runQuote" /></div>
             <div class="field"><label for="quote-booking-type">Loại đặt</label><Select input-id="quote-booking-type" v-model="selection.booking_type" :options="[{ label: 'Phòng', value: 'room' }, { label: 'Combo (phòng + vé)', value: 'combo' }]" option-label="label" option-value="value" @change="runQuote" /></div>
@@ -581,7 +562,7 @@ async function revokeQuote() {
         </section>
 
         <section class="form-card" aria-labelledby="content-heading">
-          <div class="section-heading"><span>4</span><div><h2 id="content-heading">Nội dung & điều kiện</h2><p>Chính sách phòng được điền sẵn từ khách sạn; bạn có thể chỉnh sửa trước khi lưu.</p></div></div>
+          <div class="section-heading"><span>3</span><div><h2 id="content-heading">Nội dung & điều kiện</h2><p>Chính sách phòng được điền sẵn từ khách sạn; bạn có thể chỉnh sửa trước khi lưu.</p></div></div>
           <div class="field-grid">
             <div class="field"><label for="quote-inclusions">Dịch vụ bao gồm</label><Textarea id="quote-inclusions" v-model="form.inclusions" rows="5" auto-resize /></div>
             <div class="field"><label for="quote-exclusions">Không bao gồm</label><Textarea id="quote-exclusions" v-model="form.exclusions" rows="5" auto-resize /></div>
