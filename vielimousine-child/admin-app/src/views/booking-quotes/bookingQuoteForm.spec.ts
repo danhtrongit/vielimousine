@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultQuote, lineTotal, quoteAmounts, validateQuote } from './bookingQuoteForm';
 
 describe('booking quote form helpers', () => {
-  it('creates useful defaults with a future expiry and starter lines', () => {
+  it('creates useful defaults with a future expiry and no manual price lines', () => {
     const quote = createDefaultQuote(new Date('2026-09-22T09:00:00'));
     expect(quote.deposit_type).toBe('percent');
     expect(quote.deposit_value).toBe(30);
-    expect(quote.lines).toHaveLength(2);
+    expect(quote.lines).toHaveLength(0);
+    expect(quote.items).toHaveLength(0);
     expect(quote.valid_until).toContain('2026-09-29');
   });
 
@@ -20,12 +21,12 @@ describe('booking quote form helpers', () => {
     expect(quoteAmounts(quote)).toEqual({ subtotal: 2_000_000, total: 1_750_000, deposit: 1_750_000, remaining: 0 });
   });
 
-  it('requires a positive priced line only when publishing', () => {
+  it('requires a room selection only when publishing', () => {
     const quote = createDefaultQuote();
     quote.customer_name = 'Nguyễn Văn A';
     quote.title = 'Xe đi Hạ Long';
     expect(validateQuote(quote)).toEqual([]);
-    expect(validateQuote(quote, true)).toContain('Cần ít nhất một dòng có thành tiền lớn hơn 0 để phát hành.');
+    expect(validateQuote(quote, true)).toContain('Vui lòng chọn ít nhất một phòng và khoảng ngày để phát hành.');
   });
 
   it('allows an incomplete draft to be saved for later', () => {

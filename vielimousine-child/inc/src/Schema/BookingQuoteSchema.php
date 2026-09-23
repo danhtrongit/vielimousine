@@ -5,7 +5,7 @@ namespace Vie\Schema;
 
 final class BookingQuoteSchema
 {
-    public const VERSION = '1.0.1';
+    public const VERSION = '1.1.0';
 
     public static function install(\wpdb $wpdb): void
     {
@@ -34,6 +34,7 @@ final class BookingQuoteSchema
             contact_phone VARCHAR(50) DEFAULT NULL,
             contact_zalo VARCHAR(50) DEFAULT NULL,
             `lines` LONGTEXT NOT NULL,
+            `items` LONGTEXT DEFAULT NULL,
             discount DECIMAL(12,0) NOT NULL DEFAULT 0,
             deposit_type VARCHAR(20) NOT NULL DEFAULT 'percent',
             deposit_value DECIMAL(12,0) NOT NULL DEFAULT 0,

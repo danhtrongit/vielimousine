@@ -49,7 +49,7 @@
     "src": "node_modules/primeicons/fonts/primeicons.woff2"
   },
   "src/entries/booking.ts": {
-    "file": "assets/booking-DKdVP_NV.js",
+    "file": "assets/booking-Bl6ztT2P.js",
     "name": "booking",
     "src": "src/entries/booking.ts",
     "isEntry": true,
@@ -57,7 +57,7 @@
       "_tokens-C_ykwzRD.js"
     ],
     "css": [
-      "assets/booking-CujKoVx-.css"
+      "assets/booking-ChlHQgyh.css"
     ]
   },
   "src/entries/hotel.ts": {

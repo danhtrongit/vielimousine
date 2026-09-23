@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   push: vi.fn(),
   copy: vi.fn(),
+  quote: vi.fn(),
 }));
 
 vi.mock('vue-router', () => ({
@@ -22,11 +23,13 @@ vi.mock('@/api/bookingQuotes.api', () => ({
     duplicate: vi.fn(), revoke: vi.fn(),
   },
 }));
+vi.mock('@/api/quote.api', () => ({ quoteApi: { quote: mocks.quote } }));
 vi.mock('@/composables/useNotify', () => ({
   useNotify: () => ({ success: vi.fn(), warn: vi.fn(), apiError: vi.fn() }),
 }));
 vi.mock('@/stores/ui.store', () => ({ useUIStore: () => ({ setBreadcrumb: vi.fn() }) }));
 vi.mock('@/stores/auth.store', () => ({ useAuthStore: () => ({ can: () => true }) }));
+vi.mock('@/stores/lookup.store', () => ({ useLookupStore: () => ({ rooms: [], hotelById: () => undefined, ensureLoaded: vi.fn() }) }));
 
 import BookingQuoteDetailView from './BookingQuoteDetailView.vue';
 
@@ -73,6 +76,7 @@ const draft = {
   created_at: '2026-09-22 10:00:00',
   updated_at: '2026-09-22 10:00:00',
   payments: [],
+  items: [],
 } as const;
 
 async function mountView() {
@@ -82,7 +86,7 @@ async function mountView() {
       stubs: {
         PageHeader: { template: '<header><slot /></header>' },
         Button: true, InputText: true, InputNumber: true, Textarea: true,
-        DatePicker: true, Select: true, Tag: true, Message: { template: '<div><slot /></div>' },
+        DatePicker: true, Select: true, Chips: true, Tag: true, Message: { template: '<div><slot /></div>' },
         ProgressSpinner: true, DataTable: true, Column: true, BookingQuotePreview: true,
       },
     },
@@ -101,6 +105,13 @@ describe('BookingQuoteDetailView', () => {
       data: { ...draft, status: 'published', effective_status: 'published', public_url: 'https://vielimousine.com/booking/' + 'a'.repeat(32) },
     });
     mocks.copy.mockResolvedValue(undefined);
+    mocks.quote.mockResolvedValue({ data: {
+      num_rooms: 1, nights: 2, effective_adults: 2, effective_children: 0, extra_adult_beds: 0,
+      seat_count: 0, billable_seats: 0, free_child_seats: 0, nightly: [], child_assessments: [],
+      room_subtotal: 2_000_000, extra_adult_subtotal: 0, child_surcharge_total: 0,
+      ticket_subtotal: 0, subtotal: 2_000_000, discount: 0, total: 2_000_000,
+      requires_quote: false, messages: [], unavailable_date: null,
+    } });
   });
 
   it('recognizes the named new route when params.id is absent', async () => {
@@ -112,10 +123,10 @@ describe('BookingQuoteDetailView', () => {
 
   it('creates a draft using editable fields', async () => {
     const wrapper = await mountView();
-    const vm = wrapper.vm as unknown as { form: typeof draft; persistDraft: () => Promise<unknown> };
+    const vm = wrapper.vm as unknown as { form: typeof draft; selection: any; persistDraft: () => Promise<unknown> };
     vm.form.customer_name = draft.customer_name;
     vm.form.title = draft.title;
-    vm.form.lines = draft.lines.map(({ line_total: _lineTotal, ...line }) => line) as typeof vm.form.lines;
+    vm.selection = { room_id: 9, booking_type: 'room', checkin: '2026-09-25', checkout: '2026-09-27', adults: 2, child_ages: [], user_rooms: 0 };
     await vm.persistDraft();
     expect(mocks.create).toHaveBeenCalledOnce();
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('total');
@@ -124,14 +135,48 @@ describe('BookingQuoteDetailView', () => {
 
   it('publishes the saved draft and copies the server public URL', async () => {
     const wrapper = await mountView();
-    const vm = wrapper.vm as unknown as { form: typeof draft; persistDraft: () => Promise<unknown>; publishQuote: () => Promise<void> };
+    const vm = wrapper.vm as unknown as { form: typeof draft; selection: any; persistDraft: () => Promise<unknown>; publishQuote: () => Promise<void> };
     vm.form.customer_name = draft.customer_name;
     vm.form.title = draft.title;
-    vm.form.lines = draft.lines.map(({ line_total: _lineTotal, ...line }) => line) as typeof vm.form.lines;
+    vm.selection = { room_id: 9, booking_type: 'room', checkin: '2026-09-25', checkout: '2026-09-27', adults: 2, child_ages: [], user_rooms: 0 };
     await vm.persistDraft();
     await vm.publishQuote();
     expect(mocks.update).toHaveBeenCalledOnce();
     expect(mocks.publish).toHaveBeenCalledWith(7);
     expect(mocks.copy).toHaveBeenCalledWith('https://vielimousine.com/booking/' + 'a'.repeat(32));
+  });
+
+  it('sends the same item selection fields as Orders to the price preview', async () => {
+    const wrapper = await mountView();
+    const vm = wrapper.vm as any;
+    vm.selection = { room_id: 9, booking_type: 'combo', checkin: '2026-09-25', checkout: '2026-09-27', adults: 2, child_ages: ['5'], user_rooms: 1 };
+    await vm.runQuote();
+    expect(mocks.quote).toHaveBeenCalledWith({ room_id: 9, booking_type: 'combo', checkin: '2026-09-25', checkout: '2026-09-27', adults: 2, child_ages: [5], user_rooms: 1 });
+  });
+
+  it('does not save while a price request is pending', async () => {
+    const wrapper = await mountView();
+    const vm = wrapper.vm as any;
+    vm.pricingPending = true;
+    await vm.persistDraft();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('ignores a stale price response after the selection changes', async () => {
+    const wrapper = await mountView();
+    const vm = wrapper.vm as any;
+    let resolveFirst!: (value: unknown) => void;
+    let resolveSecond!: (value: unknown) => void;
+    mocks.quote
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+    vm.selection = { room_id: 9, booking_type: 'room', checkin: '2026-09-25', checkout: '2026-09-27', adults: 2, child_ages: [], user_rooms: 0 };
+    const first = vm.runQuote();
+    vm.selection = { room_id: 10, booking_type: 'room', checkin: '2026-09-26', checkout: '2026-09-28', adults: 2, child_ages: [], user_rooms: 0 };
+    const second = vm.runQuote();
+    resolveFirst({ data: { subtotal: 100, total: 100, messages: [], requires_quote: false } });
+    resolveSecond({ data: { subtotal: 200, total: 200, messages: [], requires_quote: false } });
+    await Promise.all([first, second]);
+    expect(vm.pricing.subtotal).toBe(200);
   });
 });

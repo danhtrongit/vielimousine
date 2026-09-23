@@ -37,10 +37,8 @@ export function createDefaultQuote(now = new Date()): BookingQuotePayload {
     contact_name: '',
     contact_phone: '',
     contact_zalo: '',
-    lines: [
-      { label: 'Người lớn', quantity: 1, unit: 'khách', unit_price: 0 },
-      { label: 'Trẻ em (2–11 tuổi)', quantity: 1, unit: 'khách', unit_price: 0 },
-    ],
+    items: [],
+    lines: [],
     discount: 0,
     deposit_type: 'percent',
     deposit_value: 30,
@@ -65,7 +63,24 @@ export function quoteToPayload(quote: BookingQuote): BookingQuotePayload {
     contact_name: quote.contact_name ?? '',
     contact_phone: quote.contact_phone ?? '',
     contact_zalo: quote.contact_zalo ?? '',
-    lines: (quote.lines ?? []).map(({ label, quantity, unit, unit_price }) => ({ label, quantity, unit, unit_price })),
+    items: (quote.items ?? []).map((item) => ({
+      room_id: item.room_id,
+      booking_type: item.booking_type,
+      checkin: item.checkin,
+      checkout: item.checkout,
+      adults: item.adults,
+      child_ages: item.child_ages ?? [],
+      user_rooms: item.user_rooms ?? 0,
+    })),
+    lines: (quote.lines ?? []).map((line) => ({
+      label: line.label,
+      quantity: line.quantity,
+      unit: line.unit,
+      unit_price: line.unit_price,
+      line_total: line.line_total,
+      hotel_name: line.hotel_name,
+      room_name: line.room_name,
+    })),
     discount: quote.discount ?? 0,
     deposit_type: quote.deposit_type,
     deposit_value: quote.deposit_value,
@@ -79,7 +94,7 @@ export function lineTotal(line: BookingQuoteLinePayload): number {
 
 export function quoteAmounts(payload: BookingQuotePayload): { subtotal: number; total: number; deposit: number; remaining: number } {
   const subtotal = Math.min(MAX_MONEY, payload.lines.reduce((sum, line) => sum + lineTotal(line), 0));
-  const total = Math.max(0, subtotal - Math.max(0, Math.round(payload.discount || 0)));
+  const total = Math.max(0, Math.round((subtotal - Math.max(0, Math.round(payload.discount || 0))) / 1000) * 1000);
   const rawDeposit = payload.deposit_type === 'percent'
     ? Math.ceil(total * Math.max(0, payload.deposit_value || 0) / 100)
     : Math.max(0, Math.round(payload.deposit_value || 0));
@@ -92,8 +107,14 @@ export function validateQuote(payload: BookingQuotePayload, forPublish = false):
   if (forPublish && !payload.customer_name.trim()) errors.push('Vui lòng nhập tên khách hàng hoặc tên đoàn.');
   if (forPublish && !payload.title.trim()) errors.push('Vui lòng nhập tên dịch vụ hoặc chuyến đi.');
   if (forPublish && !payload.valid_until) errors.push('Vui lòng chọn hạn báo giá.');
-  if (forPublish && payload.lines.length < 1) errors.push('Báo giá cần ít nhất một dòng giá.');
+  if (forPublish && payload.items.length < 1) errors.push('Vui lòng chọn ít nhất một phòng và khoảng ngày để phát hành.');
+  if (payload.items.length > 5) errors.push('Một báo giá chỉ hỗ trợ tối đa 5 lựa chọn phòng.');
   if (payload.lines.length > 50) errors.push('Báo giá chỉ hỗ trợ tối đa 50 dòng giá.');
+  payload.items.forEach((item, index) => {
+    if (!item.room_id || !item.checkin || !item.checkout) errors.push(`Lựa chọn phòng ${index + 1}: cần đủ phòng và ngày nhận/trả.`);
+    if (item.checkout <= item.checkin) errors.push(`Lựa chọn phòng ${index + 1}: ngày trả phải sau ngày nhận.`);
+    if (!Number.isInteger(item.adults) || item.adults < 1 || item.adults > 20) errors.push(`Lựa chọn phòng ${index + 1}: số người lớn không hợp lệ.`);
+  });
   payload.lines.forEach((line, index) => {
     if (forPublish && !line.label.trim()) errors.push(`Dòng ${index + 1}: chưa có nội dung.`);
     if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 1000) errors.push(`Dòng ${index + 1}: số lượng phải từ 1 đến 1.000.`);
@@ -108,10 +129,10 @@ export function validateQuote(payload: BookingQuotePayload, forPublish = false):
   if (payload.deposit_value < 0) errors.push('Giá trị tiền cọc không được âm.');
   if (payload.deposit_type === 'percent' && payload.deposit_value > 100) errors.push('Tỷ lệ cọc không được quá 100%.');
   if (forPublish && payload.deposit_type === 'percent' && payload.deposit_value <= 0) errors.push('Tỷ lệ cọc phải lớn hơn 0.');
-  if (payload.deposit_type === 'fixed' && payload.deposit_value > amounts.total) errors.push('Tiền cọc không được vượt quá tổng tiền.');
+  if (payload.deposit_type === 'fixed' && payload.lines.length > 0 && payload.deposit_value > amounts.total) errors.push('Tiền cọc không được vượt quá tổng tiền.');
   if (forPublish && payload.deposit_type === 'fixed' && payload.deposit_value <= 0) errors.push('Tiền cọc phải lớn hơn 0.');
-  if (forPublish && !payload.lines.some((line) => lineTotal(line) > 0)) errors.push('Cần ít nhất một dòng có thành tiền lớn hơn 0 để phát hành.');
-  if (forPublish && (amounts.total <= 0 || amounts.deposit <= 0)) errors.push('Tổng tiền và tiền cọc phải lớn hơn 0 để phát hành.');
+  if (forPublish && payload.items.length === 0 && !payload.lines.some((line) => lineTotal(line) > 0)) errors.push('Cần chọn phòng để hệ thống tính giá trước khi phát hành.');
+  if (forPublish && payload.items.length === 0 && (amounts.total <= 0 || amounts.deposit <= 0)) errors.push('Tổng tiền và tiền cọc phải lớn hơn 0 để phát hành.');
   return [...new Set(errors)];
 }
 

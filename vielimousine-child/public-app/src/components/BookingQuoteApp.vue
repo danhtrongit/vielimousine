@@ -255,6 +255,7 @@ const advisorName = computed(() => quote.value?.contact_name || 'Đội ngũ Vie
 const customerInitials = computed(() => initials(quote.value?.customer_name));
 const advisorInitials = computed(() => initials(advisorName.value));
 const hasTripDates = computed(() => !!(quote.value?.trip_start || quote.value?.trip_end));
+const roomItems = computed(() => quote.value?.items ?? []);
 const hasDetails = computed(() => !!(
   quote.value?.description || quote.value?.inclusions || quote.value?.exclusions || quote.value?.terms
 ));
@@ -399,7 +400,27 @@ onBeforeUnmount(() => {
                 <h2 id="bq-service-title">Thông tin chuyến đi</h2>
               </div>
             </div>
-            <div v-if="quote.lines.length" class="bq-guest-summary" aria-label="Tóm tắt dịch vụ">
+            <div v-if="roomItems.length" class="bq-room-items">
+              <article v-for="(item, index) in roomItems" :key="`${item.room_id}-${index}`" class="bq-room-item">
+                <div class="bq-room-heading">
+                  <div><span class="bq-eyebrow">{{ item.hotel_name }}</span><h3>{{ item.room_name }}</h3></div>
+                  <span class="bq-room-type">{{ item.booking_type === 'combo' ? 'Combo phòng + xe' : 'Phòng khách sạn' }}</span>
+                </div>
+                <dl class="bq-room-facts">
+                  <div><dt>Nhận / trả phòng</dt><dd>{{ formatTripDate(item.checkin) }} – {{ formatTripDate(item.checkout) }}</dd></div>
+                  <div><dt>Số phòng / số đêm</dt><dd>{{ item.num_rooms }} phòng · {{ item.nights }} đêm</dd></div>
+                  <div><dt>Khách lưu trú</dt><dd>{{ item.adults }} người lớn<template v-if="item.child_ages.length"> · {{ item.child_ages.length }} trẻ em ({{ item.child_ages.join(', ') }} tuổi)</template></dd></div>
+                </dl>
+                <dl class="bq-room-prices">
+                  <div><dt>Tiền phòng</dt><dd>{{ formatMoney(item.room_subtotal) }}</dd></div>
+                  <div v-if="item.extra_adult_total > 0"><dt>Phụ thu người lớn</dt><dd>{{ formatMoney(item.extra_adult_total) }}</dd></div>
+                  <div v-if="item.child_surcharge_total > 0"><dt>Phụ thu trẻ em</dt><dd>{{ formatMoney(item.child_surcharge_total) }}</dd></div>
+                  <div v-if="item.booking_type === 'combo'"><dt>Vé xe khứ hồi · {{ item.ticket_count }} vé</dt><dd>{{ formatMoney(item.ticket_subtotal) }}</dd></div>
+                  <div class="bq-room-total"><dt>Tạm tính</dt><dd>{{ formatMoney(item.line_total) }}</dd></div>
+                </dl>
+              </article>
+            </div>
+            <div v-else-if="quote.lines.length" class="bq-guest-summary" aria-label="Tóm tắt dịch vụ">
               <span><i class="pi pi-list" aria-hidden="true" /> {{ quote.lines.length }} hạng mục dịch vụ</span>
             </div>
             <p v-if="quote.description" class="bq-preline">{{ quote.description }}</p>

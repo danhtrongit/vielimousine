@@ -48,6 +48,21 @@ html, body { margin: 0; min-height: 100%; background: #f4eee6; }
 .bq-trip-dates strong { white-space: nowrap; }
 .bq-trip-dates > i { color: var(--bq-orange); }
 .bq-preline { margin: 0; white-space: pre-line; }
+.bq-room-items { display: grid; gap: 16px; margin-bottom: 18px; }
+.bq-room-item { min-width: 0; padding: 18px; border: 1px solid var(--bq-line); border-radius: 16px; background: var(--bq-soft); break-inside: avoid; }
+.bq-room-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.bq-room-heading > div { min-width: 0; }
+.bq-room-heading h3 { margin: 4px 0 0; font-size: 1.08rem; line-height: 1.35; overflow-wrap: anywhere; }
+.bq-room-type { flex-shrink: 0; padding: 5px 9px; border-radius: 8px; color: var(--bq-orange-dark); background: #f6e4d9; font-size: .73rem; font-weight: 700; }
+.bq-room-facts { display: grid; gap: 10px; margin: 16px 0; }
+.bq-room-facts dt { color: var(--bq-muted); font-size: .76rem; }
+.bq-room-facts dd { margin: 2px 0 0; font-weight: 600; font-size: .88rem; }
+.bq-room-prices { display: grid; gap: 7px; margin: 0; padding-top: 12px; border-top: 1px solid var(--bq-line); font-size: .84rem; }
+.bq-room-prices > div { display: flex; justify-content: space-between; gap: 12px; }
+.bq-room-prices dt { color: var(--bq-muted); }
+.bq-room-prices dd { margin: 0; text-align: right; font-weight: 700; white-space: nowrap; }
+.bq-room-total { margin-top: 3px; padding-top: 8px; border-top: 1px dashed var(--bq-line); }
+.bq-room-total dt, .bq-room-total dd { color: var(--bq-orange-dark); font-weight: 800; }
 .bq-lines { overflow: hidden; border: 1px solid var(--bq-line); border-radius: 12px; }
 .bq-line { display: grid; grid-template-columns: minmax(180px, 1fr) 58px minmax(100px, .7fr) minmax(115px, .8fr); gap: 12px; align-items: center; padding: 14px 16px; border-top: 1px solid var(--bq-line); text-align: right; font-size: .94rem; }
 .bq-line:first-child { border-top: 0; }
@@ -132,6 +147,8 @@ html, body { margin: 0; min-height: 100%; background: #f4eee6; }
   .bq-company-card { max-width: 620px; }
 }
 @media (max-width: 640px) {
+  .bq-room-heading { flex-direction: column; gap: 8px; }
+  .bq-room-item { padding: 14px; }
   .bq-page { padding: 0 14px 116px; font-size: 15px; }
   .bq-header { min-height: 64px; }
   .bq-header-actions { gap: 4px; }

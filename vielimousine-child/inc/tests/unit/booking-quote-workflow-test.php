@@ -169,7 +169,7 @@ final class BookingQuoteWorkflowWpdb
         }
         $valueIndex = 0;
         foreach (preg_split('/,\s*/', $match[1]) ?: [] as $assignment) {
-            if (!preg_match('/^([a-z_]+) = (NULL|%[ds])$/', trim($assignment), $part)) {
+            if (!preg_match('/^`?([a-z_]+)`? = (NULL|%[ds])$/', trim($assignment), $part)) {
                 throw new RuntimeException('Unexpected assignment: ' . $assignment);
             }
             $this->rows[$id][$part[1]] = $part[2] === 'NULL' ? null : $args[$valueIndex++];
@@ -294,8 +294,14 @@ $payload = static fn(string $customer): array => [
 $draftA = $service->createDraft($payload('Owner A'), 101);
 $same('created quote is a draft owned by A', ['draft', 101], [$draftA['status'], $draftA['sales_user_id']]);
 $same('create computes financial fields', [2_000_000, 1_900_000, 570_000], [$draftA['subtotal'], $draftA['total'], $draftA['deposit_amount']]);
-$publishedA = $service->publish($draftA['id'], 101);
-$same('publish freezes brand and state', ['published', 'Vie Limousine'], [$publishedA['status'], $publishedA['brand']['company_name'] ?? null]);
+$throws('legacy manual draft cannot be published without room items', 'validation_error', static fn() => $service->publish($draftA['id'], 101));
+// Keep lifecycle coverage for a historical manual quote. Such rows remain
+// readable and immutable after the pricing workflow is enabled.
+$wpdb->rows[$draftA['id']]['status'] = 'published';
+$wpdb->rows[$draftA['id']]['brand'] = json_encode($GLOBALS['quote_workflow_options']['vie_invoice_settings']);
+$wpdb->rows[$draftA['id']]['published_at'] = '2026-09-22 10:00:00';
+$publishedA = $service->getAdmin($draftA['id'], 101);
+$same('historical published quote preserves brand and state', ['published', 'Vie Limousine'], [$publishedA['status'], $publishedA['brand']['company_name'] ?? null]);
 $publicA = $service->getPublic($publishedA['public_id']);
 $same('published token resolves publicly', $publishedA['code'], $publicA['code']);
 $assert('public projection excludes private contact/state fields', !isset($publicA['customer_phone'], $publicA['customer_email'], $publicA['sales_user_id'], $publicA['status']));
@@ -358,7 +364,10 @@ $same('duplicate resets owner and lifecycle state', [202, 'draft', 0, false, nul
 ]);
 $assert('new id implies independent payment history', $copy['id'] !== $source['id']);
 $copy = $service->updateDraft($copy['id'], ['valid_until' => '2099-10-01T17:30'], 202);
-$service->publish($copy['id'], 202);
+$throws('duplicated legacy manual draft still requires room items', 'validation_error', static fn() => $service->publish($copy['id'], 202));
+$wpdb->rows[$copy['id']]['status'] = 'published';
+$wpdb->rows[$copy['id']]['brand'] = json_encode($GLOBALS['quote_workflow_options']['vie_invoice_settings']);
+$wpdb->rows[$copy['id']]['published_at'] = '2026-09-22 10:00:00';
 $service->revoke($copy['id'], 202);
 $throws('revoked quote is no longer public', 'not_found', static fn() => $service->getPublic($copy['public_id']));
 

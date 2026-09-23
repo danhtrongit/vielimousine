@@ -18,7 +18,7 @@ final class BookingQuoteRepository extends AbstractRepository
             'public_id', 'code', 'sales_user_id', 'status',
             'customer_name', 'customer_phone', 'customer_email', 'title', 'image_url',
             'greeting', 'trip_start', 'trip_end', 'description', 'inclusions', 'exclusions', 'terms',
-            'contact_name', 'contact_phone', 'contact_zalo', 'lines', 'discount',
+            'contact_name', 'contact_phone', 'contact_zalo', 'lines', 'items', 'discount',
             'deposit_type', 'deposit_value', 'subtotal', 'total', 'deposit_amount',
             'paid_amount', 'payment_review', 'valid_until', 'brand', 'published_at',
         ];
@@ -30,6 +30,7 @@ final class BookingQuoteRepository extends AbstractRepository
             'id' => 'int',
             'sales_user_id' => 'int',
             'lines' => 'json',
+            'items' => 'json',
             'discount' => 'int',
             'deposit_value' => 'int',
             'subtotal' => 'int',
@@ -260,7 +261,7 @@ final class BookingQuoteRepository extends AbstractRepository
 
     public function publishChecked(int $id, array $snapshot): array
     {
-        $allowed = ['brand', 'subtotal', 'discount', 'total', 'deposit_amount', 'published_at'];
+        $allowed = ['brand', 'subtotal', 'discount', 'total', 'deposit_amount', 'published_at', 'lines', 'items'];
         $safe = array_intersect_key($snapshot, array_flip($allowed));
         $safe['status'] = 'published';
         $this->checkedConditionalUpdate($id, 'draft', $safe, true);
@@ -334,10 +335,10 @@ final class BookingQuoteRepository extends AbstractRepository
         $values = [];
         foreach ($patch as $column => $value) {
             if ($value === null) {
-                $parts[] = "{$column} = NULL";
+                $parts[] = "`{$column}` = NULL";
                 continue;
             }
-            $parts[] = "{$column} = " . (is_int($value) || is_bool($value) ? '%d' : '%s');
+            $parts[] = "`{$column}` = " . (is_int($value) || is_bool($value) ? '%d' : '%s');
             $values[] = $value;
         }
         return [implode(', ', $parts), $values];

@@ -11,6 +11,28 @@ export interface BookingQuoteLine {
   line_total: number;
 }
 
+/** The frozen room selection and selling prices published with the quote. */
+export interface BookingQuoteRoomItem {
+  room_id: number;
+  hotel_id: number;
+  hotel_name: string;
+  room_name: string;
+  booking_type: 'room' | 'combo';
+  checkin: string;
+  checkout: string;
+  adults: number;
+  child_ages: number[];
+  user_rooms: number;
+  num_rooms: number;
+  nights: number;
+  room_subtotal: number;
+  extra_adult_total: number;
+  child_surcharge_total: number;
+  ticket_count: number;
+  ticket_subtotal: number;
+  line_total: number;
+}
+
 export interface BookingQuoteBrand {
   company_name: string | null;
   company_phone: string | null;
@@ -37,6 +59,7 @@ export interface PublicBookingQuote {
   contact_phone: string | null;
   contact_zalo: string | null;
   lines: BookingQuoteLine[];
+  items?: BookingQuoteRoomItem[];
   discount: number;
   subtotal: number;
   total: number;

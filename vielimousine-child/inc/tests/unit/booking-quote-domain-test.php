@@ -18,6 +18,7 @@ if (!function_exists('home_url')) {
 require __DIR__ . '/../../src/Service/BookingQuote/BookingQuoteException.php';
 require __DIR__ . '/../../src/Service/BookingQuote/BookingQuotePolicy.php';
 require __DIR__ . '/../../src/Support/QueryBuilder.php';
+require __DIR__ . '/../../src/Support/Money.php';
 require __DIR__ . '/../../src/Repository/RepositoryException.php';
 require __DIR__ . '/../../src/Repository/AbstractRepository.php';
 require __DIR__ . '/../../src/Repository/BookingQuoteRepository.php';
@@ -164,6 +165,17 @@ $normalized = BookingQuoteValidation::normalize([
         'unit_price' => 1_500_000,
         'line_total' => 1,
     ]],
+    'items'          => [[
+        'room_id' => 10,
+        'booking_type' => 'room',
+        'checkin' => '2026-10-01',
+        'checkout' => '2026-10-03',
+        'adults' => 2,
+        'child_ages' => [5],
+        'user_rooms' => 1,
+        'line_total' => 1,
+        'pricing_snapshot' => ['total' => 1],
+    ]],
     'discount'       => 200_000,
     'deposit_type'   => 'percent',
     'deposit_value'  => 30,
@@ -184,6 +196,17 @@ $same('client review state is ignored', false, array_key_exists('payment_review'
 $same('client subtotal is ignored', false, array_key_exists('subtotal', $normalized));
 $same('client total is ignored', false, array_key_exists('total', $normalized));
 $same('client deposit amount is ignored', false, array_key_exists('deposit_amount', $normalized));
+$same('room item keeps only validated request fields', [
+    'room_id' => 10,
+    'booking_type' => 'room',
+    'checkin' => '2026-10-01',
+    'checkout' => '2026-10-03',
+    'adults' => 2,
+    'child_ages' => [5],
+    'user_rooms' => 1,
+], $normalized['items'][0] ?? null);
+$same('client item total is ignored', false, array_key_exists('line_total', $normalized['items'][0] ?? []));
+$same('client item pricing snapshot is ignored', false, array_key_exists('pricing_snapshot', $normalized['items'][0] ?? []));
 
 $same(
     'same-origin HTTPS image is accepted',
@@ -260,6 +283,15 @@ $publishable = [
         'unit_price' => 5_000_000,
         'line_total' => 10_000_000,
     ]],
+    'items'          => [[
+        'room_id' => 10,
+        'booking_type' => 'room',
+        'checkin' => '2026-10-01',
+        'checkout' => '2026-10-03',
+        'adults' => 2,
+        'child_ages' => [],
+        'user_rooms' => 1,
+    ]],
     'total'          => 9_800_000,
     'deposit_amount' => 3_000_000,
     'valid_until'    => '2026-09-22 12:00:00',
@@ -302,6 +334,10 @@ $invalid('expiry boundary is not publishable', 'valid_until', static fn() => Boo
     $publishable,
     $expiryTimestamp
 ));
+$invalid('draft with legacy manual lines cannot be published', 'items', static fn() => BookingQuoteValidation::assertPublishable(
+    array_merge($publishable, ['status' => 'draft', 'items' => []]),
+    $expiryTimestamp - 1
+));
 
 // BookingQuoteService's arithmetic and public projection stay deterministic without a DB.
 $service = new BookingQuoteService(new BookingQuoteRepository(), $policy, new InvoiceSettings());
@@ -313,7 +349,7 @@ $calculated = $calculate->invoke($service, [
     'deposit_value' => 10,
 ]);
 $same('service computes subtotal from server line totals', 999, $calculated['subtotal'] ?? null);
-$same('service computes total after discount', 999, $calculated['total'] ?? null);
+$same('service computes total after discount with VND rounding', 1_000, $calculated['total'] ?? null);
 $same('percent deposit rounds up fractional VND', 100, $calculated['deposit_amount'] ?? null);
 
 $fixed = $calculate->invoke($service, [

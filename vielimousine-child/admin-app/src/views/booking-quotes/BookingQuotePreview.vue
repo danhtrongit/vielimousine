@@ -10,7 +10,9 @@ const props = defineProps<{
   quote?: BookingQuote | null;
 }>();
 
-const amounts = computed(() => quoteAmounts(props.model));
+const amounts = computed(() => props.quote
+  ? { subtotal: props.quote.subtotal, total: props.quote.total, deposit: props.quote.deposit_amount, remaining: props.quote.remaining_amount }
+  : quoteAmounts(props.model));
 const statusSeverity = computed(() => {
   switch (props.quote?.effective_status) {
     case 'published': return 'success';
@@ -58,7 +60,7 @@ const statusSeverity = computed(() => {
             <td>{{ line.label || 'Dòng giá' }} <small v-if="line.unit">/ {{ line.unit }}</small></td>
             <td>{{ line.quantity }}</td>
             <td>{{ formatVND(line.unit_price) }}</td>
-            <td><strong>{{ formatVND(lineTotal(line)) }}</strong></td>
+            <td><strong>{{ formatVND(props.quote ? line.line_total : lineTotal(line)) }}</strong></td>
           </tr>
         </tbody>
       </table>

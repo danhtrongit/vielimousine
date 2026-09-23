@@ -9,6 +9,7 @@ final class BookingQuoteValidation
 {
     public const MAX_MONEY = 999_999_999_999;
     public const MAX_LINES = 50;
+    public const MAX_ITEMS = 5;
 
     private const SINGLE_TEXT = [
         'customer_name' => 255,
@@ -48,6 +49,7 @@ final class BookingQuoteValidation
             'contact_phone' => 'nullable|string|max:50',
             'contact_zalo' => 'nullable|string|max:50',
             'lines' => 'nullable|array|max_items:50',
+            'items' => 'nullable|array|max_items:5',
             'discount' => 'nullable|int|min:0|max:999999999999',
             'deposit_type' => 'nullable|string|in:percent,fixed',
             'deposit_value' => 'nullable|int|min:0|max:999999999999',
@@ -136,6 +138,10 @@ final class BookingQuoteValidation
             $out['lines'] = self::normalizeLines($input['lines']);
         }
 
+        if (array_key_exists('items', $input)) {
+            $out['items'] = self::normalizeItems($input['items']);
+        }
+
         foreach (['discount', 'deposit_value'] as $field) {
             if (!array_key_exists($field, $input)) {
                 continue;
@@ -171,6 +177,14 @@ final class BookingQuoteValidation
             self::invalid('title', 'là bắt buộc khi phát hành');
         }
 
+        $items = is_array($quote['items'] ?? null) ? $quote['items'] : [];
+        if ($items === []) {
+            // Manual lines are retained for historical published quotes, but a
+            // draft created in the room-pricing workflow must select rooms first.
+            if (($quote['status'] ?? 'draft') === 'draft' && empty($quote['published_at'])) {
+                self::invalid('items', 'phải có ít nhất một lựa chọn phòng khi phát hành');
+            }
+        }
         $lines = is_array($quote['lines'] ?? null) ? $quote['lines'] : [];
         if ($lines === [] || count($lines) > self::MAX_LINES) {
             self::invalid('lines', 'phải có từ 1 đến 50 dòng');
@@ -248,6 +262,65 @@ final class BookingQuoteValidation
             ];
         }
         return $lines;
+    }
+
+    /** @throws BookingQuoteException */
+    private static function normalizeItems(mixed $value): array
+    {
+        if (!is_array($value) || !array_is_list($value) || count($value) > self::MAX_ITEMS) {
+            self::invalid('items', 'phải là danh sách tối đa 5 lựa chọn phòng');
+        }
+        $items = [];
+        foreach ($value as $index => $item) {
+            if (!is_array($item)) {
+                self::invalid("items.{$index}", 'phải là một lựa chọn phòng');
+            }
+            $roomId = $item['room_id'] ?? null;
+            $type = $item['booking_type'] ?? null;
+            if (!is_int($roomId) || $roomId <= 0) {
+                self::invalid("items.{$index}.room_id", 'phải là số nguyên dương');
+            }
+            if (!is_string($type) || !in_array($type, ['room', 'combo'], true)) {
+                self::invalid("items.{$index}.booking_type", 'phải là room hoặc combo');
+            }
+            foreach (['checkin', 'checkout'] as $field) {
+                if (!is_string($item[$field] ?? null) || !self::isDate($item[$field])) {
+                    self::invalid("items.{$index}.{$field}", 'không đúng định dạng ngày YYYY-MM-DD');
+                }
+            }
+            if ($item['checkout'] <= $item['checkin']) {
+                self::invalid("items.{$index}.checkout", 'phải sau checkin');
+            }
+            $adults = $item['adults'] ?? null;
+            if (!is_int($adults) || $adults < 1 || $adults > 20) {
+                self::invalid("items.{$index}.adults", 'phải là số nguyên từ 1 đến 20');
+            }
+            $ages = $item['child_ages'] ?? [];
+            if (!is_array($ages) || !array_is_list($ages) || count($ages) > 10) {
+                self::invalid("items.{$index}.child_ages", 'phải là danh sách tối đa 10 tuổi');
+            }
+            $cleanAges = [];
+            foreach ($ages as $j => $age) {
+                if (!is_int($age) || $age < 0 || $age > 17) {
+                    self::invalid("items.{$index}.child_ages.{$j}", 'tuổi phải trong khoảng 0–17');
+                }
+                $cleanAges[] = $age;
+            }
+            $rooms = $item['user_rooms'] ?? 0;
+            if (!is_int($rooms) || $rooms < 0 || $rooms > 10) {
+                self::invalid("items.{$index}.user_rooms", 'phải là số nguyên từ 0 đến 10');
+            }
+            $items[] = [
+                'room_id' => $roomId,
+                'booking_type' => $type,
+                'checkin' => $item['checkin'],
+                'checkout' => $item['checkout'],
+                'adults' => $adults,
+                'child_ages' => $cleanAges,
+                'user_rooms' => $rooms,
+            ];
+        }
+        return $items;
     }
 
     /** @throws BookingQuoteException */

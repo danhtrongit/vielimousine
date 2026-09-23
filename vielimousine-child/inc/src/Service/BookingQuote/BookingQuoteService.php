@@ -7,6 +7,12 @@ use Vie\Repository\BookingQuoteRepository;
 use Vie\Repository\ActivityLogRepository;
 use Vie\Repository\RepositoryException;
 use Vie\Service\Settings\InvoiceSettings;
+use Vie\Service\Pricing\PriceCalculator;
+use Vie\Repository\RoomRepository;
+use Vie\Repository\HotelRepository;
+use Vie\DTO\QuoteRequest;
+use Vie\Support\Money;
+use Vie\Support\CostVisibility;
 use Vie\Validation\Schemas\BookingQuoteValidation;
 
 final class BookingQuoteService
@@ -16,6 +22,9 @@ final class BookingQuoteService
         private readonly BookingQuotePolicy $policy,
         private readonly InvoiceSettings $invoiceSettings,
         private readonly ?ActivityLogRepository $activityLog = null,
+        private readonly ?PriceCalculator $priceCalculator = null,
+        private readonly ?RoomRepository $rooms = null,
+        private readonly ?HotelRepository $hotels = null,
     ) {
     }
 
@@ -59,12 +68,13 @@ final class BookingQuoteService
             'contact_phone' => null,
             'contact_zalo' => null,
             'lines' => [],
+            'items' => [],
             'discount' => 0,
             'deposit_type' => 'percent',
             'deposit_value' => 0,
             'valid_until' => null,
         ], $clean);
-        $base = array_merge($base, $this->calculate($base), [
+        $base = array_merge($base, $this->reprice($base), [
             'sales_user_id' => $userId,
             'status' => 'draft',
             'paid_amount' => 0,
@@ -100,7 +110,7 @@ final class BookingQuoteService
             }
             $merged = array_merge($quote, $clean);
             $this->assertTripDates($merged);
-            $patch = array_merge($clean, $this->calculate($merged));
+            $patch = array_merge($clean, $this->reprice($merged));
             try {
                 return $this->adminView($this->quotes->updateDraftChecked($id, $patch));
             } catch (RepositoryException $e) {
@@ -119,13 +129,15 @@ final class BookingQuoteService
                 throw new BookingQuoteException('Chỉ báo giá nháp mới có thể phát hành', 'invalid_quote_state', 409);
             }
             $this->assertTripDates($quote);
-            $calculated = $this->calculate($quote);
+            $calculated = $this->reprice($quote);
             $quote = array_merge($quote, $calculated);
             // Re-validate persisted media at the immutable publish boundary in case
             // a legacy/import path wrote a URL before this validation existed.
             BookingQuoteValidation::normalize(['image_url' => $quote['image_url'] ?? null]);
             BookingQuoteValidation::assertPublishable($quote);
             $snapshot = array_merge($calculated, [
+                'lines' => $quote['lines'] ?? [],
+                'items' => $quote['items'] ?? [],
                 'brand' => $this->brandSnapshot(),
                 'published_at' => current_time('mysql'),
             ]);
@@ -193,6 +205,8 @@ final class BookingQuoteService
         $view['expires_at'] = $this->policy->expiresAt($quote);
         $view['public_url'] = $this->publicUrl((string) ($quote['public_id'] ?? ''));
         $view['currency'] = 'VND';
+        $view['items'] = $this->safeItems($quote['items'] ?? [], true);
+        $view['lines'] = $this->safeLines($quote['lines'] ?? []);
         return $view;
     }
 
@@ -203,9 +217,11 @@ final class BookingQuoteService
             'trip_start', 'trip_end', 'description', 'inclusions', 'exclusions', 'terms',
             'contact_name', 'contact_phone', 'contact_zalo', 'lines', 'discount',
             'deposit_type', 'deposit_value', 'subtotal', 'total', 'deposit_amount',
-            'paid_amount', 'brand',
+            'paid_amount', 'brand', 'items',
         ];
         $view = array_intersect_key($quote, array_flip($allowed));
+        $view['items'] = $this->safeItems($quote['items'] ?? [], false);
+        $view['lines'] = $this->safeLines($quote['lines'] ?? []);
         $view['effective_status'] = $this->policy->effectiveStatus($quote);
         $view['payment_status'] = $this->policy->paymentStatus($quote);
         $view['remaining_amount'] = $this->policy->remainingAmount($quote);
@@ -233,7 +249,10 @@ final class BookingQuoteService
         if (!is_int($discount) || $discount < 0 || $discount > $subtotal) {
             throw new BookingQuoteException('Giảm giá không được vượt quá tạm tính', 'validation_error', 422, 'discount');
         }
-        $total = $subtotal - $discount;
+        $rawTotal = max(0, $subtotal - $discount);
+        // Keep the domain helper as the source of truth; the fallback only
+        // supports lightweight unit harnesses that do not load the autoloader.
+        $total = class_exists(Money::class) ? Money::roundVND($rawTotal) : $rawTotal;
         $type = (string) ($quote['deposit_type'] ?? 'percent');
         $value = $quote['deposit_value'] ?? 0;
         if (!is_int($value) || $value < 0) {
@@ -254,6 +273,123 @@ final class BookingQuoteService
             throw new BookingQuoteException('Tiền cọc không được vượt tổng tiền', 'validation_error', 422, 'deposit_value');
         }
         return ['subtotal' => $subtotal, 'total' => $total, 'deposit_amount' => $deposit];
+    }
+
+    /** Reprice room selections through the same server calculator used by Orders. */
+    private function reprice(array $quote): array
+    {
+        $items = $quote['items'] ?? [];
+        if (!is_array($items) || $items === []) {
+            return $this->calculate($quote); // historical/manual drafts remain readable
+        }
+        if ($this->priceCalculator === null || $this->rooms === null || $this->hotels === null) {
+            throw new BookingQuoteException('Không thể định giá lựa chọn phòng', 'save_failed', 500);
+        }
+        $generated = [];
+        $subtotal = 0;
+        foreach ($items as $index => $input) {
+            try {
+                $request = QuoteRequest::fromArray($input);
+                $breakdown = $this->priceCalculator->quote($request, false);
+                if ($breakdown->requiresQuote) {
+                    throw new BookingQuoteException(
+                        'Lựa chọn phòng chưa có giá hoặc tồn kho phù hợp',
+                        'room_requires_quote', 422, "items.{$index}"
+                    );
+                }
+                $room = $this->rooms->findOrFail($request->roomId);
+                $hotel = $this->hotels->findOrFail((int) $room['hotel_id']);
+            } catch (BookingQuoteException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                throw new BookingQuoteException('Phòng không tồn tại hoặc không thể định giá', 'validation_error', 422, "items.{$index}", $e);
+            }
+            $snapshot = $breakdown->toArray();
+            $item = array_merge($input, [
+                'hotel_id' => (int) ($room['hotel_id'] ?? 0),
+                'hotel_name' => (string) ($hotel['name'] ?? ''),
+                'room_name' => (string) ($room['name'] ?? ''),
+                'num_rooms' => $breakdown->numRooms,
+                'nights' => $breakdown->nights,
+                'room_subtotal' => $breakdown->roomSubtotal,
+                'extra_adult_total' => $breakdown->extraAdultSubtotal,
+                'child_surcharge_total' => $breakdown->childSurchargeTotal,
+                'ticket_count' => $breakdown->seatCount,
+                'ticket_subtotal' => $breakdown->ticketSubtotal,
+                'subtotal' => $breakdown->subtotal,
+                'line_total' => $breakdown->subtotal,
+                'pricing_snapshot' => $snapshot,
+            ]);
+            $generated[] = $item;
+            $subtotal += $breakdown->subtotal;
+        }
+        $next = array_merge($quote, ['items' => $generated]);
+        $discount = $next['discount'] ?? 0;
+        if (!is_int($discount) || $discount < 0 || $discount > $subtotal) {
+            throw new BookingQuoteException('Giảm giá không được vượt quá tạm tính', 'validation_error', 422, 'discount');
+        }
+        $lines = array_map(static function (array $item): array {
+            return [
+                'label' => trim((string) ($item['hotel_name'] ?? '') . ' - ' . (string) ($item['room_name'] ?? 'Phòng')),
+                'unit' => 'gói lưu trú',
+                'quantity' => 1,
+                'unit_price' => (int) ($item['line_total'] ?? 0),
+                'line_total' => (int) ($item['line_total'] ?? 0),
+                'room_id' => (int) ($item['room_id'] ?? 0),
+                'hotel_id' => (int) ($item['hotel_id'] ?? 0),
+                'hotel_name' => (string) ($item['hotel_name'] ?? ''),
+                'room_name' => (string) ($item['room_name'] ?? ''),
+                'booking_type' => (string) ($item['booking_type'] ?? 'room'),
+                'checkin' => (string) ($item['checkin'] ?? ''),
+                'checkout' => (string) ($item['checkout'] ?? ''),
+                'adults' => (int) ($item['adults'] ?? 0),
+                'child_ages' => $item['child_ages'] ?? [],
+                'user_rooms' => (int) ($item['user_rooms'] ?? 0),
+                'num_rooms' => (int) ($item['num_rooms'] ?? 0),
+                'nights' => (int) ($item['nights'] ?? 0),
+                'pricing_snapshot' => $item['pricing_snapshot'] ?? [],
+            ];
+        }, $generated);
+        $next['lines'] = $lines;
+        $next['subtotal'] = $subtotal;
+        return array_merge($this->calculate($next), [
+            'items' => $generated,
+            'lines' => $lines,
+        ]);
+    }
+
+    private function safeItems(mixed $items, bool $admin): array
+    {
+        if (!is_array($items)) return [];
+        return array_map(function (mixed $item) use ($admin): array {
+            if (!is_array($item)) return [];
+            $allowed = [
+                'room_id','hotel_id','hotel_name','room_name','booking_type','checkin','checkout',
+                'adults','child_ages','user_rooms','num_rooms','nights','room_subtotal',
+                'extra_adult_total','child_surcharge_total','ticket_count','ticket_subtotal',
+                'subtotal','line_total',
+            ];
+            if ($admin) $allowed[] = 'pricing_snapshot';
+            $result = array_intersect_key($item, array_flip($allowed));
+            if (isset($result['pricing_snapshot']) && !CostVisibility::canView()) {
+                unset($result['pricing_snapshot']);
+            }
+            return $result;
+        }, $items);
+    }
+
+    private function safeLines(mixed $lines): array
+    {
+        if (!is_array($lines)) return [];
+        return array_map(static function (mixed $line): array {
+            if (!is_array($line)) return [];
+            $allowed = [
+                'label','quantity','unit','unit_price','line_total','room_id','hotel_id',
+                'hotel_name','room_name','booking_type','checkin','checkout','adults',
+                'child_ages','user_rooms','num_rooms','nights',
+            ];
+            return array_intersect_key($line, array_flip($allowed));
+        }, $lines);
     }
 
     private function assertTripDates(array $quote): void

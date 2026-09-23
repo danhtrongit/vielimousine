@@ -5,6 +5,7 @@ import { useConfirm } from 'primevue/useconfirm';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
+import Chips from 'primevue/chips';
 import Textarea from 'primevue/textarea';
 import DatePicker from 'primevue/datepicker';
 import Select from 'primevue/select';
@@ -15,16 +16,17 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import PageHeader from '@/components/PageHeader.vue';
 import { bookingQuotesApi } from '@/api/bookingQuotes.api';
+import { quoteApi, type PriceBreakdown } from '@/api/quote.api';
 import { useNotify } from '@/composables/useNotify';
 import { useUIStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { useLookupStore } from '@/stores/lookup.store';
 import { formatDateTime, formatVND, ymdLocal } from '@/composables/useFormat';
-import type { BookingQuote, BookingQuoteDetail, BookingQuotePayload } from '@/types/bookingQuote';
+import type { BookingQuote, BookingQuoteDetail, BookingQuoteItemPayload, BookingQuotePayload } from '@/types/bookingQuote';
 import BookingQuotePreview from './BookingQuotePreview.vue';
 import {
   createDefaultQuote,
   effectiveStatusLabels,
-  lineTotal,
   paymentStatusLabels,
   quoteAmounts,
   quoteToPayload,
@@ -38,6 +40,7 @@ const confirm = useConfirm();
 const notify = useNotify();
 const ui = useUIStore();
 const auth = useAuthStore();
+const lookup = useLookupStore();
 
 const quote = ref<BookingQuoteDetail | null>(null);
 const form = ref<BookingQuotePayload>(createDefaultQuote());
@@ -47,12 +50,35 @@ const actionLoading = ref(false);
 const loadError = ref(false);
 const viewMode = ref<'edit' | 'preview'>('edit');
 const skipNextRouteLoad = ref(false);
+const pricing = ref<PriceBreakdown | null>(null);
+const pricingPending = ref(false);
+let pricingRequestId = 0;
+
+function emptyItem(): BookingQuoteItemPayload {
+  return { room_id: 0, booking_type: 'room', checkin: '', checkout: '', adults: 2, child_ages: [], user_rooms: 0 };
+}
+const selection = ref<BookingQuoteItemPayload>(emptyItem());
 
 const isNew = computed(() => route.name === 'booking-quotes-new');
 const quoteId = computed(() => isNew.value ? null : Number(route.params.id));
 const canMutate = computed(() => auth.can('vie_create_booking_quotes'));
 const editable = computed(() => (isNew.value || quote.value?.status === 'draft') && canMutate.value);
-const amounts = computed(() => quoteAmounts(form.value));
+const roomOptions = computed(() => lookup.rooms.map((room) => ({
+  label: `${room.name} — ${lookup.hotelById(room.hotel_id)?.name ?? 'Hotel ?'}`,
+  value: room.id,
+})));
+const multiItemQuote = computed(() => form.value.items.length > 1);
+const amounts = computed(() => {
+  const subtotal = pricing.value?.subtotal ?? (!editable.value && quote.value ? quote.value.subtotal : quoteAmounts(form.value).subtotal);
+  const total = pricing.value
+    ? Math.max(0, Math.round((subtotal - Math.max(0, Math.round(form.value.discount || 0))) / 1000) * 1000)
+    : (!editable.value && quote.value ? quote.value.total : quoteAmounts(form.value).total);
+  const rawDeposit = form.value.deposit_type === 'percent'
+    ? Math.ceil(total * Math.max(0, form.value.deposit_value || 0) / 100)
+    : Math.max(0, Math.round(form.value.deposit_value || 0));
+  const deposit = Math.min(total, rawDeposit);
+  return { subtotal, total, deposit, remaining: Math.max(0, total - deposit) };
+});
 const reviewReceipts = computed(() => (quote.value?.payments ?? [])
   .flatMap((payment) => payment.receipts ?? [])
   .filter((receipt) => receipt.outcome === 'review'));
@@ -100,6 +126,9 @@ async function load() {
     loadError.value = false;
     quote.value = null;
     form.value = createDefaultQuote();
+    selection.value = emptyItem();
+    pricing.value = null;
+    void lookup.ensureLoaded();
     viewMode.value = 'edit';
     return;
   }
@@ -114,6 +143,9 @@ async function load() {
     loadError.value = false;
     quote.value = { ...response.data, payments: response.data.payments ?? [] };
     form.value = quoteToPayload(response.data);
+    selection.value = form.value.items[0] ? { ...form.value.items[0], child_ages: [...form.value.items[0].child_ages] } : emptyItem();
+    pricing.value = null;
+    void lookup.ensureLoaded();
     viewMode.value = response.data.status === 'draft' ? 'edit' : 'preview';
     setBreadcrumb(response.data);
   } catch (error) {
@@ -135,19 +167,55 @@ watch(() => [route.name, route.params.id] as const, (next, previous) => {
   load();
 });
 
-function addLine() {
-  if (form.value.lines.length >= 50) {
-    notify.warn('Một báo giá có tối đa 50 dòng giá');
-    return;
-  }
-  form.value.lines.push({ label: '', quantity: 1, unit: 'khách', unit_price: 0 });
+function syncSelection() {
+  selection.value.child_ages = selection.value.child_ages
+    .map((age) => typeof age === 'number' ? age : Number(age))
+    .filter((age) => Number.isInteger(age) && age >= 0 && age <= 17);
+  if (multiItemQuote.value) return;
+  const first = selection.value.room_id && selection.value.checkin && selection.value.checkout
+    ? { ...selection.value, child_ages: [...selection.value.child_ages] }
+    : null;
+  form.value.items = first ? [first, ...form.value.items.slice(1)] : form.value.items.slice(1);
 }
 
-function removeLine(index: number) {
-  form.value.lines.splice(index, 1);
+async function runQuote() {
+  const requestId = ++pricingRequestId;
+  syncSelection();
+  if (multiItemQuote.value) {
+    pricing.value = null;
+    pricingPending.value = false;
+    return;
+  }
+  const item = selection.value;
+  if (!item.room_id || !item.checkin || !item.checkout || item.checkout <= item.checkin) {
+    pricing.value = null;
+    pricingPending.value = false;
+    return;
+  }
+  pricingPending.value = true;
+  try {
+    const response = await quoteApi.quote(item);
+    if (requestId !== pricingRequestId) return;
+    pricing.value = response.data;
+  } catch (error) {
+    if (requestId === pricingRequestId) {
+      pricing.value = null;
+      notify.apiError(error, 'Không tính được giá phòng');
+    }
+  } finally {
+    if (requestId === pricingRequestId) pricingPending.value = false;
+  }
 }
 
 function validate(forPublish = false): boolean {
+  if (forPublish && form.value.items.length > 0 && form.value.lines.length === 0 && !pricing.value) {
+    notify.warn('Vui lòng chờ bảng giá phòng tải xong trước khi phát hành.');
+    return false;
+  }
+  if (forPublish && pricing.value?.requires_quote) {
+    notify.warn('Lựa chọn phòng này cần liên hệ báo giá trước khi phát hành.');
+    return false;
+  }
   const errors = validateQuote(form.value, forPublish);
   if (errors.length) {
     notify.warn(errors[0], errors.length > 1 ? `Còn ${errors.length - 1} mục cần kiểm tra.` : undefined);
@@ -161,7 +229,8 @@ async function persistDraft(showToast = true): Promise<BookingQuoteDetail | null
     notify.error('Không thể lưu khi báo giá chưa tải được.');
     return null;
   }
-  if (saving.value) return null;
+  if (saving.value || pricingPending.value) return null;
+  syncSelection();
   if (!validate(false)) return null;
   saving.value = true;
   try {
@@ -170,6 +239,8 @@ async function persistDraft(showToast = true): Promise<BookingQuoteDetail | null
       : await bookingQuotesApi.create(form.value);
     quote.value = { ...response.data, payments: quote.value?.payments ?? [] };
     form.value = quoteToPayload(response.data);
+    selection.value = form.value.items[0] ? { ...form.value.items[0], child_ages: [...form.value.items[0].child_ages] } : emptyItem();
+    pricing.value = null;
     setBreadcrumb(response.data);
     if (isNew.value) {
       skipNextRouteLoad.value = true;
@@ -198,7 +269,8 @@ async function copyPublicUrl(url = quote.value?.public_url): Promise<boolean> {
 }
 
 function requestPublish() {
-  if (actionLoading.value || saving.value) return;
+  if (actionLoading.value || saving.value || pricingPending.value) return;
+  syncSelection();
   if (!validate(true)) return;
   confirm.require({
     header: 'Phát hành báo giá?',
@@ -218,6 +290,8 @@ async function publishQuote() {
     const response = await bookingQuotesApi.publish(saved.id);
     quote.value = { ...response.data, payments: quote.value?.payments ?? [] };
     form.value = quoteToPayload(response.data);
+    selection.value = form.value.items[0] ? { ...form.value.items[0], child_ages: [...form.value.items[0].child_ages] } : emptyItem();
+    pricing.value = null;
     viewMode.value = 'preview';
     notify.success('Đã phát hành báo giá');
     await copyPublicUrl(response.data.public_url);
@@ -292,8 +366,8 @@ async function revokeQuote() {
           outlined
           @click="viewMode = viewMode === 'edit' ? 'preview' : 'edit'"
         />
-        <Button label="Lưu nháp" icon="pi pi-save" severity="secondary" :loading="saving" :disabled="actionLoading" @click="persistDraft()" />
-        <Button label="Phát hành & sao chép link" icon="pi pi-send" :loading="actionLoading" :disabled="saving" @click="requestPublish" />
+        <Button label="Lưu nháp" icon="pi pi-save" severity="secondary" :loading="saving" :disabled="actionLoading || pricingPending" @click="persistDraft()" />
+        <Button label="Phát hành & sao chép link" icon="pi pi-send" :loading="actionLoading" :disabled="saving || pricingPending" @click="requestPublish" />
       </template>
       <template v-else-if="quote">
         <Button v-if="quote.public_url && quote.status === 'published'" label="Sao chép link" icon="pi pi-copy" @click="copyPublicUrl()" />
@@ -337,19 +411,44 @@ async function revokeQuote() {
         </section>
 
         <section class="form-card" aria-labelledby="pricing-heading">
-          <div class="section-heading section-heading-actions">
-            <span>3</span><div><h2 id="pricing-heading">Bảng giá</h2><p>VND, số nguyên. Server sẽ tính lại toàn bộ thành tiền.</p></div>
-            <Button label="Thêm dòng" icon="pi pi-plus" severity="secondary" outlined size="small" type="button" @click="addLine" />
+          <div class="section-heading"><span>3</span><div><h2 id="pricing-heading">Phòng và bảng giá</h2><p>Chọn đúng thông tin như khi tạo đơn. Giá và thành tiền do máy chủ tính.</p></div></div>
+          <div class="field-grid">
+            <div class="field span-2"><label for="quote-room">Phòng <em>*</em></label><Select input-id="quote-room" v-model="selection.room_id" :options="roomOptions" option-label="label" option-value="value" filter placeholder="Chọn phòng" @change="runQuote" /></div>
+            <div class="field"><label for="quote-booking-type">Loại đặt</label><Select input-id="quote-booking-type" v-model="selection.booking_type" :options="[{ label: 'Phòng', value: 'room' }, { label: 'Combo (phòng + vé)', value: 'combo' }]" option-label="label" option-value="value" @change="runQuote" /></div>
+            <div class="field"><label for="quote-user-rooms">Số phòng (0 = tự động)</label><InputNumber input-id="quote-user-rooms" v-model="selection.user_rooms" :min="0" :max="10" show-buttons @input="runQuote" /></div>
+            <div class="field"><label for="quote-checkin">Check-in <em>*</em></label><DatePicker input-id="quote-checkin" :model-value="selection.checkin ? new Date(`${selection.checkin}T00:00:00`) : null" date-format="yy-mm-dd" show-icon @update:model-value="(v: any) => { selection.checkin = v instanceof Date ? ymdLocal(v) : ''; runQuote(); }" /></div>
+            <div class="field"><label for="quote-checkout">Check-out <em>*</em></label><DatePicker input-id="quote-checkout" :model-value="selection.checkout ? new Date(`${selection.checkout}T00:00:00`) : null" date-format="yy-mm-dd" show-icon @update:model-value="(v: any) => { selection.checkout = v instanceof Date ? ymdLocal(v) : ''; runQuote(); }" /></div>
+            <div class="field"><label for="quote-adults">Số người lớn</label><InputNumber input-id="quote-adults" v-model="selection.adults" :min="1" :max="20" show-buttons @input="runQuote" /></div>
+            <div class="field"><label for="quote-child-ages">Tuổi các bé</label><Chips input-id="quote-child-ages" v-model="selection.child_ages" separator="," @add="runQuote" @remove="runQuote" /><small class="muted">Nhập từng tuổi rồi Enter (ví dụ: 5, 8)</small></div>
           </div>
-          <div class="line-list">
+          <Message v-if="multiItemQuote" severity="info" :closable="false">Báo giá này có nhiều lựa chọn phòng. Các lựa chọn và giá đã lưu được giữ nguyên; phần xem lại chi tiết hiển thị bên dưới.</Message>
+
+          <div v-if="pricingPending" class="quote-loading"><ProgressSpinner style="width: 24px;height: 24px" /><span>Đang tính giá…</span></div>
+          <div v-else-if="pricing" class="quote-panel">
+            <h4>Bảng tính giá</h4>
+            <Message v-if="pricing.requires_quote" severity="warn" :closable="false">{{ pricing.messages.join('. ') }}</Message>
+            <div class="quote-grid">
+              <div><span>Số phòng:</span> <strong>{{ pricing.num_rooms }}</strong></div>
+              <div><span>Số đêm:</span> <strong>{{ pricing.nights }}</strong></div>
+              <div><span>Người lớn quy đổi:</span> <strong>{{ pricing.effective_adults }}</strong></div>
+              <div><span>Trẻ em quy đổi:</span> <strong>{{ pricing.effective_children }}</strong></div>
+              <div v-if="selection.booking_type === 'combo'"><span>Số vé tính phí / Tổng ghế:</span> <strong>{{ pricing.billable_seats }} / {{ pricing.seat_count }}</strong> (miễn {{ pricing.free_child_seats }})</div>
+              <div><span>Tiền phòng:</span> <strong>{{ formatVND(pricing.room_subtotal) }}</strong></div>
+              <div v-if="pricing.extra_adult_subtotal > 0"><span>Giường phụ:</span> <strong>{{ formatVND(pricing.extra_adult_subtotal) }}</strong></div>
+              <div v-if="pricing.child_surcharge_total > 0"><span>Phụ thu bé:</span> <strong>{{ formatVND(pricing.child_surcharge_total) }}</strong></div>
+              <div v-if="pricing.ticket_subtotal > 0"><span>Vé xe:</span> <strong>{{ formatVND(pricing.ticket_subtotal) }}</strong></div>
+              <div class="total"><span>Tổng tạm tính:</span> <strong>{{ formatVND(pricing.total) }}</strong></div>
+            </div>
+            <div v-if="pricing.messages.length" class="quote-messages"><i class="pi pi-info-circle" /><ul><li v-for="(message, i) in pricing.messages" :key="i">{{ message }}</li></ul></div>
+          </div>
+          <div v-else-if="!form.items.length && !form.lines.length" class="empty-pricing">Chọn phòng và ngày để hệ thống tính bảng giá.</div>
+
+          <div v-if="form.lines.length" class="line-list generated-lines">
+            <h4>Chi tiết giá từ máy chủ</h4>
             <div v-for="(line, index) in form.lines" :key="index" class="line-row">
               <div class="line-index">{{ index + 1 }}</div>
-              <div class="field line-label"><label :for="`line-label-${index}`">Nội dung</label><InputText :id="`line-label-${index}`" v-model="line.label" /></div>
-              <div class="field quantity"><label :for="`line-qty-${index}`">Số lượng</label><InputNumber :input-id="`line-qty-${index}`" v-model="line.quantity" :min="1" :max="1000" :min-fraction-digits="0" :max-fraction-digits="0" /></div>
-              <div class="field unit"><label :for="`line-unit-${index}`">Đơn vị</label><InputText :id="`line-unit-${index}`" v-model="line.unit" /></div>
-              <div class="field price"><label :for="`line-price-${index}`">Đơn giá</label><InputNumber :input-id="`line-price-${index}`" v-model="line.unit_price" :min="0" :max="999999999999" :min-fraction-digits="0" :max-fraction-digits="0" suffix=" đ" :use-grouping="true" /></div>
-              <div class="line-total"><span>Thành tiền</span><strong>{{ formatVND(lineTotal(line)) }}</strong></div>
-              <Button icon="pi pi-trash" severity="danger" text rounded type="button" :aria-label="`Xóa dòng ${index + 1}`" @click="removeLine(index)" />
+              <div class="generated-label"><strong>{{ line.label || line.room_name || 'Dòng giá' }}</strong><small v-if="line.hotel_name">{{ line.hotel_name }} · {{ line.room_name }}</small></div>
+              <div class="line-total"><span>Thành tiền</span><strong>{{ formatVND(line.line_total) }}</strong></div>
             </div>
           </div>
         </section>
@@ -387,8 +486,8 @@ async function revokeQuote() {
       </aside>
 
       <div class="mobile-actions">
-        <Button label="Lưu nháp" icon="pi pi-save" severity="secondary" :loading="saving" :disabled="actionLoading" type="submit" />
-        <Button label="Phát hành" icon="pi pi-send" :loading="actionLoading" :disabled="saving" type="button" @click="requestPublish" />
+        <Button label="Lưu nháp" icon="pi pi-save" severity="secondary" :loading="saving" :disabled="actionLoading || pricingPending" type="submit" />
+        <Button label="Phát hành" icon="pi pi-send" :loading="actionLoading" :disabled="saving || pricingPending" type="button" @click="requestPublish" />
       </div>
     </form>
 

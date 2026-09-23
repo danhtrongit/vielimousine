@@ -9,6 +9,34 @@ export interface BookingQuoteLine {
   unit: string;
   unit_price: number;
   line_total: number;
+  room_id?: number | null;
+  hotel_id?: number | null;
+  hotel_name?: string | null;
+  room_name?: string | null;
+  booking_type?: 'room' | 'combo' | string;
+  checkin?: string | null;
+  checkout?: string | null;
+  adults?: number;
+  child_ages?: number[];
+  user_rooms?: number;
+  num_rooms?: number;
+  nights?: number;
+  room_subtotal?: number;
+  extra_adult_total?: number;
+  child_surcharge_total?: number;
+  ticket_count?: number;
+  ticket_subtotal?: number;
+  pricing_snapshot?: Record<string, unknown>;
+}
+
+export interface BookingQuoteItemPayload {
+  room_id: number;
+  booking_type: 'room' | 'combo';
+  checkin: string;
+  checkout: string;
+  adults: number;
+  child_ages: number[];
+  user_rooms: number;
 }
 
 export interface BookingQuoteBrand {
@@ -71,6 +99,7 @@ export interface BookingQuote {
   contact_name: string | null;
   contact_phone: string | null;
   contact_zalo: string | null;
+  items: BookingQuoteItemPayload[];
   lines: BookingQuoteLine[];
   discount: number;
   deposit_type: BookingQuoteDepositType;
@@ -101,6 +130,9 @@ export interface BookingQuoteLinePayload {
   quantity: number;
   unit: string;
   unit_price: number;
+  line_total?: number;
+  hotel_name?: string | null;
+  room_name?: string | null;
 }
 
 export interface BookingQuotePayload {
@@ -119,6 +151,7 @@ export interface BookingQuotePayload {
   contact_name: string;
   contact_phone: string;
   contact_zalo: string;
+  items: BookingQuoteItemPayload[];
   lines: BookingQuoteLinePayload[];
   discount: number;
   deposit_type: BookingQuoteDepositType;
