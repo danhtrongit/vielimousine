@@ -12,9 +12,15 @@ declare(strict_types=1);
 
 const ARRAY_A = 'ARRAY_A';
 
-function current_time(string $type): string { return '2026-09-22 10:00:00'; }
-function wp_timezone(): DateTimeZone { return new DateTimeZone('Asia/Ho_Chi_Minh'); }
-function sanitize_title(string $value): string { return strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $value) ?? $value)); }
+if (!function_exists('current_time')) {
+    function current_time(string $type): string { return '2026-09-22 10:00:00'; }
+}
+if (!function_exists('wp_timezone')) {
+    function wp_timezone(): DateTimeZone { return new DateTimeZone('Asia/Ho_Chi_Minh'); }
+}
+if (!function_exists('sanitize_title')) {
+    function sanitize_title(string $value): string { return strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $value) ?? $value)); }
+}
 
 final class BookingQuotePricingWpdb
 {
