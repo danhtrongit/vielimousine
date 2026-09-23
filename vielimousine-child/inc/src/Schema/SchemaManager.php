@@ -98,6 +98,7 @@ final class SchemaManager
         self::dropProductCode();
         self::backfillCustomerBookingCount();
         self::migrateOrderDraftColumns();
+        self::migrateBookingQuoteCustomerId();
         self::$ran = true;
     }
 
@@ -221,5 +222,34 @@ final class SchemaManager
         $wpdb->query("ALTER TABLE {$table} MODIFY nights TINYINT UNSIGNED DEFAULT NULL");
 
         update_option('vie_order_draft_columns_v1', 'done', false);
+    }
+
+    /** Add the optional canonical customer link to legacy quote tables. */
+    private static function migrateBookingQuoteCustomerId(): void
+    {
+        if (get_option('vie_booking_quote_customer_id_v1') === 'done') {
+            return;
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . 'vie_booking_quote';
+        $hasColumn = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'customer_id'",
+            DB_NAME,
+            $table
+        ));
+        if ($hasColumn === 0) {
+            $wpdb->query("ALTER TABLE {$table} ADD COLUMN customer_id BIGINT UNSIGNED DEFAULT NULL AFTER sales_user_id");
+        }
+        $hasIndex = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.STATISTICS
+              WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = 'idx_customer_id'",
+            DB_NAME,
+            $table
+        ));
+        if ($hasIndex === 0) {
+            $wpdb->query("ALTER TABLE {$table} ADD KEY idx_customer_id (customer_id)");
+        }
+        update_option('vie_booking_quote_customer_id_v1', 'done', false);
     }
 }

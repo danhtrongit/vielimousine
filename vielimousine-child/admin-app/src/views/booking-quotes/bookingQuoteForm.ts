@@ -22,6 +22,7 @@ export function createDefaultQuote(now = new Date()): BookingQuotePayload {
   validUntil.setHours(23, 59, 0, 0);
 
   return {
+    customer_id: null,
     customer_name: '',
     customer_phone: '',
     customer_email: '',
@@ -48,6 +49,7 @@ export function createDefaultQuote(now = new Date()): BookingQuotePayload {
 
 export function quoteToPayload(quote: BookingQuote): BookingQuotePayload {
   return {
+    customer_id: quote.customer_id ?? null,
     customer_name: quote.customer_name ?? '',
     customer_phone: quote.customer_phone ?? '',
     customer_email: quote.customer_email ?? '',

@@ -33,6 +33,7 @@ final class BookingQuoteValidation
     public static function rules(): array
     {
         return [
+            'customer_id' => 'nullable|int|min:1|exists:vie_customer,id',
             'customer_name' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:50',
             'customer_email' => 'nullable|email|max:255',
@@ -65,6 +66,17 @@ final class BookingQuoteValidation
     public static function normalize(array $input): array
     {
         $out = [];
+
+        if (array_key_exists('customer_id', $input)) {
+            $value = $input['customer_id'];
+            if ($value === null || $value === '') {
+                $out['customer_id'] = null;
+            } elseif (!is_int($value) || $value <= 0) {
+                self::invalid('customer_id', 'phải là mã khách hàng hợp lệ');
+            } else {
+                $out['customer_id'] = $value;
+            }
+        }
 
         foreach (self::SINGLE_TEXT as $field => $max) {
             if (!array_key_exists($field, $input)) {

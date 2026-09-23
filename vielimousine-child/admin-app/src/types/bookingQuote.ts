@@ -81,6 +81,7 @@ export interface BookingQuote {
   public_id: string;
   code: string;
   sales_user_id: number;
+  customer_id: number | null;
   status: BookingQuoteStatus;
   effective_status: BookingQuoteEffectiveStatus;
   payment_status: BookingQuotePaymentStatus;
@@ -136,6 +137,7 @@ export interface BookingQuoteLinePayload {
 }
 
 export interface BookingQuotePayload {
+  customer_id: number | null;
   customer_name: string;
   customer_phone: string;
   customer_email: string;

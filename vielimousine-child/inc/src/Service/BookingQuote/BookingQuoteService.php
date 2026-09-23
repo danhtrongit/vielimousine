@@ -10,6 +10,7 @@ use Vie\Service\Settings\InvoiceSettings;
 use Vie\Service\Pricing\PriceCalculator;
 use Vie\Repository\RoomRepository;
 use Vie\Repository\HotelRepository;
+use Vie\Repository\CustomerRepository;
 use Vie\DTO\QuoteRequest;
 use Vie\Support\Money;
 use Vie\Support\CostVisibility;
@@ -25,6 +26,7 @@ final class BookingQuoteService
         private readonly ?PriceCalculator $priceCalculator = null,
         private readonly ?RoomRepository $rooms = null,
         private readonly ?HotelRepository $hotels = null,
+        private readonly ?CustomerRepository $customers = null,
     ) {
     }
 
@@ -55,6 +57,7 @@ final class BookingQuoteService
             'customer_name' => '',
             'customer_phone' => '',
             'customer_email' => null,
+            'customer_id' => null,
             'title' => '',
             'image_url' => null,
             'greeting' => null,
@@ -74,6 +77,7 @@ final class BookingQuoteService
             'deposit_value' => 0,
             'valid_until' => null,
         ], $clean);
+        $base = array_merge($base, $this->customerSnapshot($base));
         $base = array_merge($base, $this->reprice($base), [
             'sales_user_id' => $userId,
             'status' => 'draft',
@@ -109,8 +113,9 @@ final class BookingQuoteService
                 throw new BookingQuoteException('Báo giá đã phát hành hoặc thu hồi không thể chỉnh sửa', 'quote_immutable', 409);
             }
             $merged = array_merge($quote, $clean);
+            $merged = array_merge($merged, $this->customerSnapshot($merged));
             $this->assertTripDates($merged);
-            $patch = array_merge($clean, $this->reprice($merged));
+            $patch = array_merge($clean, $this->customerSnapshot($merged), $this->reprice($merged));
             try {
                 return $this->adminView($this->quotes->updateDraftChecked($id, $patch));
             } catch (RepositoryException $e) {
@@ -184,6 +189,85 @@ final class BookingQuoteService
         return $this->createDraft($editable, $userId);
     }
 
+    /**
+     * Build the safe payload used when an operator continues a quote in the
+     * Orders wizard. This creates an order draft only: stock, coupon and
+     * payment side effects happen after the operator confirms the order.
+     *
+     * @throws BookingQuoteException
+     */
+    public function orderDraftPayload(int $id, int $userId): array
+    {
+        $quote = $this->getAdmin($id, $userId);
+        if (($quote['status'] ?? '') === 'revoked') {
+            throw new BookingQuoteException('Báo giá đã thu hồi, không thể tạo đơn', 'invalid_quote_state', 409);
+        }
+
+        $items = is_array($quote['items'] ?? null) ? array_values($quote['items']) : [];
+        if ($items === []) {
+            throw new BookingQuoteException('Báo giá chưa có lựa chọn phòng để tạo đơn', 'quote_items_required', 422, 'items');
+        }
+
+        $first = is_array($items[0] ?? null) ? $items[0] : [];
+        $wizardItems = [];
+        foreach ($items as $item) {
+            if (!is_array($item) || (int) ($item['room_id'] ?? 0) <= 0) {
+                throw new BookingQuoteException('Báo giá có lựa chọn phòng không hợp lệ', 'quote_items_invalid', 422, 'items');
+            }
+            $wizardItems[] = [
+                'room_id' => (int) $item['room_id'],
+                'booking_type' => (string) ($item['booking_type'] ?? 'room'),
+                'checkin' => (string) ($item['checkin'] ?? ''),
+                'checkout' => (string) ($item['checkout'] ?? ''),
+                'adults' => (int) ($item['adults'] ?? 1),
+                'child_ages' => is_array($item['child_ages'] ?? null) ? array_values($item['child_ages']) : [],
+                'user_rooms' => (int) ($item['user_rooms'] ?? 0),
+            ];
+        }
+
+        $tripStart = (string) ($quote['trip_start'] ?? ($first['checkin'] ?? ''));
+        $tripEnd = (string) ($quote['trip_end'] ?? ($first['checkout'] ?? ''));
+        $startTs = $tripStart !== '' ? strtotime($tripStart) : false;
+        $endTs = $tripEnd !== '' ? strtotime($tripEnd) : false;
+        $nights = $startTs !== false && $endTs !== false ? max(0, (int) (($endTs - $startTs) / 86400)) : null;
+        $childAges = is_array($first['child_ages'] ?? null) ? array_values($first['child_ages']) : [];
+        $note = 'Tạo từ báo giá ' . (string) ($quote['code'] ?? '');
+
+        return [
+            'customer_phone' => (string) ($quote['customer_phone'] ?? ''),
+            'customer_name' => (string) ($quote['customer_name'] ?? ''),
+            'customer_email' => !empty($quote['customer_email']) ? (string) $quote['customer_email'] : null,
+            'source' => 'booking_quote',
+            'customer_note' => $note,
+            'checkin' => $tripStart !== '' ? $tripStart : null,
+            'checkout' => $tripEnd !== '' ? $tripEnd : null,
+            'nights' => $nights,
+            'adults' => (int) ($first['adults'] ?? 0),
+            'children' => count($childAges),
+            'child_ages' => $childAges,
+            'subtotal' => (int) ($quote['subtotal'] ?? 0),
+            'discount' => (int) ($quote['discount'] ?? 0),
+            'total' => (int) ($quote['total'] ?? 0),
+            'draft_payload' => [
+                'quote_id' => (int) $quote['id'],
+                'quote_code' => (string) ($quote['code'] ?? ''),
+                'quote_public_id' => (string) ($quote['public_id'] ?? ''),
+                'wizard' => [
+                    'customer' => [
+                        'phone' => (string) ($quote['customer_phone'] ?? ''),
+                        'name' => (string) ($quote['customer_name'] ?? ''),
+                        'email' => !empty($quote['customer_email']) ? (string) $quote['customer_email'] : '',
+                    ],
+                    'item' => $wizardItems[0],
+                    'items' => $wizardItems,
+                    'couponCode' => '',
+                    'source' => 'booking_quote',
+                    'customerNote' => $note,
+                ],
+            ],
+        ];
+    }
+
     /** Generic public lookup: draft/revoked/unknown are intentionally indistinguishable. */
     public function getPublic(string $publicId): array
     {
@@ -231,6 +315,36 @@ final class BookingQuoteService
         $view['public_url'] = $this->publicUrl((string) ($quote['public_id'] ?? ''));
         $view['currency'] = 'VND';
         return $view;
+    }
+
+    /**
+     * A selected customer is the same canonical record used by Orders. Store
+     * the contact fields alongside the foreign key as a quote snapshot so a
+     * later customer edit cannot silently rewrite an already issued quote.
+     *
+     * @return array{customer_id:int|null,customer_name?:string,customer_phone?:string,customer_email?:string|null}
+     * @throws BookingQuoteException
+     */
+    private function customerSnapshot(array $data): array
+    {
+        $id = $data['customer_id'] ?? null;
+        if ($id === null || $id === '') {
+            return ['customer_id' => null];
+        }
+        $id = (int) $id;
+        if ($id <= 0 || $this->customers === null) {
+            throw new BookingQuoteException('Khách hàng không hợp lệ hoặc không còn tồn tại', 'customer_not_found', 422, 'customer_id');
+        }
+        $customer = $this->customers->find($id);
+        if ($customer === null) {
+            throw new BookingQuoteException('Khách hàng không tồn tại', 'customer_not_found', 422, 'customer_id');
+        }
+        return [
+            'customer_id' => $id,
+            'customer_name' => (string) ($customer['name'] ?? ''),
+            'customer_phone' => (string) ($customer['phone'] ?? ''),
+            'customer_email' => !empty($customer['email']) ? (string) $customer['email'] : null,
+        ];
     }
 
     /** @return array{subtotal:int,total:int,deposit_amount:int} */

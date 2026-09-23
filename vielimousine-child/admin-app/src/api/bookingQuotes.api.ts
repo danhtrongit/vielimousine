@@ -24,4 +24,6 @@ export const bookingQuotesApi = {
     api.post<Envelope<BookingQuote>>(`/booking-quotes/${id}/revoke`).then((r) => r.data),
   duplicate: (id: number) =>
     api.post<Envelope<BookingQuote>>(`/booking-quotes/${id}/duplicate`).then((r) => r.data),
+  orderDraft: (id: number) =>
+    api.post<Envelope<{ id: number }>>(`/booking-quotes/${id}/order-draft`).then((r) => r.data),
 };

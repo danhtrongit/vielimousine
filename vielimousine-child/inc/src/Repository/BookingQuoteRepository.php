@@ -15,7 +15,7 @@ final class BookingQuoteRepository extends AbstractRepository
     protected function fillable(): array
     {
         return [
-            'public_id', 'code', 'sales_user_id', 'status',
+            'public_id', 'code', 'sales_user_id', 'customer_id', 'status',
             'customer_name', 'customer_phone', 'customer_email', 'title', 'image_url',
             'greeting', 'trip_start', 'trip_end', 'description', 'inclusions', 'exclusions', 'terms',
             'contact_name', 'contact_phone', 'contact_zalo', 'lines', 'items', 'discount',
@@ -29,6 +29,7 @@ final class BookingQuoteRepository extends AbstractRepository
         return [
             'id' => 'int',
             'sales_user_id' => 'int',
+            'customer_id' => 'int',
             'lines' => 'json',
             'items' => 'json',
             'discount' => 'int',

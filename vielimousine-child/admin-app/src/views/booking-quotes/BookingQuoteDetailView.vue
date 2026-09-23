@@ -16,6 +16,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import PageHeader from '@/components/PageHeader.vue';
 import { bookingQuotesApi } from '@/api/bookingQuotes.api';
+import { customersApi } from '@/api/customers.api';
 import { quoteApi, type PriceBreakdown } from '@/api/quote.api';
 import { useNotify } from '@/composables/useNotify';
 import { useUIStore } from '@/stores/ui.store';
@@ -23,6 +24,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useLookupStore } from '@/stores/lookup.store';
 import { formatDateTime, formatVND, ymdLocal } from '@/composables/useFormat';
 import type { BookingQuote, BookingQuoteDetail, BookingQuoteItemPayload, BookingQuotePayload } from '@/types/bookingQuote';
+import type { CustomerListItem } from '@/types/customer';
 import BookingQuotePreview from './BookingQuotePreview.vue';
 import {
   createDefaultQuote,
@@ -52,6 +54,10 @@ const viewMode = ref<'edit' | 'preview'>('edit');
 const skipNextRouteLoad = ref(false);
 const pricing = ref<PriceBreakdown | null>(null);
 const pricingPending = ref(false);
+const customerSearch = ref('');
+const customerSuggestions = ref<CustomerListItem[]>([]);
+const customerSearching = ref(false);
+let customerSearchTimer: number | null = null;
 let pricingRequestId = 0;
 
 function emptyItem(): BookingQuoteItemPayload {
@@ -69,6 +75,39 @@ const roomOptions = computed(() => lookup.rooms.map((room) => ({
   value: room.id,
 })));
 const multiItemQuote = computed(() => form.value.items.length > 1);
+const linkedCustomer = computed(() => form.value.customer_id !== null && form.value.customer_id > 0);
+
+watch(customerSearch, (value) => {
+  if (customerSearchTimer !== null) window.clearTimeout(customerSearchTimer);
+  customerSuggestions.value = [];
+  const query = value.trim();
+  if (query.length < 2 || linkedCustomer.value) return;
+  customerSearchTimer = window.setTimeout(async () => {
+    customerSearching.value = true;
+    try {
+      const response = await customersApi.list({ q: query, per_page: 8 });
+      customerSuggestions.value = response.data;
+    } catch {
+      customerSuggestions.value = [];
+    } finally {
+      customerSearching.value = false;
+    }
+  }, 250);
+});
+
+function selectCustomer(customer: CustomerListItem): void {
+  form.value.customer_id = customer.id;
+  form.value.customer_name = customer.name;
+  form.value.customer_phone = customer.phone;
+  form.value.customer_email = customer.email ?? '';
+  customerSearch.value = customer.name + ' · ' + customer.phone;
+  customerSuggestions.value = [];
+}
+
+function unlinkCustomer(): void {
+  form.value.customer_id = null;
+  customerSearch.value = '';
+}
 const amounts = computed(() => {
   const subtotal = pricing.value?.subtotal ?? (!editable.value && quote.value ? quote.value.subtotal : quoteAmounts(form.value).subtotal);
   const total = pricing.value
@@ -127,6 +166,8 @@ async function load() {
     loadError.value = false;
     quote.value = null;
     form.value = createDefaultQuote();
+    customerSearch.value = '';
+    customerSuggestions.value = [];
     selection.value = emptyItem();
     autoFilledRoomId = null;
     pricing.value = null;
@@ -145,6 +186,9 @@ async function load() {
     loadError.value = false;
     quote.value = { ...response.data, payments: response.data.payments ?? [] };
     form.value = quoteToPayload(response.data);
+    customerSearch.value = response.data.customer_id
+      ? response.data.customer_name + ' · ' + response.data.customer_phone
+      : '';
     selection.value = form.value.items[0] ? { ...form.value.items[0], child_ages: [...form.value.items[0].child_ages] } : emptyItem();
     autoFilledRoomId = selection.value.room_id || null;
     pricing.value = null;
@@ -349,6 +393,20 @@ async function duplicateQuote() {
   }
 }
 
+async function createOrderDraft() {
+  if (!quote.value || actionLoading.value || saving.value || !quote.value.items?.length) return;
+  actionLoading.value = true;
+  try {
+    const response = await bookingQuotesApi.orderDraft(quote.value.id);
+    notify.success('Đã tạo đơn nháp từ báo giá', 'Kiểm tra lại tồn kho và xác nhận trước khi tạo đơn chính thức.');
+    await router.push(`/orders/new?draft=${response.data.id}`);
+  } catch (error) {
+    notify.apiError(error, 'Không tạo được đơn từ báo giá');
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
 function requestRevoke() {
   if (!quote.value || actionLoading.value || saving.value) return;
   confirm.require({
@@ -403,6 +461,15 @@ async function revokeQuote() {
         <Button label="Phát hành & sao chép link" icon="pi pi-send" :loading="actionLoading" :disabled="saving || pricingPending" @click="requestPublish" />
       </template>
       <template v-else-if="quote">
+        <Button
+          v-if="auth.can('vie_create_orders') && quote.status !== 'revoked' && quote.items?.length"
+          label="Tạo đơn từ báo giá"
+          icon="pi pi-shopping-cart"
+          severity="success"
+          :loading="actionLoading"
+          :disabled="saving"
+          @click="createOrderDraft"
+        />
         <Button v-if="quote.public_url && quote.status === 'published'" label="Sao chép link" icon="pi pi-copy" @click="copyPublicUrl()" />
         <Button v-if="canMutate" label="Nhân bản để sửa" icon="pi pi-clone" severity="secondary" outlined :loading="actionLoading" @click="duplicateQuote" />
         <Button v-if="canMutate && quote.status === 'published'" label="Thu hồi" icon="pi pi-ban" severity="danger" text :disabled="actionLoading || saving" @click="requestRevoke" />
@@ -424,10 +491,38 @@ async function revokeQuote() {
       <main class="form-main">
         <section class="form-card" aria-labelledby="customer-heading">
           <div class="section-heading"><span>1</span><div><h2 id="customer-heading">Khách hàng</h2><p>Thông tin liên hệ chỉ hiển thị trong quản trị.</p></div></div>
+          <div class="customer-link-field">
+            <label for="quote-customer-search">Liên kết khách hàng trong hệ thống Orders</label>
+            <div class="customer-search-wrap">
+              <InputText
+                id="quote-customer-search"
+                v-model="customerSearch"
+                :disabled="linkedCustomer"
+                placeholder="Tìm theo tên, số điện thoại hoặc email"
+                autocomplete="off"
+              />
+              <Button v-if="linkedCustomer" type="button" label="Bỏ liên kết" severity="secondary" text @click="unlinkCustomer" />
+              <ProgressSpinner v-else-if="customerSearching" style="width: 20px;height: 20px" />
+              <div v-if="customerSuggestions.length && !linkedCustomer" class="customer-suggestions" role="listbox">
+                <button
+                  v-for="customer in customerSuggestions"
+                  :key="customer.id"
+                  type="button"
+                  role="option"
+                  class="customer-suggestion"
+                  @click="selectCustomer(customer)"
+                >
+                  <strong>{{ customer.name || 'Chưa có tên' }}</strong>
+                  <span>{{ customer.phone }}<template v-if="customer.email"> · {{ customer.email }}</template></span>
+                </button>
+              </div>
+            </div>
+            <small class="muted">{{ linkedCustomer ? 'Đã liên kết hồ sơ khách hàng; thông tin bên dưới lấy theo bản ghi này.' : 'Có thể nhập thủ công nếu chưa có hồ sơ khách hàng.' }}</small>
+          </div>
           <div class="field-grid">
-            <div class="field span-2"><label for="quote-customer">Tên khách / đoàn <em>*</em></label><InputText id="quote-customer" v-model="form.customer_name" autocomplete="name" /></div>
-            <div class="field"><label for="quote-phone">Điện thoại</label><InputText id="quote-phone" v-model="form.customer_phone" inputmode="tel" autocomplete="tel" /></div>
-            <div class="field"><label for="quote-email">Email</label><InputText id="quote-email" v-model="form.customer_email" type="email" autocomplete="email" /></div>
+            <div class="field span-2"><label for="quote-customer">Tên khách / đoàn <em>*</em></label><InputText id="quote-customer" v-model="form.customer_name" :disabled="linkedCustomer" autocomplete="name" /></div>
+            <div class="field"><label for="quote-phone">Điện thoại</label><InputText id="quote-phone" v-model="form.customer_phone" :disabled="linkedCustomer" inputmode="tel" autocomplete="tel" /></div>
+            <div class="field"><label for="quote-email">Email</label><InputText id="quote-email" v-model="form.customer_email" :disabled="linkedCustomer" type="email" autocomplete="email" /></div>
           </div>
         </section>
 
@@ -566,7 +661,14 @@ async function revokeQuote() {
 </template>
 
 <style scoped>
-.quote-page { max-width: var(--content-max-width); margin: 0 auto; }
+.quote-page {
+  --quote-brand: #00a651;
+  --quote-brand-hover: #00793a;
+  --quote-brand-soft: #e8f8ef;
+  --quote-brand-border: #b6e4c8;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
 .loading { min-height: 60vh; display: grid; place-content: center; justify-items: center; gap: var(--space-3); color: var(--app-text-muted); }
 .review-warning { margin-bottom: var(--space-4); }
 .status-strip { display: flex; flex-wrap: wrap; gap: var(--space-5); align-items: center; padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); border: 1px solid var(--app-card-border); border-radius: var(--radius-lg); background: var(--app-card-bg); }
@@ -574,29 +676,54 @@ async function revokeQuote() {
 .status-strip span { color: var(--app-text-muted); font-size: .8rem; }
 .form-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: var(--space-5); align-items: start; }
 .form-main { min-width: 0; display: grid; gap: var(--space-4); }
-.form-card, .summary-card, .operations-card, .payments-card { background: var(--app-card-bg); border: 1px solid var(--app-card-border); border-radius: var(--radius-xl); padding: var(--space-5); box-shadow: var(--shadow-xs); }
-.section-heading { display: flex; align-items: flex-start; gap: var(--space-3); margin-bottom: var(--space-5); }
-.section-heading > span { flex: 0 0 30px; height: 30px; display: grid; place-items: center; color: var(--app-on-tint-primary); background: var(--app-tint-primary); border-radius: var(--radius-full); font-weight: 700; }
+.form-card, .summary-card, .operations-card, .payments-card { background: var(--app-card-bg); border: 1px solid var(--app-card-border); border-radius: var(--radius-xl); padding: 18px; box-shadow: var(--shadow-xs); }
+.section-heading { display: flex; align-items: flex-start; gap: var(--space-3); margin-bottom: 16px; }
+.section-heading > span { flex: 0 0 28px; height: 28px; display: grid; place-items: center; color: #fff; background: var(--quote-brand); border-radius: var(--radius-full); font-size: .82rem; font-weight: 700; }
 .section-heading h2, .summary-card h2, .operations-card h2, .payments-card h2 { margin: 0; font-size: 1.05rem; color: var(--app-text-strong); }
 .section-heading p, .payments-heading p { margin: .25rem 0 0; font-size: .84rem; color: var(--app-text-muted); }
 .section-heading-actions > :last-child { margin-left: auto; }
-.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.customer-link-field { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); }
+.customer-link-field > label { color: var(--app-text); font-size: .82rem; font-weight: 500; }
+.customer-search-wrap { position: relative; display: flex; align-items: center; gap: var(--space-2); }
+.customer-search-wrap > .p-inputtext { flex: 1; min-width: 0; }
+.customer-suggestions { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; right: 0; display: grid; gap: 2px; padding: 4px; border: 1px solid var(--app-card-border); border-radius: var(--radius-lg); background: var(--app-card-bg); box-shadow: var(--shadow-md); }
+.customer-suggestion { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: .65rem .75rem; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--app-text); text-align: left; cursor: pointer; }
+.customer-suggestion:hover, .customer-suggestion:focus-visible { background: var(--app-muted-bg); outline: none; }
+.customer-suggestion span { color: var(--app-text-muted); font-size: .78rem; }
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
 .field-grid.three { grid-template-columns: repeat(3, 1fr); }
 .span-2 { grid-column: 1 / -1; }
-.field { display: flex; min-width: 0; flex-direction: column; gap: var(--space-2); }
+.field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
 .field label { color: var(--app-text); font-size: .82rem; font-weight: 500; }
 .field em { color: var(--p-red-500); font-style: normal; }
 .field :deep(.p-inputtext), .field :deep(.p-inputnumber), .field :deep(.p-datepicker), .field :deep(.p-select), .field :deep(textarea) { width: 100%; }
+.field :deep(.p-inputtext), .field :deep(.p-inputnumber-input), .field :deep(.p-datepicker-input), .field :deep(.p-select) { min-height: 38px; }
+.field :deep(textarea) { line-height: 1.45; }
 .line-list { display: grid; gap: var(--space-3); }
 .line-row { display: grid; grid-template-columns: 28px minmax(180px, 1.6fr) 100px 100px minmax(150px, 1fr) 130px 42px; gap: var(--space-2); align-items: end; padding: var(--space-3); border: 1px solid var(--app-divider); border-radius: var(--radius-lg); background: var(--app-muted-bg); }
 .line-index { align-self: center; display: grid; place-items: center; height: 28px; border-radius: var(--radius-full); background: var(--app-card-bg); color: var(--app-text-muted); font-size: .8rem; }
 .line-total { display: flex; flex-direction: column; gap: var(--space-1); padding-bottom: .65rem; text-align: right; white-space: nowrap; }
 .line-total span { color: var(--app-text-muted); font-size: .72rem; }
+.quote-panel { margin-top: 14px; padding: 14px; border: 1px solid var(--quote-brand-border); border-radius: var(--radius-lg); background: var(--quote-brand-soft); color: var(--app-text); }
+.quote-panel h4 { margin: 0 0 10px; color: var(--quote-brand-hover); font-size: .95rem; line-height: 1.3; font-weight: 700; }
+.quote-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 20px; font-size: .86rem; line-height: 1.4; }
+.quote-grid > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.quote-grid > div > span { color: var(--app-text-muted); }
+.quote-grid > div > strong { color: var(--app-text-strong); font-weight: 600; text-align: right; white-space: nowrap; }
+.quote-grid .total { grid-column: 1 / -1; margin-top: 5px; padding-top: 9px; border-top: 1px solid var(--quote-brand-border); font-size: .93rem; }
+.quote-grid .total span { color: var(--app-text); font-weight: 600; }
+.quote-grid .total strong { color: var(--quote-brand-hover); font-size: 1.08rem; }
+.quote-messages { display: flex; gap: 7px; margin-top: 10px; color: var(--app-text-muted); font-size: .8rem; line-height: 1.4; }
+.quote-messages ul { margin: 0; padding-left: 16px; }
+.quote-panel :deep(.p-message) { margin: 0 0 10px; padding: 8px 10px; font-size: .8rem; }
+.empty-pricing { margin-top: 14px; padding: 12px 14px; border: 1px dashed var(--app-card-border); border-radius: var(--radius-md); color: var(--app-text-muted); font-size: .82rem; }
+.generated-lines { margin-top: 14px; }
+.generated-lines h4 { margin: 0 0 10px; color: var(--app-text-strong); font-size: .9rem; }
 .summary-card { position: sticky; top: calc(var(--topbar-height) + var(--space-4)); display: grid; gap: var(--space-4); }
 .summary-row, .operation-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
 .summary-row span, .operation-row span { color: var(--app-text-muted); font-size: .85rem; }
 .summary-row.total { border-top: 1px solid var(--app-divider); padding-top: var(--space-4); font-size: 1.08rem; }
-.deposit-box, .money-highlight { display: grid; gap: var(--space-1); padding: var(--space-4); background: var(--app-tint-primary); color: var(--app-on-tint-primary); border: 1px solid var(--app-tint-primary-border); border-radius: var(--radius-lg); }
+.deposit-box, .money-highlight { display: grid; gap: var(--space-1); padding: 14px; background: var(--quote-brand-soft); color: var(--quote-brand-hover); border: 1px solid var(--quote-brand-border); border-radius: var(--radius-lg); }
 .deposit-box strong, .money-highlight strong { font-size: 1.35rem; }
 .summary-note, .immutable-note { display: flex; gap: var(--space-2); margin: 0; color: var(--app-text-muted); font-size: .8rem; line-height: 1.5; }
 .mobile-actions { display: none; }
@@ -620,6 +747,8 @@ async function revokeQuote() {
 @media (max-width: 720px) {
   .form-card, .summary-card, .operations-card, .payments-card { padding: var(--space-4); border-radius: var(--radius-lg); }
   .field-grid, .field-grid.three { grid-template-columns: 1fr; }
+  .quote-grid { grid-template-columns: 1fr; gap: 7px; }
+  .quote-grid .total { grid-column: auto; }
   .span-2 { grid-column: auto; }
   .line-row { grid-template-columns: 28px 1fr 42px; align-items: end; }
   .line-row .field, .line-total { grid-column: 2 / -1; text-align: left; }

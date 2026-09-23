@@ -7,6 +7,7 @@ use Vie\Container;
 use Vie\Service\BookingQuote\BookingQuoteException;
 use Vie\Service\BookingQuote\BookingQuotePaymentService;
 use Vie\Service\BookingQuote\BookingQuoteService;
+use Vie\Service\Order\OrderDraftService;
 use Vie\Support\ResponseEnvelope;
 
 final class BookingQuoteController
@@ -85,6 +86,22 @@ final class BookingQuoteController
                 (int) get_current_user_id(),
             );
             return ResponseEnvelope::success($quote, [], 201);
+        } catch (BookingQuoteException $e) {
+            return self::exception($e);
+        } catch (\Throwable) {
+            return self::internalError();
+        }
+    }
+
+    /** Create an order draft prefilled from the room selections in a quote. */
+    public static function orderDraft(\WP_REST_Request $request): \WP_REST_Response
+    {
+        try {
+            $quoteId = (int) $request->get_param('id');
+            $userId = (int) get_current_user_id();
+            $payload = self::service()->orderDraftPayload($quoteId, $userId);
+            $draft = Container::get(OrderDraftService::class)->save($payload, $userId);
+            return ResponseEnvelope::success($draft, [], 201);
         } catch (BookingQuoteException $e) {
             return self::exception($e);
         } catch (\Throwable) {

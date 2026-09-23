@@ -143,6 +143,7 @@ $same('zero-deposit quote cannot checkout', false, $policy->canCheckout($quote([
 // Editable payload normalization must ignore all client-owned derived and state fields.
 $normalized = BookingQuoteValidation::normalize([
     'id'             => 999,
+    'customer_id'    => 42,
     'public_id'      => str_repeat('a', 32),
     'sales_user_id'  => 444,
     'status'         => 'published',
@@ -187,6 +188,7 @@ $same('multiline text preserves normalized newlines', "Dòng 1\nDòng 2", $norma
 $same('line total is calculated server-side', 3_000_000, $normalized['lines'][0]['line_total'] ?? null);
 $same('local datetime input gains seconds', '2026-10-01 17:30:00', $normalized['valid_until'] ?? null);
 $same('relative same-site image is accepted', '/wp-content/uploads/quote.jpg', $normalized['image_url'] ?? null);
+$same('selected customer id is preserved for the canonical link', 42, $normalized['customer_id'] ?? null);
 $same('client id is ignored', false, array_key_exists('id', $normalized));
 $same('client public token is ignored', false, array_key_exists('public_id', $normalized));
 $same('client owner is ignored', false, array_key_exists('sales_user_id', $normalized));
@@ -421,7 +423,7 @@ $same('public projection builds booking URL', 'https://vielimousine.test/booking
 $same('public projection includes ISO expiry', '2026-09-30T12:00:00+07:00', $public['expires_at'] ?? null);
 $same('public projection includes review payment status', 'review_required', $public['payment_status'] ?? null);
 foreach ([
-    'id', 'sales_user_id', 'customer_phone', 'customer_email',
+    'id', 'sales_user_id', 'customer_id', 'customer_phone', 'customer_email',
     'created_at', 'updated_at', 'published_at', 'payment_id', 'raw_payload', 'payment_review',
 ] as $forbidden) {
     $same("public projection omits {$forbidden}", false, array_key_exists($forbidden, $public));

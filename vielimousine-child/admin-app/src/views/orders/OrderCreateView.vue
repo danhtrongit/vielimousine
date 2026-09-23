@@ -42,6 +42,16 @@ const steps = [
   { label: 'Xác nhận' },
 ];
 
+type OrderWizardItem = {
+  room_id: number | null;
+  booking_type: 'room' | 'combo';
+  checkin: string;
+  checkout: string;
+  adults: number;
+  child_ages: number[];
+  user_rooms: number;
+};
+
 const wizard = ref({
   customer: { phone: '', name: '', email: '' },
   item: {
@@ -53,6 +63,10 @@ const wizard = ref({
     child_ages: [] as number[],
     user_rooms: 0,
   },
+  // A quote may contain more than one room selection. The first item is
+  // editable in this wizard; the remaining selections are preserved and
+  // submitted together when the draft originated from a quote.
+  items: [] as OrderWizardItem[],
   couponCode: '',
   source: 'admin',
   customerNote: '',
@@ -136,6 +150,9 @@ async function runQuote() {
       booking_type: it.booking_type,
     });
     quote.value = resp.data;
+    if (wizard.value.items.length > 0) {
+      wizard.value.items = [wizard.value.item, ...wizard.value.items.slice(1)];
+    }
     if (resp.data.requires_quote) {
       notify.warn('Liên hệ báo giá', resp.data.messages?.join(', ') ?? '');
     }
@@ -243,6 +260,9 @@ async function submit() {
   if (!quote.value) return;
   submitting.value = true;
   try {
+    const orderItems = wizard.value.items.length > 0
+      ? [wizard.value.item, ...wizard.value.items.slice(1)]
+      : [wizard.value.item];
     const body = {
       customer: {
         phone: wizard.value.customer.phone,
@@ -251,15 +271,15 @@ async function submit() {
       },
       source: wizard.value.source,
       customer_note: wizard.value.customerNote || null,
-      items: [{
-        room_id: wizard.value.item.room_id,
-        booking_type: wizard.value.item.booking_type,
-        checkin: toDateStr(wizard.value.item.checkin),
-        checkout: toDateStr(wizard.value.item.checkout),
-        adults: wizard.value.item.adults,
-        child_ages: wizard.value.item.child_ages,
-        user_rooms: wizard.value.item.user_rooms,
-      }],
+      items: orderItems.map((item) => ({
+        room_id: item.room_id,
+        booking_type: item.booking_type,
+        checkin: toDateStr(item.checkin),
+        checkout: toDateStr(item.checkout),
+        adults: item.adults,
+        child_ages: item.child_ages,
+        user_rooms: item.user_rooms,
+      })),
       coupon_code: wizard.value.couponCode.trim() || null,
     };
     const resp = await ordersApi.create(body, idempotencyKey.value);

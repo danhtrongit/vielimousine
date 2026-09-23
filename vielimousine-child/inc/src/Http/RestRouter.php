@@ -383,6 +383,11 @@ final class RestRouter
                 'permission_callback' => $write,
             ]);
         }
+        register_rest_route(VIE_API_NAMESPACE, '/booking-quotes/(?P<id>\\d+)/order-draft', [
+            'methods' => 'POST',
+            'callback' => [BookingQuoteController::class, 'orderDraft'],
+            'permission_callback' => AuthMiddleware::requireCap('vie_create_orders'),
+        ]);
         register_rest_route(VIE_API_NAMESPACE, '/public/booking-quotes/(?P<public_id>[a-f0-9]{32})', [
             'methods' => 'GET',
             'callback' => [PublicBookingQuoteController::class, 'show'],

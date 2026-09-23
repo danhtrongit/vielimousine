@@ -151,6 +151,7 @@ function schemaTestFixture(string $prefix = 'wp_'): wpdb
         'vie_drop_product_code_v1' => 'done',
         'vie_backfill_customer_booking_count_v1' => 'done',
         'vie_order_draft_columns_v1' => 'done',
+        'vie_booking_quote_customer_id_v1' => 'done',
     ];
     $GLOBALS['schema_test_updates'] = [];
     return $wpdb;

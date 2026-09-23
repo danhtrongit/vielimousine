@@ -5,7 +5,7 @@ namespace Vie\Schema;
 
 final class BookingQuoteSchema
 {
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.2.0';
 
     public static function install(\wpdb $wpdb): void
     {
@@ -17,6 +17,7 @@ final class BookingQuoteSchema
             public_id CHAR(32) NOT NULL,
             code VARCHAR(32) NOT NULL,
             sales_user_id BIGINT UNSIGNED NOT NULL,
+            customer_id BIGINT UNSIGNED DEFAULT NULL,
             status VARCHAR(20) NOT NULL DEFAULT 'draft',
             customer_name VARCHAR(255) NOT NULL DEFAULT '',
             customer_phone VARCHAR(50) NOT NULL DEFAULT '',
@@ -52,6 +53,7 @@ final class BookingQuoteSchema
             UNIQUE KEY uniq_public_id (public_id),
             UNIQUE KEY uniq_code (code),
             KEY idx_sales_user_id (sales_user_id),
+            KEY idx_customer_id (customer_id),
             KEY idx_status (status),
             KEY idx_valid_until (valid_until),
             KEY idx_created_at (created_at)
