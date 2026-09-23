@@ -28,42 +28,100 @@ final class SchemaManager
         'vie_sepay_webhook_event' => SepayWebhookEventSchema::class,
     ];
 
+    /** A schema may create more than the table used as its version key. */
+    private const COMPANION_TABLES = [
+        'vie_booking_quote_payment' => ['vie_booking_quote_payment_receipt'],
+    ];
+
     public static function install(): void
     {
         if (self::$ran) {
             return;
         }
-        self::$ran = true;
-
         global $wpdb;
 
         /** @var array<string, string> $stored */
         $stored  = get_option('vie_schema_versions', []);
-        $changed = false;
+        $stored = is_array($stored) ? $stored : [];
+        $original = $stored;
+        $failed = false;
+
+        try {
+            // One inventory query per request also repairs databases restored
+            // with a version option but without all of their feature tables.
+            $tables = self::existingTables($wpdb);
+        } catch (\Throwable $e) {
+            error_log('[vie] Cannot inspect schema tables: ' . $e->getMessage());
+            return;
+        }
 
         foreach (self::SCHEMAS as $table => $class) {
             $version = $class::VERSION;
+            $required = array_merge([$table], self::COMPANION_TABLES[$table] ?? []);
 
-            if (($stored[$table] ?? '') === $version) {
+            if (($stored[$table] ?? '') === $version && self::hasTables($wpdb, $tables, $required)) {
                 continue;
             }
 
-            if (!$changed) {
-                require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-                $changed = true;
-            }
+            // A failed dbDelta must not print SQL into REST output or be
+            // permanently marked as installed. Keep diagnostics in the log.
+            $previousSuppression = $wpdb->suppress_errors(true);
+            try {
+                if (!function_exists('dbDelta')) {
+                    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+                }
 
-            $class::install($wpdb);
-            $stored[$table] = $version;
+                $class::install($wpdb);
+                $installError = (string) $wpdb->last_error;
+                $tables = self::existingTables($wpdb);
+                if ($installError !== '' || !self::hasTables($wpdb, $tables, $required)) {
+                    throw new \RuntimeException($installError !== '' ? $installError : 'Required table is still missing');
+                }
+                $stored[$table] = $version;
+            } catch (\Throwable $e) {
+                $failed = true;
+                unset($stored[$table]);
+                error_log('[vie] Schema installation failed for ' . $table . ': ' . $e->getMessage());
+            } finally {
+                $wpdb->suppress_errors($previousSuppression);
+            }
         }
 
-        if ($changed) {
+        if ($stored !== $original) {
             update_option('vie_schema_versions', $stored, false);
+        }
+
+        if ($failed) {
+            return;
         }
 
         self::dropProductCode();
         self::backfillCustomerBookingCount();
         self::migrateOrderDraftColumns();
+        self::$ran = true;
+    }
+
+    /** @return array<string,true> */
+    private static function existingTables(\wpdb $wpdb): array
+    {
+        $names = $wpdb->get_col($wpdb->prepare(
+            'SHOW TABLES LIKE %s',
+            $wpdb->esc_like($wpdb->prefix . 'vie_') . '%',
+        ));
+        if (!is_array($names) || (string) $wpdb->last_error !== '') {
+            throw new \RuntimeException('Could not read schema table inventory');
+        }
+        return array_fill_keys($names, true);
+    }
+
+    private static function hasTables(\wpdb $wpdb, array $tables, array $required): bool
+    {
+        foreach ($required as $table) {
+            if (!isset($tables[$wpdb->prefix . $table])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
