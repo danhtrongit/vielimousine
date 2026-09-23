@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
@@ -47,10 +47,11 @@ const emailConfig = reactive<EmailConfig>({
 });
 const templateKeys = ref<string[]>([]);
 
-const sepayConfig = reactive<SepayConfig & { secret_key: string }>({
+const sepayConfig = reactive<SepayConfig & { webhook_secret: string }>({
   enabled: false,
   merchant_id: '',
-  secret_key: '',
+  webhook_secret: '',
+  webhook_secret_set: false,
   secret_key_set: false,
   environment: 'sandbox',
   auto_confirm_on_paid: true,
@@ -64,6 +65,7 @@ const invoiceConfig = reactive<InvoiceConfig>({
   company_phone: '',
   company_email: '',
   bank_name: '',
+  bank_code: '',
   bank_account: '',
   bank_holder: '',
   logo_url: '',
@@ -99,6 +101,12 @@ const environmentOptions = [
   { label: 'Production',     value: 'production' },
 ];
 
+const webhookUrl = computed(() => sepayConfig.webhook_url || (
+  general.value?.site_url
+    ? `${general.value.site_url.replace(/\/$/, '')}/wp-json/vie/v1/payments/sepay/webhook`
+    : ''
+));
+
 onMounted(async () => {
   ui.setBreadcrumb([{ label: 'Cài đặt' }]);
   await loadAll();
@@ -120,8 +128,10 @@ async function loadAll() {
 
     sepayConfig.enabled              = s.data.enabled;
     sepayConfig.merchant_id          = s.data.merchant_id;
+    sepayConfig.webhook_secret_set   = s.data.webhook_secret_set ?? false;
+    sepayConfig.webhook_url          = s.data.webhook_url;
     sepayConfig.secret_key_set       = s.data.secret_key_set;
-    sepayConfig.secret_key           = '';
+    sepayConfig.webhook_secret       = '';
     sepayConfig.environment          = s.data.environment;
     sepayConfig.auto_confirm_on_paid = s.data.auto_confirm_on_paid;
 
@@ -162,14 +172,16 @@ async function saveSepay() {
       environment: sepayConfig.environment,
       auto_confirm_on_paid: sepayConfig.auto_confirm_on_paid,
     };
-    if (sepayConfig.secret_key && sepayConfig.secret_key.trim() !== '') {
-      body.secret_key = sepayConfig.secret_key;
+    if (sepayConfig.webhook_secret && sepayConfig.webhook_secret.trim() !== '') {
+      body.webhook_secret = sepayConfig.webhook_secret.trim();
     }
     const resp = await settingsApi.updateSepay(body);
     sepayConfig.enabled              = resp.data.enabled;
     sepayConfig.merchant_id          = resp.data.merchant_id;
+    sepayConfig.webhook_secret_set   = resp.data.webhook_secret_set ?? sepayConfig.webhook_secret_set;
+    sepayConfig.webhook_url          = resp.data.webhook_url;
     sepayConfig.secret_key_set       = resp.data.secret_key_set;
-    sepayConfig.secret_key           = '';
+    sepayConfig.webhook_secret       = '';
     sepayConfig.environment          = resp.data.environment;
     sepayConfig.auto_confirm_on_paid = resp.data.auto_confirm_on_paid;
     notify.success('Đã lưu cài đặt SePay');
@@ -190,6 +202,7 @@ async function saveInvoice() {
       company_phone: invoiceConfig.company_phone,
       company_email: invoiceConfig.company_email,
       bank_name: invoiceConfig.bank_name,
+      bank_code: invoiceConfig.bank_code,
       bank_account: invoiceConfig.bank_account,
       bank_holder: invoiceConfig.bank_holder,
       logo_url: invoiceConfig.logo_url,
@@ -218,6 +231,16 @@ async function runHotelSync() {
     notify.apiError(e);
   } finally {
     syncingHotels.value = false;
+  }
+}
+
+async function copyWebhookUrl() {
+  if (!webhookUrl.value) return;
+  try {
+    await navigator.clipboard.writeText(webhookUrl.value);
+    notify.success('Đã sao chép URL Webhook');
+  } catch {
+    notify.error('Không thể sao chép URL Webhook');
   }
 }
 </script>
@@ -306,9 +329,10 @@ async function runHotelSync() {
 
         <div class="section">
           <h3>Tài khoản ngân hàng</h3>
-          <p class="muted">Dùng cho mẫu Hoá đơn bán hàng (VAT) — phần "Thông tin chuyển khoản".</p>
+          <p class="muted">Dùng trên hoá đơn và để tạo QR chuyển khoản cho đơn hàng, báo giá và thanh toán SePay.</p>
           <div class="grid-2">
             <div class="field"><label>Tên ngân hàng</label><InputText v-model="invoiceConfig.bank_name" /></div>
+            <div class="field"><label>Mã ngân hàng VietQR (ví dụ: VCB, MB, ACB)</label><InputText v-model="invoiceConfig.bank_code" /></div>
             <div class="field"><label>Số tài khoản</label><InputText v-model="invoiceConfig.bank_account" /></div>
             <div class="field grid-full"><label>Chủ tài khoản</label><InputText v-model="invoiceConfig.bank_holder" /></div>
           </div>
@@ -358,31 +382,54 @@ async function runHotelSync() {
       </TabPanel>
 
       <TabPanel value="sepay">
-        <div class="grid-2">
-          <div class="field">
-            <label>Bật cổng SePay</label>
-            <ToggleSwitch v-model="sepayConfig.enabled" />
-          </div>
-          <div class="field">
-            <label>Auto-confirm khi đã thanh toán đủ</label>
-            <ToggleSwitch v-model="sepayConfig.auto_confirm_on_paid" />
-          </div>
-          <div class="field">
-            <label>Môi trường</label>
-            <Select v-model="sepayConfig.environment" :options="environmentOptions" option-label="label" option-value="value" />
-          </div>
-          <div class="field">
-            <label>Merchant ID</label>
-            <InputText v-model="sepayConfig.merchant_id" />
-          </div>
+        <div class="section">
+          <h3>Webhook chuyển khoản</h3>
+          <p class="muted">Khách chuyển khoản bằng QR. SePay gửi giao dịch vào địa chỉ dưới đây; chỉ webhook có chữ ký hợp lệ mới xác nhận thanh toán.</p>
           <div class="field grid-full">
-            <label>Secret Key {{ sepayConfig.secret_key_set ? '(đã lưu — bỏ trống nếu không đổi)' : '(chưa thiết lập)' }}</label>
-            <Password v-model="sepayConfig.secret_key" toggle-mask :feedback="false" />
+            <label>URL Webhook để cấu hình trong SePay</label>
+            <div class="copy-row">
+              <InputText :model-value="webhookUrl" readonly />
+              <Button label="Sao chép" icon="pi pi-copy" severity="secondary" :disabled="!webhookUrl" @click="copyWebhookUrl" />
+            </div>
+          </div>
+          <div class="grid-2 webhook-fields">
+            <div class="field">
+              <label>Bật nhận thanh toán qua SePay</label>
+              <ToggleSwitch v-model="sepayConfig.enabled" />
+            </div>
+            <div class="field">
+              <label>Môi trường</label>
+              <Select v-model="sepayConfig.environment" :options="environmentOptions" option-label="label" option-value="value" />
+            </div>
+            <div class="field grid-full">
+              <label>Webhook HMAC Secret {{ sepayConfig.webhook_secret_set ? '(đã lưu — để trống nếu không đổi)' : '(chưa thiết lập)' }}</label>
+              <Password v-model="sepayConfig.webhook_secret" toggle-mask :feedback="false" autocomplete="new-password" />
+              <small class="muted">Nhập cùng secret trong cấu hình Webhook SePay. Secret đã lưu không được trả lại từ máy chủ.</small>
+            </div>
+            <div class="field">
+              <label>Tự xác nhận đơn khi đã thanh toán đủ</label>
+              <ToggleSwitch v-model="sepayConfig.auto_confirm_on_paid" />
+            </div>
+          </div>
+        </div>
+
+        <div class="deprecated-box">
+          <strong>Cấu hình Hosted Checkout cũ (deprecated)</strong>
+          <p>Merchant ID và secret Hosted Checkout vẫn được giữ để tương thích dữ liệu cũ. Luồng thanh toán hiện dùng QR chuyển khoản và Webhook HMAC phía trên.</p>
+          <div class="grid-2 legacy-fields">
+            <div class="field">
+              <label>Merchant ID cũ</label>
+              <InputText v-model="sepayConfig.merchant_id" disabled />
+            </div>
+            <div class="field legacy-secret-status">
+              <label>Secret Hosted Checkout</label>
+              <span>{{ sepayConfig.secret_key_set ? 'Đã lưu (được giữ lại)' : 'Chưa thiết lập' }}</span>
+            </div>
           </div>
         </div>
 
         <div class="actions">
-          <Button label="Lưu cài đặt SePay" icon="pi pi-save" :loading="savingSepay" @click="saveSepay" />
+          <Button label="Lưu cấu hình Webhook" icon="pi pi-save" :loading="savingSepay" @click="saveSepay" />
         </div>
       </TabPanel>
       </TabPanels>
@@ -400,4 +447,12 @@ async function runHotelSync() {
 .grid-full { grid-column: 1 / -1; }
 .muted { color: var(--p-text-muted-color); font-size: 0.85rem; margin: 0 0 0.75rem; }
 .actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--p-surface-200); }
+.copy-row { display: flex; gap: 0.5rem; }
+.copy-row :deep(input) { width: 100%; }
+.webhook-fields { margin-top: 1rem; }
+.deprecated-box { border: 1px solid var(--p-surface-300); border-radius: 0.5rem; padding: 0.875rem 1rem; color: var(--p-text-muted-color); font-size: 0.85rem; }
+.deprecated-box p { margin: 0.35rem 0; }
+.legacy-fields { margin-top: 0.75rem; }
+.legacy-secret-status { justify-content: center; }
+@media (max-width: 640px) { .general-grid, .grid-2 { grid-template-columns: 1fr; } .grid-full { grid-column: auto; } .copy-row { align-items: stretch; flex-direction: column; } }
 </style>

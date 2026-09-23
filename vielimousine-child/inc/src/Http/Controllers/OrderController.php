@@ -11,7 +11,6 @@ use Vie\Service\Order\OrderNotFoundException;
 use Vie\Service\Order\OrderService;
 use Vie\Service\Order\RequiresQuoteException;
 use Vie\Service\Order\StockUnavailableException;
-use Vie\Service\Payment\SepayCheckout;
 use Vie\Support\CostVisibility;
 use Vie\Support\ResponseEnvelope;
 use Vie\Support\Validator;
@@ -106,17 +105,14 @@ final class OrderController
         $ua      = $_SERVER['HTTP_USER_AGENT'] ?? null;
 
         try {
-            $req      = OrderRequest::fromArray($v->validated(), $idemKey, $ip, $ua);
+            $validated = $v->validated();
+            // Every new payment is settled by a bank transfer and confirmed
+            // by the SePay Webhook. Accept legacy values at the request edge,
+            // but persist one canonical method for admin and public orders.
+            $validated['payment_method'] = 'bank_transfer';
+            $req      = OrderRequest::fromArray($validated, $idemKey, $ip, $ua);
             $orderSvc = Container::get(OrderService::class);
             $detail   = $orderSvc->create($req);
-
-            // Build SePay checkout form (POST) nếu enabled
-            try {
-                $checkout = Container::get(SepayCheckout::class);
-                $detail['checkout'] = $checkout->buildCheckoutForm((int) $detail['id']);
-            } catch (\Throwable $e) {
-                $detail['checkout'] = null;
-            }
 
             return ResponseEnvelope::success(CostVisibility::stripOrder($detail), [], 201);
         } catch (StockUnavailableException $e) {

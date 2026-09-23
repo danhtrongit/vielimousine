@@ -323,27 +323,34 @@
       return;
     }
 
+    let hasLoadedOrder = false;
     async function fetchOnce() {
       try {
         const data = await Vie.api.get('orders/lookup', { code, phone });
         wrap.innerHTML = renderSuccessSummary(data, code, phone);
+        hasLoadedOrder = true;
         return data;
       } catch (e) {
-        wrap.innerHTML = '<p class="vie-public__error-inline">' + (e.errors?.[0]?.message || 'Không tìm thấy đơn') + '</p>';
+        // Keep a rendered order visible during transient polling/network failures.
+        if (!hasLoadedOrder) {
+          wrap.innerHTML = '<p class="vie-public__error-inline">' + (e.errors?.[0]?.message || 'Không tìm thấy đơn') + '</p>';
+        }
         return null;
       }
     }
 
     let order = await fetchOnce();
     // Poll while pending (max 2 minutes, every 8s) so SePay webhook updates appear quickly.
-    if (order && (order.payment_status === 'pending' || order.status === 'pending')) {
+    const shouldPoll = (o) => o && !['cancelled', 'no_show', 'draft'].includes(String(o.status || ''))
+      && (o.payment_status === 'pending' || o.payment_status === 'partial' || o.status === 'pending');
+    if (shouldPoll(order)) {
       let pollCount = 0;
       const maxPolls = 15;
       const timer = setInterval(async () => {
         pollCount++;
         const next = await fetchOnce();
         if (!next || pollCount >= maxPolls) { clearInterval(timer); return; }
-        if (next.payment_status !== 'pending' && next.status !== 'pending') {
+        if (!shouldPoll(next)) {
           clearInterval(timer);
         }
       }, 8000);
@@ -356,6 +363,17 @@
       if (t.matches('[data-vie-refresh]')) {
         t.disabled = true; t.textContent = 'Đang tải…';
         await fetchOnce();
+      }
+      if (t.matches('[data-vie-copy]')) {
+        const value = t.getAttribute('data-vie-copy') || '';
+        if (value && navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(value);
+            const original = t.textContent;
+            t.textContent = 'Đã sao chép';
+            setTimeout(() => { t.textContent = original; }, 1500);
+          } catch (err) { /* clipboard permission is optional */ }
+        }
       }
     });
   }
@@ -379,8 +397,9 @@
     }[paymentStatus] || paymentStatus;
 
     const isPaid = paymentStatus === 'paid';
-    const isPending = paymentStatus === 'pending';
+    const isPending = paymentStatus === 'pending' || paymentStatus === 'partial';
     const isCancelled = status === 'cancelled';
+    const paymentBlocked = isCancelled || status === 'no_show' || status === 'draft';
 
     const items = (order.items || []).map((it) => `
       <li class="vie-public__order-item">
@@ -400,13 +419,26 @@
       ? '<div class="vh-success-banner vh-success-banner-warn">⏳ Đang chờ thanh toán. Trang này sẽ tự cập nhật.</div>'
       : '<div class="vh-success-banner vh-success-banner-ok">✓ Đặt phòng thành công!</div>';
 
-    const refreshLink = isPending
+    const refreshLink = isPending && !paymentBlocked
       ? `<button type="button" class="vh-btn" data-vie-refresh>Kiểm tra trạng thái</button>`
       : '';
 
-    const paid = order.paid_amount || 0;
+    const paid = Number(order.paid_amount || 0);
     const total = order.total || 0;
     const remaining = Math.max(0, total - paid);
+    const bank = order.bank_transfer || null;
+    const bankAmount = Number(bank?.amount || remaining);
+    const transferHtml = bank && remaining > 0 && !paymentBlocked ? `
+      <div class="vh-success-extra vh-bank-box" aria-live="polite">
+        <div><strong>Chuyển khoản ngân hàng</strong> <span class="vie-public__muted">— hệ thống sẽ tự cập nhật sau khi nhận được giao dịch</span></div>
+        ${bank.qr_url ? `<div class="vh-bank-qr"><img src="${escapeHtml(bank.qr_url)}" alt="Mã QR chuyển khoản" loading="lazy"></div>` : ''}
+        ${bank.bank_name ? `<div><span class="vie-public__muted">Ngân hàng:</span> <strong>${escapeHtml(bank.bank_name)}</strong></div>` : ''}
+        ${bank.bank_code ? `<div><span class="vie-public__muted">Mã ngân hàng:</span> <strong>${escapeHtml(bank.bank_code)}</strong></div>` : ''}
+        <div><span class="vie-public__muted">Số tài khoản:</span> <strong>${escapeHtml(bank.bank_account || '')}</strong> <button type="button" class="vh-copy-btn" data-vie-copy="${escapeHtml(bank.bank_account || '')}">Sao chép</button></div>
+        ${bank.bank_holder ? `<div><span class="vie-public__muted">Chủ tài khoản:</span> <strong>${escapeHtml(bank.bank_holder)}</strong></div>` : ''}
+        <div><span class="vie-public__muted">Số tiền:</span> <strong>${Vie.format.vnd(bankAmount)}</strong> <button type="button" class="vh-copy-btn" data-vie-copy="${bankAmount}">Sao chép</button></div>
+        <div><span class="vie-public__muted">Nội dung CK:</span> <strong>${escapeHtml(bank.memo || code)}</strong> <button type="button" class="vh-copy-btn" data-vie-copy="${escapeHtml(bank.memo || code)}">Sao chép</button></div>
+      </div>` : '';
 
     return `
       ${banner}
@@ -429,6 +461,8 @@
           <div><span>Đã thanh toán</span><strong>${Vie.format.vnd(paid)}</strong></div>
           ${remaining > 0 ? `<div class="vh-line-warn"><span>Còn lại</span><strong>${Vie.format.vnd(remaining)}</strong></div>` : ''}
         </div>
+
+        ${transferHtml}
 
         <p class="vie-public__muted">Email xác nhận đã được gửi đến ${order.customer_email ? '<strong>' + escapeHtml(order.customer_email) + '</strong>' : 'số điện thoại của bạn'}. Vui lòng kiểm tra hộp thư (cả Spam).</p>
 
@@ -808,7 +842,7 @@
         },
         items: [Object.assign({ room_id: selectedRoomId }, common)],
         customer_note: String(fd.get('customer_note') || '').trim() || null,
-        payment_method: String(fd.get('payment_method') || 'sepay'),
+        payment_method: 'bank_transfer',
       };
       if (appliedCoupon) body.coupon_code = appliedCoupon;
 
@@ -817,9 +851,9 @@
       submitBtn.textContent = 'Đang xử lý…';
       try {
         const data = await Vie.api.post('public/orders', body, { idempotencyKey: idemKey });
-        if (data.redirect_url) {
-          window.location.href = data.redirect_url;
-        } else {
+        // Direct bank transfer: always open the order lookup page, where the
+        // server-provided QR/account instructions are displayed and polled.
+        {
           // Kèm slug khách sạn để trang thành công giữ danh tính sản phẩm cho tracking.
           // KHÔNG dùng tên `hotel`: WP coi `?hotel=<slug>` là query var của CPT hotel
           // → redirect_canonical 301 sang trang khách sạn.

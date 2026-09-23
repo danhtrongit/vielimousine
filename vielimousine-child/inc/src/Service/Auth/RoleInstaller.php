@@ -50,6 +50,9 @@ final class RoleInstaller
         'vie_print_order',
         'vie_manage_settings',
         'vie_manage_media',
+        'vie_create_booking_quotes',
+        'vie_view_own_booking_quotes',
+        'vie_view_all_booking_quotes',
     ];
 
     public static function install(): void
@@ -83,6 +86,8 @@ final class RoleInstaller
             'vie_cancel_orders'   => true,
             'vie_use_price_check' => true,
             'vie_print_order'     => true,
+            'vie_create_booking_quotes'   => true,
+            'vie_view_own_booking_quotes' => true,
         ]);
 
         foreach ([self::ROLE_HOTEL_MANAGER, self::ROLE_SALES] as $slug) {

@@ -14,7 +14,7 @@ final class InvoiceSettings
      * @return array{
      *   company_name:string, company_tax_id:string, company_address:string,
      *   company_phone:string, company_email:string,
-     *   bank_name:string, bank_account:string, bank_holder:string,
+     *   bank_name:string, bank_code:string, bank_account:string, bank_holder:string,
      *   logo_url:string,
      *   invoice_prefix:string, invoice_format:string,
      *   next_seq:int, reset_yearly:bool, last_seq_year:?int,
@@ -45,6 +45,7 @@ final class InvoiceSettings
             'company_phone'   => '',
             'company_email'   => (string) get_option('admin_email', ''),
             'bank_name'       => '',
+            'bank_code'       => '',
             'bank_account'    => '',
             'bank_holder'     => '',
             'logo_url'        => '',
@@ -58,7 +59,7 @@ final class InvoiceSettings
         ];
     }
 
-    public function update(array $values): array
+    public function update(array $values): array|\WP_Error
     {
         $current   = $this->all();
         $sanitized = $current;
@@ -66,13 +67,25 @@ final class InvoiceSettings
         $textFields = [
             'company_name', 'company_tax_id', 'company_address',
             'company_phone', 'company_email',
-            'bank_name', 'bank_account', 'bank_holder',
+            'bank_name', 'bank_code', 'bank_account', 'bank_holder',
             'invoice_prefix', 'invoice_format', 'footer_note',
         ];
         foreach ($textFields as $key) {
             if (array_key_exists($key, $values)) {
                 $sanitized[$key] = sanitize_text_field((string) $values[$key]);
             }
+        }
+        if (array_key_exists('bank_code', $values)) {
+            $sanitized['bank_code'] = strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $values['bank_code']) ?? '');
+        }
+        if (array_key_exists('bank_account', $values)) {
+            $sanitized['bank_account'] = preg_replace('/\s+/', '', (string) $sanitized['bank_account']) ?? '';
+            if ($sanitized['bank_account'] !== '' && !preg_match('/^[0-9]{6,20}$/', $sanitized['bank_account'])) {
+                return new \WP_Error('invalid_bank_account', 'Số tài khoản phải gồm 6–20 chữ số.');
+            }
+        }
+        if ($sanitized['bank_code'] !== '' && !preg_match('/^[A-Z0-9]{2,20}$/', $sanitized['bank_code'])) {
+            return new \WP_Error('invalid_bank_code', 'Mã ngân hàng không hợp lệ.');
         }
         if (array_key_exists('company_email', $values)) {
             $email = sanitize_email((string) $values['company_email']);

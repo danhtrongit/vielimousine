@@ -41,7 +41,7 @@ final class PublicAssets
 
     public static function enqueue(): void
     {
-        if (is_admin()) {
+        if (is_admin() || get_query_var('vie_booking_quote') !== '') {
             return;
         }
 
@@ -147,6 +147,40 @@ final class PublicAssets
         }
         // Replace `<script src=...>` with type=module
         return '<script type="module" src="' . esc_url($src) . '" id="' . esc_attr($handle) . '-js"></script>' . "\n";
+    }
+
+    /**
+     * Private-link pages render only their manifest assets, without wp_head /
+     * wp_footer hooks that may send the bearer URL to third-party analytics.
+     *
+     * @return array{entry:string,css:array<string>,imports:array<string>}|null
+     */
+    public static function standaloneEntry(string $entry): ?array
+    {
+        $manifest = self::loadManifest();
+        $chunk = $manifest[$entry] ?? null;
+        if (!is_array($chunk) || !is_string($chunk['file'] ?? null)) {
+            return null;
+        }
+
+        $seen = $css = $imports = [];
+        self::walkChunk($entry, $manifest, $seen, $css, $imports);
+        $files = array_merge([$chunk['file']], $css, $imports);
+        foreach ($files as $file) {
+            // The build manifest is local, but do not emit unexpected paths.
+            if (!is_string($file) || !preg_match('~^assets/[a-zA-Z0-9_./-]+$~D', $file)
+                || str_contains($file, '..') || !is_file(VIE_CHILD_PATH . '/public-app/dist/' . $file)) {
+                return null;
+            }
+        }
+
+        self::$vueEntry = $entry;
+        $base = VIE_CHILD_URL . '/public-app/dist/';
+        return [
+            'entry' => $base . $chunk['file'],
+            'css' => array_values(array_map(static fn(string $file): string => $base . $file, array_unique($css))),
+            'imports' => array_values(array_map(static fn(string $file): string => $base . $file, array_unique($imports))),
+        ];
     }
 
     /**

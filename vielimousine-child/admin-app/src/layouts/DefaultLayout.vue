@@ -30,6 +30,8 @@ const navItems = computed<NavItem[]>(() => [
   { label: 'Tổng quan', icon: 'pi pi-home', to: '/dashboard', show: true, group: 'main' },
   { label: 'Đơn hàng', icon: 'pi pi-shopping-cart', to: '/orders',
     show: auth.canAny(['vie_view_own_orders', 'vie_view_all_orders']), group: 'main' },
+  { label: 'Báo giá', icon: 'pi pi-file-edit', to: '/booking-quotes',
+    show: auth.canAny(['vie_view_own_booking_quotes', 'vie_view_all_booking_quotes']), group: 'main' },
   { label: 'Khách hàng', icon: 'pi pi-users', to: '/customers',
     show: auth.can('vie_manage_customers'), group: 'main' },
   { label: 'Khách sạn', icon: 'pi pi-building', to: '/hotels',

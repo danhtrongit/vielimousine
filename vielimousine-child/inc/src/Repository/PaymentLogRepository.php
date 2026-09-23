@@ -19,7 +19,7 @@ final class PaymentLogRepository extends AbstractRepository
     protected function fillable(): array
     {
         // SYSTEM-MANAGED FIELDS:
-        //   - 'raw_payload' → chỉ SepayWebhook ghi (toàn bộ IPN payload).
+        //   - 'raw_payload' → chỉ SepayWebhook ghi (toàn bộ Webhook payload).
         //                     PaymentEntryValidation KHÔNG list raw_payload → manual entries
         //                     từ admin sẽ bị Validator strip → không thể giả mạo gateway data.
         // 'gateway' + 'transaction_id' admin CÓ THỂ set (vd: ghi manual deposit kèm mã GD ngân hàng);
@@ -28,7 +28,7 @@ final class PaymentLogRepository extends AbstractRepository
         return [
             'order_id', 'type', 'amount', 'method',
             'gateway', 'transaction_id', 'note',
-            'paid_at', 'created_by', 'raw_payload',
+            'paid_at', 'created_by', 'raw_payload', 'webhook_event_id',
         ];
     }
 
@@ -40,6 +40,7 @@ final class PaymentLogRepository extends AbstractRepository
             'amount'      => 'float',
             'created_by'  => 'int',
             'raw_payload' => 'json',
+            'webhook_event_id' => 'int',
         ];
     }
 

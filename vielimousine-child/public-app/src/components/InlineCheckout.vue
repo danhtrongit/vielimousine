@@ -3,7 +3,6 @@ import { ref, computed, reactive, watch } from 'vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
-import RadioButton from 'primevue/radiobutton';
 import Select from 'primevue/select';
 import SelectButton from 'primevue/selectbutton';
 import Checkbox from 'primevue/checkbox';
@@ -17,7 +16,6 @@ import type {
 } from '@/api/types';
 import { search, selection, hotel, getQuote, clearSelectionBack, appliedCoupon, resetCoupon, DROPOFF_OPTIONS, setSelection, type BookingType } from '@/composables/useBookingState';
 import { fetchQuoteForRoom } from '@/composables/useQuotes';
-import { submitCheckoutForm } from '@/composables/useCheckout';
 import { afterTrackingFlush, fbTrack } from '@/composables/useFbPixel';
 import { pushBookingComboSuccess } from '@/composables/useDataLayer';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
@@ -36,7 +34,7 @@ const form = reactive({
   email: '',
   customer_note: '',
   coupon_code: '',
-  payment_method: 'sepay' as 'sepay' | 'bank_transfer',
+  payment_method: 'bank_transfer' as 'bank_transfer',
   pickupAddress: '',
   dropoffAddress: '',
   vat: { company_name: '', tax_code: '', address: '', email: '' },
@@ -155,7 +153,9 @@ async function submitOrder(ev: Event) {
       user_rooms: search.userRooms,
     }],
     customer_note: form.customer_note.trim() || null,
-    payment_method: form.payment_method,
+    // Direct bank transfer is the only supported payment flow. Keep the request
+    // field for compatibility with older API clients and normalize the value.
+    payment_method: 'bank_transfer',
   };
   if (appliedCoupon.code) body.coupon_code = appliedCoupon.code;
   if (isCombo.value) {
@@ -183,11 +183,9 @@ async function submitOrder(ev: Event) {
       value: Number(data.total || 0),
     });
 
-    if (data.checkout) {
-      // Đẩy khách sang trang thanh toán SePay bằng POST form.
-      submitCheckoutForm(data.checkout, pushed);
-      return;
-    }
+    // Direct bank transfer: the success page renders the server-provided
+    // account/QR instructions and polls payment_status for the webhook result.
+    // Payment details are fetched from the order lookup as bank-transfer instructions.
     // Chuyển khoản / đơn 0đ → về trang xem đơn (chờ beacon kịp gửi nếu vừa bắn event).
     // Kèm slug khách sạn để trang thành công giữ được danh tính sản phẩm cho tracking.
     // KHÔNG dùng tên `hotel`: WP coi `?hotel=<slug>` là query var của CPT hotel →
@@ -410,20 +408,13 @@ async function submitInquiry() {
 
         <fieldset v-if="!isQuoteMode" class="vh-fieldset">
           <legend><i class="pi pi-credit-card" /> Phương thức thanh toán</legend>
-          <label class="vh-pay-option" :class="{ 'vh-pay-picked': form.payment_method === 'sepay' }">
-            <RadioButton v-model="form.payment_method" value="sepay" input-id="pm-sepay" />
+          <div class="vh-pay-option vh-pay-picked" role="status">
+            <i class="pi pi-qrcode" aria-hidden="true" />
             <span>
-              <strong>SePay</strong>
-              <small>Thanh toán qua QR code / thẻ ngân hàng</small>
+              <strong>Chuyển khoản ngân hàng qua QR</strong>
+              <small>Thông tin tài khoản và mã QR sẽ hiển thị ngay sau khi đặt phòng.</small>
             </span>
-          </label>
-          <label class="vh-pay-option" :class="{ 'vh-pay-picked': form.payment_method === 'bank_transfer' }">
-            <RadioButton v-model="form.payment_method" value="bank_transfer" input-id="pm-bank" />
-            <span>
-              <strong>Chuyển khoản ngân hàng</strong>
-              <small>Nhận thông tin sau khi đặt</small>
-            </span>
-          </label>
+          </div>
         </fieldset>
 
         <div v-if="errorMsg" class="vh-error">

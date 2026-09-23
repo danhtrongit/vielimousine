@@ -216,6 +216,11 @@ final class InvoiceController
         }
         $s = Container::get(InvoiceSettings::class);
         $updated = $s->update($data);
+        if (is_wp_error($updated)) {
+            return ResponseEnvelope::error([
+                ['code' => $updated->get_error_code(), 'field' => str_contains($updated->get_error_code(), 'bank_code') ? 'bank_code' : 'bank_account', 'message' => $updated->get_error_message()],
+            ], 422);
+        }
         return ResponseEnvelope::success([
             'config' => $updated,
         ]);

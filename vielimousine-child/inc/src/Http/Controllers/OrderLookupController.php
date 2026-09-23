@@ -10,7 +10,7 @@ use Vie\Repository\HotelRepository;
 use Vie\Repository\OrderItemRepository;
 use Vie\Repository\OrderRepository;
 use Vie\Repository\RoomRepository;
-use Vie\Service\Settings\InvoiceSettings;
+use Vie\Service\Payment\BankTransferInstructions;
 use Vie\Support\ResponseEnvelope;
 
 final class OrderLookupController
@@ -84,17 +84,15 @@ final class OrderLookupController
             ];
         }
 
-        // Đơn còn nợ → kèm thông tin chuyển khoản (khách chọn CK sẽ tự chuyển theo mã đơn).
+        // Keep the transfer memo tied to the stable order code so the webhook can match it.
         $bankTransfer = null;
-        if ((int) $order['total'] - (int) $order['paid_amount'] > 0) {
-            $inv = Container::get(InvoiceSettings::class)->all();
-            if ($inv['bank_account'] !== '') {
-                $bankTransfer = [
-                    'bank_name'    => $inv['bank_name'],
-                    'bank_account' => $inv['bank_account'],
-                    'bank_holder'  => $inv['bank_holder'],
-                    'memo'         => (string) $order['code'],
-                ];
+        $remaining = max(0, (int) $order['total'] - (int) $order['paid_amount']);
+        if ($remaining > 0) {
+            try {
+                $bankTransfer = Container::get(BankTransferInstructions::class)
+                    ->build($remaining, (string) $order['code']);
+            } catch (\Throwable) {
+                // The lookup itself remains available while bank settings are incomplete.
             }
         }
 
@@ -112,6 +110,7 @@ final class OrderLookupController
             'discount'       => $order['discount'],
             'total'          => $order['total'],
             'paid_amount'    => $order['paid_amount'],
+            'amount_due'     => $remaining,
             'currency'       => $order['currency'],
             'customer_name'  => $order['customer_name'],
             'customer_phone' => $order['customer_phone'],

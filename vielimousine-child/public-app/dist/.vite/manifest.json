@@ -1,9 +1,24 @@
 {
-  "_main-IygBKNLy.js": {
-    "file": "assets/main-IygBKNLy.js",
+  "_main-BazxnxBa.css": {
+    "file": "assets/main-BazxnxBa.css",
+    "src": "_main-BazxnxBa.css"
+  },
+  "_main-ClKOUrzc.js": {
+    "file": "assets/main-ClKOUrzc.js",
     "name": "main",
     "css": [
-      "assets/main-zlPw0db9.css"
+      "assets/main-BazxnxBa.css"
+    ]
+  },
+  "_tokens-BAf49Fq4.css": {
+    "file": "assets/tokens-BAf49Fq4.css",
+    "src": "_tokens-BAf49Fq4.css"
+  },
+  "_tokens-C_ykwzRD.js": {
+    "file": "assets/tokens-C_ykwzRD.js",
+    "name": "tokens",
+    "css": [
+      "assets/tokens-BAf49Fq4.css"
     ],
     "assets": [
       "assets/primeicons-DMOk5skT.eot",
@@ -12,10 +27,6 @@
       "assets/primeicons-MpK4pl85.ttf",
       "assets/primeicons-Dr5RGzOO.svg"
     ]
-  },
-  "_main-zlPw0db9.css": {
-    "file": "assets/main-zlPw0db9.css",
-    "src": "_main-zlPw0db9.css"
   },
   "node_modules/primeicons/fonts/primeicons.eot": {
     "file": "assets/primeicons-DMOk5skT.eot",
@@ -37,25 +48,39 @@
     "file": "assets/primeicons-C6QP2o4f.woff2",
     "src": "node_modules/primeicons/fonts/primeicons.woff2"
   },
+  "src/entries/booking.ts": {
+    "file": "assets/booking-DKdVP_NV.js",
+    "name": "booking",
+    "src": "src/entries/booking.ts",
+    "isEntry": true,
+    "imports": [
+      "_tokens-C_ykwzRD.js"
+    ],
+    "css": [
+      "assets/booking-CujKoVx-.css"
+    ]
+  },
   "src/entries/hotel.ts": {
-    "file": "assets/hotel-Bv8dQDml.js",
+    "file": "assets/hotel-BCcCK3Vo.js",
     "name": "hotel",
     "src": "src/entries/hotel.ts",
     "isEntry": true,
     "imports": [
-      "_main-IygBKNLy.js"
+      "_tokens-C_ykwzRD.js",
+      "_main-ClKOUrzc.js"
     ],
     "css": [
       "assets/hotel-BsOrsDaW.css"
     ]
   },
   "src/entries/success.ts": {
-    "file": "assets/success-CwWl-c5N.js",
+    "file": "assets/success-CXFZRQM2.js",
     "name": "success",
     "src": "src/entries/success.ts",
     "isEntry": true,
     "imports": [
-      "_main-IygBKNLy.js"
+      "_tokens-C_ykwzRD.js",
+      "_main-ClKOUrzc.js"
     ]
   }
 }

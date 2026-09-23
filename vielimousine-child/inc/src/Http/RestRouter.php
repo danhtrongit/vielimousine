@@ -6,6 +6,8 @@ namespace Vie\Http;
 use Vie\Http\Controllers\ActivityLogController;
 use Vie\Http\Controllers\AuthController;
 use Vie\Http\Controllers\BackupController;
+use Vie\Http\Controllers\BookingQuoteController;
+use Vie\Http\Controllers\PublicBookingQuoteController;
 use Vie\Http\Controllers\CouponActionController;
 use Vie\Http\Controllers\CouponBulkController;
 use Vie\Http\Controllers\CouponController;
@@ -46,6 +48,7 @@ final class RestRouter
     public static function register(): void
     {
         self::registerNoCacheControl();
+        self::registerBookingQuotes();
 
         // Public routes — no auth required
         register_rest_route(VIE_API_NAMESPACE, '/health', [
@@ -352,6 +355,43 @@ final class RestRouter
             ['methods' => 'GET',        'callback' => [MediaController::class, 'show'],    'permission_callback' => $manageMedia],
             ['methods' => 'PUT,PATCH',  'callback' => [MediaController::class, 'update'],  'permission_callback' => $manageMedia],
             ['methods' => 'DELETE',     'callback' => [MediaController::class, 'destroy'], 'permission_callback' => $manageMedia],
+        ]);
+    }
+
+    /** Quote APIs have their own permissions and never expose a public list. */
+    private static function registerBookingQuotes(): void
+    {
+        $read = static function (\WP_REST_Request $request): bool {
+            \Vie\Container::get(AuthMiddleware::class)->authenticate($request);
+            return current_user_can('vie_view_own_booking_quotes')
+                || current_user_can('vie_view_all_booking_quotes');
+        };
+        $write = AuthMiddleware::requireCap('vie_create_booking_quotes');
+
+        register_rest_route(VIE_API_NAMESPACE, '/booking-quotes', [
+            ['methods' => 'GET', 'callback' => [BookingQuoteController::class, 'index'], 'permission_callback' => $read],
+            ['methods' => 'POST', 'callback' => [BookingQuoteController::class, 'store'], 'permission_callback' => $write],
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/booking-quotes/(?P<id>\\d+)', [
+            ['methods' => 'GET', 'callback' => [BookingQuoteController::class, 'show'], 'permission_callback' => $read],
+            ['methods' => 'PUT,PATCH', 'callback' => [BookingQuoteController::class, 'update'], 'permission_callback' => $write],
+        ]);
+        foreach (['publish', 'revoke', 'duplicate'] as $action) {
+            register_rest_route(VIE_API_NAMESPACE, '/booking-quotes/(?P<id>\\d+)/' . $action, [
+                'methods' => 'POST',
+                'callback' => [BookingQuoteController::class, $action],
+                'permission_callback' => $write,
+            ]);
+        }
+        register_rest_route(VIE_API_NAMESPACE, '/public/booking-quotes/(?P<public_id>[a-f0-9]{32})', [
+            'methods' => 'GET',
+            'callback' => [PublicBookingQuoteController::class, 'show'],
+            'permission_callback' => '__return_true',
+        ]);
+        register_rest_route(VIE_API_NAMESPACE, '/public/booking-quotes/(?P<public_id>[a-f0-9]{32})/checkout', [
+            'methods' => 'POST',
+            'callback' => [PublicBookingQuoteController::class, 'checkout'],
+            'permission_callback' => '__return_true',
         ]);
     }
 

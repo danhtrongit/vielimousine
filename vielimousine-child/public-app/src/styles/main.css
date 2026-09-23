@@ -1262,6 +1262,32 @@
   gap: 0.3rem;
   font-size: 0.95rem;
 }
+.vh-bank-box { background: var(--app-muted-bg); }
+.vh-bank-qr {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0;
+}
+.vh-bank-qr img {
+  display: block;
+  width: min(100%, 240px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  padding: 0.55rem;
+  background: #fff;
+  border: 1px solid var(--app-card-border);
+  border-radius: var(--radius-lg);
+}
+.vh-bank-copy-row { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.vh-copy-btn {
+  border: 1px solid var(--app-card-border);
+  border-radius: var(--radius-sm);
+  background: var(--app-card-bg);
+  color: var(--app-text-strong);
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
 .vh-success-actions {
   display: flex;
   flex-wrap: wrap;

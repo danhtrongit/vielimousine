@@ -1,19 +1,17 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
 import { api } from '@/api/client';
-import type { OrderLookup, CheckoutForm } from '@/api/types';
-import { submitCheckoutForm } from '@/composables/useCheckout';
+import type { OrderCheckoutResponse, OrderLookup, TransferInstructions } from '@/api/types';
 import { fbTrack } from '@/composables/useFbPixel';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const params = new URLSearchParams(window.location.search);
 const code = params.get('code') || '';
 const phone = params.get('phone') || '';
-// SePay redirect về kèm state=success|error|cancel — chỉ là kết quả PHIÊN thanh toán,
-// không phải bằng chứng đã trả tiền; nguồn sự thật vẫn là payment_status từ server.
-const gatewayState = params.get('state') || '';
 
 const order = ref<OrderLookup | null>(null);
+const transfer = ref<TransferInstructions | null>(null);
+const copiedField = ref('');
 const error = ref('');
 const refreshError = ref('');
 const refreshing = ref(false);
@@ -23,7 +21,7 @@ let lookupInFlight: Promise<OrderLookup | null> | null = null;
 const MAX_POLLS = 15;
 
 // Meta Pixel: chỉ fire Purchase khi đơn ĐÃ thanh toán (paid), 1 lần/mã đơn.
-// (InitiateCheckout đã fire lúc bắt đầu thanh toán ở useCheckout.)
+// (InitiateCheckout đã fire lúc bắt đầu thanh toán ở luồng đặt phòng.)
 function firePurchaseIfPaid(o: OrderLookup): void {
   if (o.payment_status !== 'paid') return;
   const items = o.items || [];
@@ -42,6 +40,32 @@ function firePurchaseIfPaid(o: OrderLookup): void {
   }, { dedupKey: `vie_fb_purchase_${o.code}` });
 }
 
+function normalizeTransfer(value: OrderLookup['bank_transfer'], source: OrderLookup): TransferInstructions | null {
+  if (!value) return null;
+  return {
+    bank_name: value.bank_name || '',
+    bank_code: value.bank_code || null,
+    bank_account: value.bank_account || '',
+    bank_holder: value.bank_holder || null,
+    amount: Number(value.amount ?? Math.max(0, source.total - source.paid_amount)),
+    memo: value.memo || source.code,
+    qr_url: value.qr_url || null,
+    currency: value.currency || 'VND',
+  };
+}
+
+async function copyTransferField(field: string, value: string | number): Promise<void> {
+  const text = String(value ?? '').trim();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedField.value = field;
+    window.setTimeout(() => { if (copiedField.value === field) copiedField.value = ''; }, 1800);
+  } catch {
+    copiedField.value = '';
+  }
+}
+
 async function fetchOnce() {
   if (lookupInFlight) return lookupInFlight;
 
@@ -56,6 +80,7 @@ async function fetchOnce() {
     try {
       const data = await api.get<OrderLookup>('orders/lookup', { code, phone });
       order.value = data;
+      transfer.value = normalizeTransfer(data.bank_transfer, data);
       error.value = '';
       refreshError.value = '';
       firePurchaseIfPaid(data);
@@ -87,15 +112,15 @@ async function payNow() {
   payError.value = '';
   paying.value = true;
   try {
-    const res = await api.post<{ checkout: CheckoutForm | null }>('public/orders/checkout', { code, phone });
-    if (res.checkout) {
-      submitCheckoutForm(res.checkout); // điều hướng sang SePay (POST form)
-    } else {
-      payError.value = 'Cổng thanh toán chưa sẵn sàng. Vui lòng thử lại sau.';
-      paying.value = false;
+    const res = await api.post<OrderCheckoutResponse>('public/orders/checkout', { code, phone });
+    if (!res?.transfer) {
+      payError.value = 'Chưa lấy được thông tin chuyển khoản. Vui lòng thử lại sau.';
+      return;
     }
+    transfer.value = res.transfer;
   } catch (e: any) {
-    payError.value = e?.errors?.[0]?.message || 'Không tạo được phiên thanh toán';
+    payError.value = e?.errors?.[0]?.message || 'Không lấy được thông tin chuyển khoản';
+  } finally {
     paying.value = false;
   }
 }
@@ -116,8 +141,6 @@ const heading = computed(() => {
   if (!o) return 'Thông tin đơn đặt phòng';
   if (o.status === 'cancelled') return 'Đơn đã bị hủy';
   if (o.payment_status === 'paid') return 'Đặt phòng thành công';
-  if (gatewayState === 'error') return 'Thanh toán chưa thành công';
-  if (gatewayState === 'cancel') return 'Bạn đã hủy thanh toán';
   return 'Đã nhận đơn — chờ thanh toán';
 });
 
@@ -133,20 +156,6 @@ const banner = computed(() => {
   }
   if (order.value.status === 'cancelled') {
     return { cls: 'vh-success-banner-err', icon: 'pi-times-circle', text: 'Đơn đã bị hủy.' };
-  }
-  if (gatewayState === 'error') {
-    return {
-      cls: 'vh-success-banner-err',
-      icon: 'pi-times-circle',
-      text: 'Thanh toán không thành công. Đơn vẫn được giữ — bạn có thể thanh toán lại bên dưới.',
-    };
-  }
-  if (gatewayState === 'cancel') {
-    return {
-      cls: 'vh-success-banner-warn',
-      icon: 'pi-clock',
-      text: 'Bạn đã hủy phiên thanh toán. Đơn vẫn được giữ — thanh toán lại khi sẵn sàng.',
-    };
   }
   if (ps === 'pending' || ps === 'partial') {
     return {
@@ -169,9 +178,10 @@ const vat = computed(() => {
   const v = order.value?.customer_vat;
   return v && (v.company_name || v.tax_code) ? v : null;
 });
-const canPay = computed(() => !!order.value && order.value.status !== 'cancelled' && order.value.payment_status !== 'paid');
+const paymentBlocked = (o: OrderLookup): boolean => ['cancelled', 'no_show', 'draft'].includes(o.status);
+const canPay = computed(() => !!order.value && !paymentBlocked(order.value) && order.value.payment_status !== 'paid');
 const isPendingOrder = (o: OrderLookup): boolean =>
-  o.status !== 'cancelled' && (o.payment_status === 'pending' || o.status === 'pending');
+  !paymentBlocked(o) && (o.payment_status === 'pending' || o.payment_status === 'partial' || o.status === 'pending');
 
 onMounted(async () => {
   await fetchOnce();
@@ -260,13 +270,17 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
           <div v-if="remaining > 0" class="vh-line-warn"><span>Còn lại</span><strong>{{ formatVND(remaining) }}</strong></div>
         </div>
 
-        <div v-if="order.bank_transfer && remaining > 0" class="vh-success-extra vh-bank-box">
-          <div><strong>Chuyển khoản ngân hàng</strong> <span class="vh-muted">— hoặc bấm "Thanh toán ngay" để trả qua SePay</span></div>
-          <div v-if="order.bank_transfer.bank_name"><span class="vh-muted">Ngân hàng:</span> <strong>{{ order.bank_transfer.bank_name }}</strong></div>
-          <div><span class="vh-muted">Số tài khoản:</span> <strong>{{ order.bank_transfer.bank_account }}</strong></div>
-          <div v-if="order.bank_transfer.bank_holder"><span class="vh-muted">Chủ tài khoản:</span> <strong>{{ order.bank_transfer.bank_holder }}</strong></div>
-          <div><span class="vh-muted">Số tiền:</span> <strong>{{ formatVND(remaining) }}</strong></div>
-          <div><span class="vh-muted">Nội dung CK:</span> <strong>{{ order.bank_transfer.memo }}</strong></div>
+        <div v-if="transfer && remaining > 0 && !paymentBlocked(order)" class="vh-success-extra vh-bank-box" aria-live="polite">
+          <div><strong>Chuyển khoản ngân hàng</strong> <span class="vh-muted">— hệ thống sẽ tự cập nhật sau khi nhận được giao dịch</span></div>
+          <div v-if="transfer.qr_url" class="vh-bank-qr">
+            <img :src="transfer.qr_url" alt="Mã QR chuyển khoản" loading="lazy" />
+          </div>
+          <div v-if="transfer.bank_name"><span class="vh-muted">Ngân hàng:</span> <strong>{{ transfer.bank_name }}</strong></div>
+          <div v-if="transfer.bank_code"><span class="vh-muted">Mã ngân hàng:</span> <strong>{{ transfer.bank_code }}</strong></div>
+          <div class="vh-bank-copy-row"><span class="vh-muted">Số tài khoản:</span> <strong>{{ transfer.bank_account }}</strong> <button type="button" class="vh-copy-btn" @click="copyTransferField('account', transfer.bank_account)">{{ copiedField === 'account' ? 'Đã sao chép' : 'Sao chép' }}</button></div>
+          <div v-if="transfer.bank_holder"><span class="vh-muted">Chủ tài khoản:</span> <strong>{{ transfer.bank_holder }}</strong></div>
+          <div class="vh-bank-copy-row"><span class="vh-muted">Số tiền:</span> <strong>{{ formatVND(transfer.amount || remaining) }}</strong> <button type="button" class="vh-copy-btn" @click="copyTransferField('amount', transfer.amount || remaining)">{{ copiedField === 'amount' ? 'Đã sao chép' : 'Sao chép' }}</button></div>
+          <div class="vh-bank-copy-row"><span class="vh-muted">Nội dung CK:</span> <strong>{{ transfer.memo }}</strong> <button type="button" class="vh-copy-btn" @click="copyTransferField('memo', transfer.memo)">{{ copiedField === 'memo' ? 'Đã sao chép' : 'Sao chép' }}</button></div>
         </div>
 
         <div v-if="payError" class="vh-error">{{ payError }}</div>
@@ -281,7 +295,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
         <div v-if="canPay" class="vh-success-actions">
           <button type="button" class="vh-btn vh-btn-primary" :disabled="paying" @click="payNow">
             <i :class="['pi', paying ? 'pi-spin pi-spinner' : 'pi-credit-card']" aria-hidden="true" />
-            {{ paying ? 'Đang chuyển tới cổng thanh toán…' : 'Thanh toán ngay' }}
+            {{ paying ? 'Đang lấy thông tin…' : (transfer ? 'Hiện lại thông tin chuyển khoản' : 'Lấy thông tin chuyển khoản') }}
           </button>
           <button type="button" class="vh-btn vh-btn-secondary" :disabled="refreshing" @click="refresh">
             <i :class="['pi', refreshing ? 'pi-spin pi-spinner' : 'pi-refresh']" aria-hidden="true" />

@@ -105,9 +105,22 @@ export interface CreateOrderRequest {
   dropoff?: { address: string } | null;
 }
 
-export interface CheckoutForm {
-  action: string;
-  fields: Record<string, string>;
+/** Bank-transfer instructions returned by order lookup/checkout. */
+export interface TransferInstructions {
+  bank_name: string;
+  bank_code?: string | null;
+  bank_account: string;
+  bank_holder?: string | null;
+  amount: number;
+  memo: string;
+  qr_url?: string | null;
+  currency?: string;
+}
+
+export interface OrderCheckoutResponse {
+  amount: number;
+  purpose: string;
+  transfer: TransferInstructions;
 }
 
 export interface CreateOrderResponse {
@@ -115,9 +128,10 @@ export interface CreateOrderResponse {
   code: string;
   total: number;
   paid_amount: number;
+  amount_due?: number;
+  currency?: string;
   status: string;
   payment_status: string;
-  checkout?: CheckoutForm | null;
 }
 
 export interface OrderLookupItem {
@@ -144,12 +158,14 @@ export interface OrderLookup {
   payment_status: string;
   total: number;
   paid_amount: number;
+  amount_due?: number;
+  currency?: string;
   items: OrderLookupItem[];
   pickup?: { address?: string } | null;
   dropoff?: { address?: string } | null;
   customer_vat?: { company_name?: string; tax_code?: string; address?: string; email?: string } | null;
   /** Có khi đơn còn nợ và admin đã cấu hình tài khoản nhận CK. */
-  bank_transfer?: { bank_name: string; bank_account: string; bank_holder: string; memo: string } | null;
+  bank_transfer?: TransferInstructions | null;
 }
 
 export interface QuoteInquiryRequest {

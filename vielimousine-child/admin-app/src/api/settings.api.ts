@@ -23,7 +23,12 @@ export interface EmailSettingsResponse {
 
 export interface SepayConfig {
   enabled: boolean;
+  webhook_secret_set: boolean;
+  /** Canonical public webhook URL when supplied by the server. */
+  webhook_url?: string;
+  /** @deprecated Hosted Checkout setting retained for API compatibility. */
   merchant_id: string;
+  /** @deprecated Hosted Checkout setting retained for API compatibility. */
   secret_key_set: boolean;
   environment: 'sandbox' | 'production';
   auto_confirm_on_paid: boolean;
@@ -44,6 +49,7 @@ export interface InvoiceConfig {
   company_phone: string;
   company_email: string;
   bank_name: string;
+  bank_code: string;
   bank_account: string;
   bank_holder: string;
   logo_url: string;
@@ -81,7 +87,7 @@ export const settingsApi = {
   getSepay: () =>
     api.get<Envelope<SepayConfig>>('/settings/sepay').then((r) => r.data),
 
-  updateSepay: (body: Partial<SepayConfig & { secret_key: string }>) =>
+  updateSepay: (body: Partial<SepayConfig & { webhook_secret: string; secret_key: string }>) =>
     api.put<Envelope<SepayConfig>>('/settings/sepay', body).then((r) => r.data),
 
   getInvoice: () =>

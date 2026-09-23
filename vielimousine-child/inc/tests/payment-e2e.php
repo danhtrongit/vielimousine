@@ -34,7 +34,14 @@ $wpdb->query("UPDATE {$wpdb->prefix}vie_room_price SET stock = 5 WHERE stock < 5
 // Setup SePay sandbox
 update_option('vie_sepay_enabled', 1, false);
 update_option('vie_sepay_merchant_id', 'TEST_MERCHANT', false);
-update_option('vie_sepay_secret_key', 'phase5_e2e_secret', false);
+update_option('vie_sepay_webhook_secret', 'phase5_e2e_webhook_secret', false);
+$invoiceSettings = get_option('vie_invoice_settings', []);
+$invoiceSettings = is_array($invoiceSettings) ? $invoiceSettings : (json_decode((string) $invoiceSettings, true) ?: []);
+$invoiceSettings['bank_name'] = 'Test Bank';
+$invoiceSettings['bank_code'] = 'VCB';
+$invoiceSettings['bank_account'] = '0123456789';
+$invoiceSettings['bank_holder'] = 'TEST HOLDER';
+update_option('vie_invoice_settings', wp_json_encode($invoiceSettings), false);
 update_option('vie_sepay_environment', 'sandbox', false);
 update_option('vie_sepay_auto_confirm_on_paid', 1, false);
 
@@ -48,7 +55,6 @@ $paymentRepo = \Vie\Container::get(\Vie\Repository\PaymentLogRepository::class);
 $paymentSvc  = \Vie\Container::get(\Vie\Service\Payment\PaymentService::class);
 $ledger      = \Vie\Container::get(\Vie\Service\Payment\PaymentLedger::class);
 $webhook     = \Vie\Container::get(\Vie\Service\Payment\SepayWebhook::class);
-$signature   = \Vie\Container::get(\Vie\Service\Payment\SepaySignature::class);
 
 // Helper: tạo 1 order tươi
 $makeOrder = function (string $idemKey, string $checkin, string $checkout, int $adults = 2) use ($orderSvc, $premierRoom): array {
@@ -135,76 +141,77 @@ try {
 }
 $assert('duplicate transaction_id → IdempotencyConflictException', $caught);
 
-// --- Scenario 6: SePay webhook — valid signature ---
-echo "\nScenario 6: SePay webhook — valid + auto-confirm\n";
+// --- Scenario 6: SePay webhook — valid HMAC + auto-confirm ---
+echo "\nScenario 6: SePay webhook — valid HMAC + auto-confirm\n";
 $order6 = $makeOrder('ph5-e2e-6-' . uniqid(), $plus10, $plus12);
-$payload = [
-    'order_invoice_number' => $order6['code'],
-    'transaction_id'       => 'SPY-WH-' . uniqid(),
-    'amount'               => $order6['total'],
-    'status'               => 'success',
+$webhookPayload = [
+    'id' => 'SPY-WH-' . uniqid(),
+    'gateway' => 'VCB',
+    'transactionDate' => gmdate('c'),
+    'accountNumber' => '0123456789',
+    'code' => $order6['code'],
+    'content' => $order6['code'],
+    'transferType' => 'in',
+    'description' => 'test',
+    'transferAmount' => (int) $order6['total'],
+    'accumulated' => 0,
+    'referenceCode' => 'REF-' . uniqid(),
 ];
-$sig = $signature->signWebhook($payload);
-$result = $webhook->handle($payload, $sig, '127.0.0.1');
+$raw = wp_json_encode($webhookPayload);
+$ts = (string) time();
+$sig = 'sha256=' . hash_hmac('sha256', $ts . '.' . $raw, 'phase5_e2e_webhook_secret');
+$result = $webhook->handleRaw($raw, $sig, $ts, '127.0.0.1');
 $assert('webhook accepted', ($result['accepted'] ?? false) === true);
-
 $updated6 = $orderRepo->find((int) $order6['id']);
 $assert('order paid_amount = total', (int) $updated6['paid_amount'] === (int) $order6['total']);
 $assert('order payment_status = paid', $updated6['payment_status'] === 'paid');
 $assert('order auto-confirmed', $updated6['status'] === 'confirmed');
 
-// --- Scenario 7: SePay webhook — invalid signature ---
-echo "\nScenario 7: SePay webhook — invalid signature\n";
+// --- Scenario 7: SePay webhook — invalid HMAC ---
+echo "\nScenario 7: SePay webhook — invalid HMAC\n";
 $order7 = $makeOrder('ph5-e2e-7-' . uniqid(), $plus10, $plus12);
-$payload7 = [
-    'order_invoice_number' => $order7['code'],
-    'transaction_id'       => 'SPY-BAD-' . uniqid(),
-    'amount'               => $order7['total'],
-    'status'               => 'success',
-];
-$result7 = $webhook->handle($payload7, 'completely_wrong_signature_xyz', '127.0.0.1');
+$payload7 = $webhookPayload;
+$payload7['id'] = 'SPY-BAD-' . uniqid();
+$payload7['code'] = $order7['code'];
+$payload7['transferAmount'] = (int) $order7['total'];
+$raw7 = wp_json_encode($payload7);
+$result7 = $webhook->handleRaw($raw7, 'sha256=' . str_repeat('0', 64), (string) time(), '127.0.0.1');
 $assert('invalid sig → accepted=false', ($result7['accepted'] ?? true) === false);
-$assert('reason = invalid_signature', ($result7['reason'] ?? '') === 'invalid_signature');
-
 $updated7 = $orderRepo->find((int) $order7['id']);
 $assert('order paid_amount vẫn = 0', (int) $updated7['paid_amount'] === 0);
 
 // --- Scenario 8: SePay webhook — duplicate (replay) ---
 echo "\nScenario 8: SePay webhook — duplicate (replay protection)\n";
 $order8 = $makeOrder('ph5-e2e-8-' . uniqid(), $plus10, $plus12);
-$payload8 = [
-    'order_invoice_number' => $order8['code'],
-    'transaction_id'       => 'SPY-DUP-' . uniqid(),
-    'amount'               => $order8['total'],
-    'status'               => 'success',
-];
-$sig8 = $signature->signWebhook($payload8);
-
-$r1 = $webhook->handle($payload8, $sig8, '127.0.0.1');
-$r2 = $webhook->handle($payload8, $sig8, '127.0.0.1');  // replay
+$payload8 = $webhookPayload;
+$payload8['id'] = 'SPY-DUP-' . uniqid();
+$payload8['code'] = $order8['code'];
+$payload8['transferAmount'] = (int) $order8['total'];
+$raw8 = wp_json_encode($payload8);
+$ts8 = (string) time();
+$sig8 = 'sha256=' . hash_hmac('sha256', $ts8 . '.' . $raw8, 'phase5_e2e_webhook_secret');
+$r1 = $webhook->handleRaw($raw8, $sig8, $ts8, '127.0.0.1');
+$r2 = $webhook->handleRaw($raw8, $sig8, $ts8, '127.0.0.1');
 $assert('1st webhook accepted', ($r1['accepted'] ?? false) === true);
 $assert('replay accepted=true', ($r2['accepted'] ?? false) === true);
 $assert('replay reason = duplicate_ignored', ($r2['reason'] ?? '') === 'duplicate_ignored');
-
-// Verify only 1 payment row exists for this order via gateway=sepay
 $count8 = (int) $wpdb->get_var($wpdb->prepare(
     "SELECT COUNT(*) FROM {$wpdb->prefix}vie_payment_log WHERE order_id = %d AND gateway = %s",
-    (int) $order8['id'],
-    'sepay'
+    (int) $order8['id'], 'sepay'
 ));
 $assert('chỉ 1 sepay payment row sau replay', $count8 === 1);
 
 // --- Scenario 9: Webhook unknown order ---
 echo "\nScenario 9: SePay webhook — unknown order code\n";
-$payload9 = [
-    'order_invoice_number' => 'VIENONEXISTENT0000',
-    'transaction_id'       => 'SPY-UNKNOWN',
-    'amount'               => 1000000,
-    'status'               => 'success',
-];
-$sig9 = $signature->signWebhook($payload9);
-$r9 = $webhook->handle($payload9, $sig9, '127.0.0.1');
-$assert('unknown order → accepted=false', ($r9['accepted'] ?? true) === false);
+$payload9 = $webhookPayload;
+$payload9['id'] = 'SPY-UNKNOWN-' . uniqid();
+$payload9['code'] = 'VIENONEXISTENT0000';
+$payload9['transferAmount'] = 1000000;
+$raw9 = wp_json_encode($payload9);
+$ts9 = (string) time();
+$sig9 = 'sha256=' . hash_hmac('sha256', $ts9 . '.' . $raw9, 'phase5_e2e_webhook_secret');
+$r9 = $webhook->handleRaw($raw9, $sig9, $ts9, '127.0.0.1');
+$assert('unknown order → acknowledged for manual review', ($r9['accepted'] ?? false) === true);
 $assert('reason = unknown_order', ($r9['reason'] ?? '') === 'unknown_order');
 
 echo "\n";

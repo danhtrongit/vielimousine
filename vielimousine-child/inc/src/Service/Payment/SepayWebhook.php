@@ -3,192 +3,256 @@ declare(strict_types=1);
 
 namespace Vie\Service\Payment;
 
+use Vie\Container;
 use Vie\DTO\PaymentRequest;
 use Vie\Repository\ActivityLogRepository;
 use Vie\Repository\OrderRepository;
-use Vie\Repository\PaymentLogRepository;
+use Vie\Repository\SepayWebhookEventRepository;
+use Vie\Service\BookingQuote\BookingQuotePaymentService;
+use Vie\Service\Settings\InvoiceSettings;
 use Vie\Service\Settings\SepaySettings;
 
-/**
- * Xử lý IPN của SePay Cổng thanh toán (Payment Gateway).
- * Xác thực bằng header X-Secret-Key; payload lồng order{}/transaction{}.
- */
+/** Processes SePay bank-account Webhooks with a durable idempotent inbox. */
 final class SepayWebhook
 {
     public function __construct(
         private readonly SepaySettings $settings,
-        private readonly SepaySignature $signature,
         private readonly OrderRepository $orderRepo,
-        private readonly PaymentLogRepository $paymentRepo,
         private readonly PaymentLedger $ledger,
         private readonly ActivityLogRepository $activityRepo,
+        private readonly ?SepayWebhookSignature $webhookSignature = null,
+        private readonly ?SepayWebhookEventRepository $eventRepo = null,
+        private readonly ?InvoiceSettings $invoiceSettings = null,
+        private readonly ?BookingQuotePaymentService $quotePayment = null,
     ) {
     }
 
-    /**
-     * @param string $authSecret Giá trị header X-Secret-Key SePay gửi.
-     * @return array{accepted: bool, reason: ?string}
-     */
-    public function handle(array $payload, string $authSecret, ?string $ip = null): array
+    /** @return array{accepted:bool,reason:string,retryable?:bool} */
+    public function handleRaw(string $rawBody, string $signature, string $timestamp, ?string $ip = null): array
     {
-        $secret = trim($this->settings->secretKey());
-
-        // 0. Fail-closed: chưa cấu hình secret → từ chối mọi IPN.
-        if ($secret === '') {
-            $this->logActivity('sepay_webhook_no_secret', $payload, $ip);
-            return ['accepted' => false, 'reason' => 'gateway_not_configured'];
+        $verifier = $this->webhookSignature ?? new SepayWebhookSignature();
+        $verified = $verifier->verify($rawBody, $signature, $timestamp, $this->settings->webhookSecret());
+        if (!$verified['valid']) {
+            $this->logActivity('sepay_webhook_auth_failed', ['reason' => $verified['reason']], $ip);
+            return ['accepted' => false, 'reason' => $verified['reason']];
         }
-
-        // 1. Xác thực: header X-Secret-Key phải khớp secret_key (so sánh hằng-thời-gian).
-        if ($authSecret === '' || !hash_equals($secret, $authSecret)) {
-            $this->logActivity('sepay_webhook_invalid_secret', $payload, $ip);
-            return ['accepted' => false, 'reason' => 'invalid_secret'];
-        }
-
-        // 2. Parse payload lồng (Cổng thanh toán IPN).
-        $orderObj    = is_array($payload['order'] ?? null) ? $payload['order'] : [];
-        $txObj       = is_array($payload['transaction'] ?? null) ? $payload['transaction'] : [];
-        $notiType    = (string) ($payload['notification_type'] ?? '');
-        $invoice     = (string) ($orderObj['order_invoice_number'] ?? '');
-        $orderStatus = (string) ($orderObj['order_status'] ?? '');
-        $txStatus    = (string) ($txObj['transaction_status'] ?? '');
-        $txType      = (string) ($txObj['transaction_type'] ?? 'PAYMENT');
-        $txId        = (string) ($txObj['transaction_id'] ?? '');
-        $amount      = (int) round((float) ($txObj['transaction_amount'] ?? $orderObj['order_amount'] ?? 0));
-
-        if ($invoice === '' || $txId === '') {
-            $this->logActivity('sepay_webhook_missing_field', $payload, $ip);
-            return ['accepted' => false, 'reason' => 'missing_field'];
-        }
-
-        // 3. Chỉ xử lý thanh toán thành công: ORDER_PAID + CAPTURED + APPROVED + PAYMENT.
-        //    Các sự kiện khác (VOID/DECLINED/refund) → trả 200 để SePay không retry, không xử lý.
-        $isPaid = $notiType === 'ORDER_PAID'
-            && $orderStatus === 'CAPTURED'
-            && $txStatus === 'APPROVED'
-            && $txType === 'PAYMENT';
-        if (!$isPaid) {
-            $this->logActivity('sepay_webhook_non_success', $this->maskedPayload($payload, $orderObj, $txObj), $ip);
-            return ['accepted' => true, 'reason' => 'ignored_non_paid'];
-        }
-
-        if ($amount <= 0) {
-            $this->logActivity('sepay_webhook_invalid_amount', $payload, $ip);
-            return ['accepted' => false, 'reason' => 'invalid_amount'];
-        }
-
-        // 4. Lookup order theo order_invoice_number (= mã đơn).
-        $order = $this->orderRepo->findByCode($invoice);
-        if ($order === null) {
-            $this->logActivity('sepay_webhook_unknown_order', $payload, $ip);
-            return ['accepted' => false, 'reason' => 'unknown_order'];
-        }
-
-        // 4a. Amount phải khớp tổng đơn (chống tampering số tiền).
-        if ($amount !== (int) ($order['total'] ?? -1)) {
-            $this->logActivity(
-                'sepay_webhook_amount_mismatch',
-                array_merge($this->maskedPayload($payload, $orderObj, $txObj), [
-                    'order_id'    => (int) $order['id'],
-                    'order_total' => (int) ($order['total'] ?? 0),
-                ]),
-                $ip
-            );
-            return ['accepted' => false, 'reason' => 'amount_mismatch'];
-        }
-
-        // 4b. Đơn đã cancelled — cần hoàn tiền thủ công (trả 200, không retry).
-        if ((string) ($order['status'] ?? '') === 'cancelled') {
-            $this->logActivity(
-                'sepay_webhook_into_cancelled_order',
-                array_merge($this->maskedPayload($payload, $orderObj, $txObj), ['order_id' => (int) $order['id']]),
-                $ip
-            );
-            return ['accepted' => true, 'reason' => 'order_cancelled_manual_refund_needed'];
-        }
-
-        // 5. Idempotency theo transaction_id.
-        if ($this->findExistingPayment($txId) !== null) {
-            $this->logActivity('sepay_webhook_duplicate', $this->maskedPayload($payload, $orderObj, $txObj), $ip);
-            return ['accepted' => true, 'reason' => 'duplicate_ignored'];
-        }
-
-        // 6. Ghi nhận thanh toán qua ledger (tự cập nhật payment_status / confirm theo cấu hình).
-        $req = new PaymentRequest(
-            orderId:       (int) $order['id'],
-            type:          'payment',
-            amount:        $amount,
-            method:        'sepay',
-            gateway:       'sepay',
-            transactionId: $txId,
-            note:          'SePay IPN' . ($txObj['payment_method'] ?? '' ? ' (' . (string) $txObj['payment_method'] . ')' : ''),
-            paidAt:        current_time('mysql'),
-            createdBy:     null,
-            rawPayload:    $this->maskedPayload($payload, $orderObj, $txObj),
-        );
 
         try {
-            $this->ledger->record($req);
-        } catch (IdempotencyConflictException $e) {
-            $this->logActivity('sepay_webhook_duplicate', $this->maskedPayload($payload, $orderObj, $txObj), $ip);
-            return ['accepted' => true, 'reason' => 'duplicate_ignored'];
-        } catch (\Throwable $e) {
-            $this->logActivity('sepay_webhook_error', ['error' => $e->getMessage(), 'order_id' => (int) $order['id']], $ip);
-            return ['accepted' => false, 'reason' => 'ledger_error'];
+            $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return ['accepted' => false, 'reason' => 'invalid_json'];
+        }
+        if (!is_array($payload)) {
+            return ['accepted' => false, 'reason' => 'invalid_json'];
         }
 
-        $this->logActivity('sepay_webhook_accepted', $this->maskedPayload($payload, $orderObj, $txObj), $ip);
-        return ['accepted' => true, 'reason' => null];
+        $eventId = trim((string) ($payload['id'] ?? ''));
+        if ($eventId === '' || strlen($eventId) > 100) {
+            return ['accepted' => false, 'reason' => 'missing_id'];
+        }
+
+        $events = $this->eventRepo ?? new SepayWebhookEventRepository();
+        $stored = $events->create($eventId, $rawBody, $payload);
+        $event = $stored['event'];
+        if ($stored['duplicate'] && !hash_equals((string) ($event['payload_hash'] ?? ''), hash('sha256', $rawBody))) {
+            $events->markReview((int) $event['id'], 'payload_changed_on_replay');
+            return ['accepted' => true, 'reason' => 'payload_changed_on_replay'];
+        }
+        if ($stored['duplicate'] && in_array((string) ($event['status'] ?? ''), ['processed', 'review'], true)) {
+            return ['accepted' => true, 'reason' => 'duplicate_ignored'];
+        }
+
+        try {
+            $result = $this->dispatch($payload, $ip, (int) $event['id']);
+            if (($result['retryable'] ?? false) === true) {
+                $events->markFailed((int) $event['id'], (string) ($result['reason'] ?? 'processing_error'));
+                return $result;
+            }
+            if ($this->isReviewReason((string) ($result['reason'] ?? ''))) {
+                $events->markReview((int) $event['id'], (string) ($result['reason'] ?? 'review_required'));
+            } else {
+                $events->markProcessed((int) $event['id']);
+            }
+            return $result;
+        } catch (\Throwable $e) {
+            try {
+                $events->markFailed((int) $event['id'], $e->getMessage());
+            } catch (\Throwable) {
+                // The original processing error is still retryable.
+            }
+            return ['accepted' => false, 'reason' => 'storage_error', 'retryable' => true];
+        }
     }
 
-    /**
-     * Trích các field nghiệp vụ cần audit từ payload lồng (không giữ PII thừa).
-     * @return array<string,mixed>
-     */
-    private function maskedPayload(array $payload, array $orderObj = [], array $txObj = []): array
+    /** Retry events whose request was persisted but processing failed. */
+    public function retryPending(int $limit = 50): void
     {
-        return [
-            'notification_type'    => (string) ($payload['notification_type'] ?? ''),
-            'timestamp'            => $payload['timestamp'] ?? null,
-            'order_invoice_number' => (string) ($orderObj['order_invoice_number'] ?? ''),
-            'order_status'         => (string) ($orderObj['order_status'] ?? ''),
-            'order_amount'         => $orderObj['order_amount'] ?? null,
-            'transaction_id'       => (string) ($txObj['transaction_id'] ?? ''),
-            'transaction_amount'   => $txObj['transaction_amount'] ?? null,
-            'transaction_status'   => (string) ($txObj['transaction_status'] ?? ''),
-            'payment_method'       => (string) ($txObj['payment_method'] ?? ''),
-        ];
+        $events = $this->eventRepo ?? new SepayWebhookEventRepository();
+        foreach ($events->pending($limit) as $event) {
+            $payload = json_decode((string) ($event['raw_payload'] ?? ''), true);
+            if (!is_array($payload)) {
+                $events->markFailed((int) $event['id'], 'Invalid persisted payload');
+                continue;
+            }
+            try {
+                $result = $this->dispatch($payload, null, (int) $event['id']);
+                if (($result['retryable'] ?? false) === true) {
+                    $events->markFailed((int) $event['id'], (string) ($result['reason'] ?? 'processing_error'));
+                } elseif ($this->isReviewReason((string) ($result['reason'] ?? ''))) {
+                    $events->markReview((int) $event['id'], (string) ($result['reason'] ?? 'review_required'));
+                } else {
+                    $events->markProcessed((int) $event['id']);
+                }
+            } catch (\Throwable $e) {
+                $events->markFailed((int) $event['id'], $e->getMessage());
+            }
+        }
     }
 
-    private function findExistingPayment(string $txId): ?array
+    /** @return array{accepted:bool,reason:string,retryable?:bool} */
+    private function dispatch(array $payload, ?string $ip, ?int $eventId = null): array
+    {
+        $code = strtoupper(trim((string) ($payload['code'] ?? '')));
+        $direction = strtolower(trim((string) ($payload['transferType'] ?? '')));
+        $amount = $this->parseAmount($payload['transferAmount'] ?? null);
+
+        if ($direction !== 'in') {
+            $this->logActivity('sepay_webhook_ignored_outgoing', ['id' => $payload['id'] ?? null, 'code' => $code], $ip);
+            return ['accepted' => true, 'reason' => 'ignored_non_incoming'];
+        }
+        if ($amount === null || $amount <= 0) {
+            return ['accepted' => true, 'reason' => 'invalid_amount'];
+        }
+        if ($code === '' || (!str_starts_with($code, 'VIE') && !str_starts_with($code, 'VQ'))) {
+            $this->logActivity('sepay_webhook_unknown_code', ['id' => $payload['id'] ?? null, 'code' => $code, 'amount' => $amount], $ip);
+            return ['accepted' => true, 'reason' => 'unknown_code'];
+        }
+
+        if (str_starts_with($code, 'VQ')) {
+            $service = $this->quotePayment ?? Container::get(BookingQuotePaymentService::class);
+            $result = $service->processWebhook($payload, $ip, $eventId);
+            if (($result['retryable'] ?? false) === true || ($result['reason'] ?? '') === 'storage_error') {
+                $result['retryable'] = true;
+            }
+            return $result + ['accepted' => false, 'reason' => 'quote_review'];
+        }
+
+        return $this->processOrder($payload, $code, $amount, $ip, $eventId);
+    }
+
+    /** @return array{accepted:bool,reason:string,retryable?:bool} */
+    private function processOrder(array $payload, string $code, int $amount, ?string $ip, ?int $eventId = null): array
+    {
+        $settings = $this->invoiceSettings ?? Container::get(InvoiceSettings::class);
+        $bank = $settings->all();
+        $account = preg_replace('/\s+/', '', trim((string) ($payload['accountNumber'] ?? '')));
+        $configured = preg_replace('/\s+/', '', (string) ($bank['bank_account'] ?? ''));
+        if ($account === '' || $configured === '' || !hash_equals($configured, $account)) {
+            return ['accepted' => true, 'reason' => 'account_mismatch'];
+        }
+
+        $order = $this->orderRepo->findByCode($code);
+        if ($order === null) {
+            return ['accepted' => true, 'reason' => 'unknown_order'];
+        }
+        if ((string) ($order['status'] ?? '') === 'cancelled') {
+            return ['accepted' => true, 'reason' => 'order_cancelled_manual_review'];
+        }
+
+        $transactionId = trim((string) ($payload['id'] ?? ''));
+        if ($transactionId === '') {
+            return ['accepted' => true, 'reason' => 'missing_id'];
+        }
+        if ($this->findExistingPayment($transactionId) !== null) {
+            return ['accepted' => true, 'reason' => 'duplicate_ignored'];
+        }
+
+        $remaining = max(0, (int) ($order['total'] ?? 0) - (int) ($order['paid_amount'] ?? 0));
+        if ($remaining <= 0 || $amount > $remaining) {
+            $this->logActivity('sepay_webhook_order_amount_review', [
+                'id' => $transactionId, 'code' => $code, 'amount' => $amount, 'remaining' => $remaining,
+            ], $ip);
+            return ['accepted' => true, 'reason' => 'amount_mismatch'];
+        }
+
+        $request = new PaymentRequest(
+            orderId: (int) $order['id'],
+            type: 'payment',
+            amount: $amount,
+            method: 'bank_transfer',
+            gateway: 'sepay',
+            transactionId: $transactionId,
+            note: 'SePay Webhook' . (($payload['content'] ?? '') !== '' ? ' (' . sanitize_text_field((string) $payload['content']) . ')' : ''),
+            paidAt: function_exists('current_time') ? current_time('mysql') : date('Y-m-d H:i:s'),
+            createdBy: null,
+            rawPayload: $payload,
+            webhookEventId: $eventId,
+        );
+        try {
+            $this->ledger->record($request);
+        } catch (IdempotencyConflictException) {
+            return ['accepted' => true, 'reason' => 'duplicate_ignored'];
+        } catch (\Throwable) {
+            $this->logActivity('sepay_webhook_order_error', ['id' => $transactionId, 'code' => $code], $ip);
+            return ['accepted' => false, 'reason' => 'storage_error', 'retryable' => true];
+        }
+        $this->logActivity('sepay_webhook_order_accepted', ['id' => $transactionId, 'code' => $code, 'amount' => $amount], $ip);
+        return ['accepted' => true, 'reason' => 'accepted'];
+    }
+
+    private function parseAmount(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value >= 0 && $value <= 999999999999 ? $value : null;
+        }
+        $raw = trim((string) $value);
+        if (!preg_match('/^(0|[1-9][0-9]*)(?:\.0+)?$/', $raw)) {
+            return null;
+        }
+        $integer = explode('.', $raw, 2)[0];
+        if (strlen($integer) > 12) {
+            return null;
+        }
+        return (int) $integer;
+    }
+
+    private function findExistingPayment(string $transactionId): ?array
     {
         global $wpdb;
         $table = $wpdb->prefix . 'vie_payment_log';
-        $row = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE gateway = %s AND transaction_id = %s LIMIT 1",
-                'sepay',
-                $txId
-            ),
-            ARRAY_A
-        );
-        return $row !== null ? $row : null;
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table} WHERE gateway = %s AND transaction_id = %s LIMIT 1",
+            'sepay', $transactionId
+        ), ARRAY_A);
+        return is_array($row) ? $row : null;
+    }
+
+    private function isReviewReason(string $reason): bool
+    {
+        return in_array($reason, [
+            'review_required', 'account_mismatch', 'unknown_order', 'unknown_invoice',
+            'invalid_invoice', 'invalid_amount', 'amount_mismatch', 'transaction_reused',
+            'quote_expired', 'quote_revoked', 'quote_unavailable', 'current_due_mismatch',
+            'extra_receipt', 'existing_review', 'currency_mismatch', 'order_cancelled_manual_review',
+            'missing_id', 'unknown_code', 'payload_changed_on_replay',
+        ], true);
     }
 
     private function logActivity(string $action, array $payload, ?string $ip): void
     {
-        $safe = $payload;
-        unset($safe['signature']);
-
-        $this->activityRepo->create([
-            'actor_user_id' => 0,
-            'entity_type'   => 'sepay_webhook',
-            'entity_id'     => 0,
-            'action'        => $action,
-            'before_json'   => null,
-            'after_json'    => $safe,
-            'ip'            => $ip,
-            'user_agent'    => isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : null,
-        ]);
+        try {
+            $this->activityRepo->create([
+                'actor_user_id' => 0,
+                'entity_type' => 'sepay_webhook',
+                'entity_id' => 0,
+                'action' => $action,
+                'before_json' => null,
+                'after_json' => $payload,
+                'ip' => $ip,
+                'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : null,
+            ]);
+        } catch (\Throwable) {
+            // Audit logging must never turn a valid Webhook into a retry storm.
+        }
     }
 }

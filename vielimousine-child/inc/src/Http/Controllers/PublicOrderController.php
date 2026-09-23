@@ -12,7 +12,6 @@ use Vie\Service\Coupon\CouponException;
 use Vie\Service\Order\OrderService;
 use Vie\Service\Order\RequiresQuoteException;
 use Vie\Service\Order\StockUnavailableException;
-use Vie\Service\Payment\SepayCheckout;
 use Vie\Support\ResponseEnvelope;
 use Vie\Support\Validator;
 use Vie\Validation\Schemas\PublicOrderValidation;
@@ -54,7 +53,9 @@ final class PublicOrderController
         $clean['source']         = 'website';
         $clean['sales_user_id']  = null;
         $clean['voucher_code']   = null;
-        $clean['payment_method'] = (string) ($clean['payment_method'] ?? 'sepay');
+        // `sepay` remains accepted as a legacy request alias; the stored method
+        // now describes the actual flow (bank transfer confirmed by webhook).
+        $clean['payment_method'] = 'bank_transfer';
 
         $idemKey = $request->get_header('X-Idempotency-Key');
         $ua      = $_SERVER['HTTP_USER_AGENT'] ?? null;
@@ -63,18 +64,6 @@ final class PublicOrderController
             $req      = OrderRequest::fromArray($clean, $idemKey, $ip, $ua);
             $orderSvc = Container::get(OrderService::class);
             $detail   = $orderSvc->create($req);
-
-            // Chỉ đẩy sang SePay khi khách CHỌN SePay và đơn còn tiền phải trả.
-            // Chuyển khoản → về trang xem đơn (kèm thông tin CK). Đơn 0đ (mã giảm 100%)
-            // đã được đánh dấu paid lúc tạo — không có gì để thanh toán.
-            $detail['checkout'] = null;
-            if ($clean['payment_method'] === 'sepay' && (int) ($detail['total'] ?? 0) > 0) {
-                try {
-                    $detail['checkout'] = Container::get(SepayCheckout::class)->buildCheckoutForm((int) $detail['id']);
-                } catch (\Throwable) {
-                    $detail['checkout'] = null;
-                }
-            }
 
             return ResponseEnvelope::success(self::publicView($detail), [], 201);
         } catch (StockUnavailableException $e) {
@@ -104,10 +93,7 @@ final class PublicOrderController
         }
     }
 
-    /**
-     * Tạo lại form checkout SePay cho một đơn đang chờ thanh toán (nút "Thanh toán ngay"
-     * ở trang xem đơn). Xác thực bằng code + phone như lookup.
-     */
+    /** Returns bank-transfer instructions for the remaining order balance. */
     public static function checkout(\WP_REST_Request $request): \WP_REST_Response
     {
         if ($denied = RateLimiter::check('order_recheckout', 10, 300)) {
@@ -136,14 +122,22 @@ final class PublicOrderController
             ], 409);
         }
 
-        $form = Container::get(SepayCheckout::class)->buildCheckoutForm((int) $order['id']);
-        if ($form === null) {
+        $amount = max(0, (int) $order['total'] - (int) $order['paid_amount']);
+        if ($amount <= 0) {
             return ResponseEnvelope::error([
-                ['code' => 'gateway_unavailable', 'field' => null, 'message' => 'Cổng thanh toán chưa sẵn sàng.'],
+                ['code' => 'invalid_state', 'field' => null, 'message' => 'Đơn không còn số dư cần thanh toán.'],
+            ], 409);
+        }
+        try {
+            $transfer = Container::get(\Vie\Service\Payment\BankTransferInstructions::class)
+                ->build($amount, (string) $order['code']);
+        } catch (\Throwable) {
+            return ResponseEnvelope::error([
+                ['code' => 'bank_unconfigured', 'field' => null, 'message' => 'Thông tin nhận chuyển khoản chưa sẵn sàng.'],
             ], 503);
         }
 
-        return ResponseEnvelope::success(['checkout' => $form]);
+        return ResponseEnvelope::success(['amount' => $amount, 'purpose' => 'balance', 'transfer' => $transfer]);
     }
 
     private static function rateLimitExceeded(string $ip): bool

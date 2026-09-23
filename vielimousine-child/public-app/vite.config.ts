@@ -18,6 +18,7 @@ export default defineConfig({
       input: {
         hotel: resolve(__dirname, 'src/entries/hotel.ts'),
         success: resolve(__dirname, 'src/entries/success.ts'),
+        booking: resolve(__dirname, 'src/entries/booking.ts'),
       },
     },
   },

@@ -100,6 +100,44 @@
   border: 1px solid var(--vie-danger-border);
 }
 
+/* ---------- Order success / bank transfer ---------- */
+.vh-success-banner {
+  padding: 0.95rem 1.1rem;
+  border-radius: var(--vie-radius);
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+.vh-success-banner-ok { background: var(--vie-success-50); color: #166534; border: 1px solid var(--vie-success-border); }
+.vh-success-banner-warn { background: var(--vie-warn-50); color: #92400e; border: 1px solid var(--vie-warn-border); }
+.vh-success-banner-err { background: var(--vie-danger-50); color: #991b1b; border: 1px solid var(--vie-danger-border); }
+.vh-success-card {
+  padding: 1.25rem 1.35rem;
+  background: var(--vie-card-bg);
+  border: 1px solid var(--vie-border);
+  border-radius: var(--vie-radius);
+  box-shadow: var(--vie-shadow);
+}
+.vh-success-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--vie-divider); padding-bottom: 0.75rem; }
+.vh-success-code { margin: 0.2rem 0 0; letter-spacing: 0.06em; }
+.vh-success-status { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: flex-start; }
+.vh-tag { display: inline-block; padding: 0.2rem 0.65rem; border-radius: var(--vie-radius-pill); background: var(--vie-divider); font-size: 0.82rem; font-weight: 600; }
+.vh-tag-ok { background: var(--vie-success-50); color: #166534; }
+.vh-tag-warn { background: var(--vie-warn-50); color: #92400e; }
+.vh-muted, .vie-public__muted { color: var(--vie-muted); font-size: 0.9rem; }
+.vh-success-totals { background: var(--vie-bg); border-radius: var(--vie-radius-sm); padding: 0.7rem 1rem; margin: 1rem 0; }
+.vh-success-totals > div { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+.vh-line-warn strong { color: var(--vie-warn); }
+.vh-success-extra { border: 1px solid var(--vie-border); border-radius: var(--vie-radius-sm); padding: 0.7rem 1rem; margin: 1rem 0; display: grid; gap: 0.3rem; }
+.vh-bank-box { background: var(--vie-bg); }
+.vh-bank-qr { display: flex; justify-content: center; padding: 0.75rem 0; }
+.vh-bank-qr img { display: block; width: min(100%, 240px); aspect-ratio: 1; object-fit: contain; padding: 0.55rem; background: #fff; border: 1px solid var(--vie-border); border-radius: var(--vie-radius); }
+.vh-bank-copy-row { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.vh-copy-btn { border: 1px solid var(--vie-border); border-radius: var(--vie-radius-sm); background: #fff; color: var(--vie-text-strong); padding: 0.2rem 0.55rem; cursor: pointer; font-size: 0.78rem; }
+.vh-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0.65rem 1rem; border: 1px solid var(--vie-border); border-radius: var(--vie-radius-sm); background: #fff; cursor: pointer; font-weight: 600; }
+.vh-success-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+.vh-pay-option { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; border: 1px solid var(--vie-primary); border-radius: var(--vie-radius-sm); background: var(--vie-primary-50); }
+.vh-pay-option small { display: block; color: var(--vie-muted); }
+
 /* ---------- Buttons ---------- */
 .vie-public__btn {
   display: inline-flex;

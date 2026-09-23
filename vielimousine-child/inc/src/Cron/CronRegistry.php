@@ -10,6 +10,7 @@ final class CronRegistry
         'vie_security_sweep' => ['class' => SecuritySweep::class, 'recurrence' => 'vie_15min'],
         'vie_no_show_sweep'  => ['class' => NoShowSweep::class,   'recurrence' => 'daily'],
         'vie_token_cleanup'  => ['class' => TokenCleanup::class,  'recurrence' => 'daily'],
+        'vie_sepay_webhook_sweep' => ['class' => SepayWebhookSweep::class, 'recurrence' => 'vie_15min'],
     ];
 
     public static function register(): void

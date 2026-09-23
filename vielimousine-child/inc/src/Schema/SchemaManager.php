@@ -23,6 +23,9 @@ final class SchemaManager
         'vie_token'           => TokenSchema::class,
         'vie_activity_log'    => ActivityLogSchema::class,
         'vie_quote_inquiry'   => QuoteInquirySchema::class,
+        'vie_booking_quote'   => BookingQuoteSchema::class,
+        'vie_booking_quote_payment' => BookingQuotePaymentSchema::class,
+        'vie_sepay_webhook_event' => SepayWebhookEventSchema::class,
     ];
 
     public static function install(): void

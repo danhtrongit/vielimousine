@@ -98,6 +98,8 @@ final class SettingsController
             'enabled'              => $s->enabled(),
             'merchant_id'          => $s->merchantId(),
             'secret_key_set'       => $s->secretKey() !== '',
+            'webhook_secret_set'   => $s->webhookSecret() !== '',
+            'webhook_url'          => $s->webhookUrl(),
             'environment'          => $s->isSandbox() ? 'sandbox' : 'production',
             'auto_confirm_on_paid' => $s->autoConfirmOnPaid(),
         ]);
@@ -111,7 +113,7 @@ final class SettingsController
                 ['code' => 'validation_error', 'field' => null, 'message' => 'Body phải là JSON object'],
             ], 422);
         }
-        $allowed = ['enabled', 'merchant_id', 'secret_key', 'environment', 'auto_confirm_on_paid'];
+        $allowed = ['enabled', 'merchant_id', 'secret_key', 'webhook_secret', 'environment', 'auto_confirm_on_paid'];
         $clean = [];
         foreach ($allowed as $key) {
             if (!array_key_exists($key, $data)) continue;
@@ -125,12 +127,33 @@ final class SettingsController
             }
         }
         // Không lưu secret_key nếu rỗng (giữ giá trị cũ)
-        if (isset($clean['secret_key']) && $clean['secret_key'] === '') {
-            unset($clean['secret_key']);
+        foreach (['secret_key', 'webhook_secret'] as $secretField) {
+            if (isset($clean[$secretField]) && $clean[$secretField] === '') {
+                unset($clean[$secretField]);
+            }
+        }
+
+        $enabled = array_key_exists('enabled', $clean) ? (bool) $clean['enabled'] : Container::get(SepaySettings::class)->enabled();
+        if ($enabled) {
+            if (!Container::get(SepaySettings::class)->webhookSecret() && empty($clean['webhook_secret'])) {
+                return ResponseEnvelope::error([
+                    ['code' => 'webhook_secret_required', 'field' => 'webhook_secret', 'message' => 'Cần thiết lập Webhook HMAC secret trước khi bật SePay.'],
+                ], 422);
+            }
+            if (!Container::get(\Vie\Service\Payment\BankTransferInstructions::class)->isConfigured()) {
+                return ResponseEnvelope::error([
+                    ['code' => 'bank_account_required', 'field' => 'enabled', 'message' => 'Hãy hoàn thiện thông tin ngân hàng và mã VietQR trước khi bật SePay.'],
+                ], 422);
+            }
         }
 
         $s = Container::get(SepaySettings::class);
-        $s->update($clean);
+        $updated = $s->update($clean);
+        if (is_wp_error($updated)) {
+            return ResponseEnvelope::error([
+                ['code' => $updated->get_error_code(), 'field' => 'webhook_secret', 'message' => $updated->get_error_message()],
+            ], 422);
+        }
 
         return self::getSepay($request);
     }

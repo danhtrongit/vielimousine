@@ -16,6 +16,7 @@ final class Plugin
         add_action('rest_api_init', [Http\RestRouter::class, 'register']);
         add_action('rest_api_init', [Service\Auth\CorsHandler::class, 'register']);
         add_action('init', [Frontend\AdminAppLoader::class, 'register']);
+        add_action('init', [Frontend\BookingQuotePage::class, 'register']);
 
         Email\OrderEmailService::register();
         Frontend\ShortcodeRegistry::register();

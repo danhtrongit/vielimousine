@@ -16,6 +16,7 @@ final readonly class PaymentRequest
         public ?string $paidAt,
         public ?int    $createdBy,
         public ?array  $rawPayload,
+        public ?int    $webhookEventId = null,
     ) {
     }
 
@@ -32,6 +33,7 @@ final readonly class PaymentRequest
             paidAt:        isset($data['paid_at']) && $data['paid_at'] !== '' ? (string) $data['paid_at'] : null,
             createdBy:     isset($data['created_by']) ? (int) $data['created_by'] : null,
             rawPayload:    isset($data['raw_payload']) && is_array($data['raw_payload']) ? $data['raw_payload'] : null,
+            webhookEventId: isset($data['webhook_event_id']) ? (int) $data['webhook_event_id'] : null,
         );
     }
 
@@ -48,6 +50,7 @@ final readonly class PaymentRequest
             'paid_at'        => $this->paidAt,
             'created_by'     => $this->createdBy,
             'raw_payload'    => $this->rawPayload,
+            'webhook_event_id' => $this->webhookEventId,
         ];
     }
 }
