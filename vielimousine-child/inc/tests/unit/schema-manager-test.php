@@ -183,6 +183,15 @@ $assert('one escaped-prefix inventory query checks a healthy installation',
     count($wpdb->inventoryQueries) === 1 && str_contains($wpdb->inventoryQueries[0], "wp\\_vie\\_%"));
 
 $wpdb = schemaTestFixture();
+$GLOBALS['schema_test_options']['vie_schema_versions']['vie_hotel'] = '1.0.0';
+SchemaManager::install();
+$hotelDdl = implode("\\n", $wpdb->ddl);
+$assert('hotel schema migration declares the breakfast default',
+    str_contains($hotelDdl, "breakfast_type VARCHAR(20) NOT NULL DEFAULT 'buffet'"));
+$assert('hotel schema migration stamps the new version',
+    get_option('vie_schema_versions')['vie_hotel'] === $versions['vie_hotel']);
+
+$wpdb = schemaTestFixture();
 unset($wpdb->tables['wp_vie_booking_quote']);
 SchemaManager::install();
 $assert('missing quote table is recreated despite matching version',

@@ -14,7 +14,7 @@ final class HotelRepository extends AbstractRepository
     {
         return [
             'post_id', 'name', 'slug', 'description', 'address', 'city',
-            'contact_phone', 'contact_email', 'star_rating',
+            'contact_phone', 'contact_email', 'star_rating', 'breakfast_type',
             'default_checkin', 'default_checkout', 'default_ticket_price',
             'ticket_free_children_count', 'ticket_free_children_max_age',
             'pricing_policy', 'cancellation_policy',

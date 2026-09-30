@@ -29,11 +29,17 @@ export const search = reactive<SearchState>({
 });
 
 // Meta khách sạn của trang hiện tại (từ data-attr mount) — dùng cho tracking
-// (content_id = slug bài, content_name = tên bài) mà không hardcode từng combo.
-export const hotel = reactive<{ id: number; slug: string; name: string }>({
+// và quyền lợi trong tóm tắt đặt phòng/combo.
+export const hotel = reactive<{
+  id: number;
+  slug: string;
+  name: string;
+  breakfastType: 'buffet' | 'breakfast';
+}>({
   id: 0,
   slug: '',
   name: '',
+  breakfastType: 'buffet',
 });
 
 // Keyed by `${roomId}:${bookingType}` so we can show both prices per room.

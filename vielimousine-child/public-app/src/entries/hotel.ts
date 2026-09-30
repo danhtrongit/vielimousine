@@ -16,6 +16,7 @@ mainMounts.forEach((el) => {
   hotel.id = hotelId;
   hotel.slug = el.getAttribute('data-hotel-slug') || '';
   hotel.name = el.getAttribute('data-hotel-name') || '';
+  hotel.breakfastType = el.getAttribute('data-hotel-breakfast-type') === 'breakfast' ? 'breakfast' : 'buffet';
   const dataScript = el.querySelector('script[type="application/json"]');
   if (dataScript) {
     try {

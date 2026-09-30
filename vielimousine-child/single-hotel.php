@@ -212,6 +212,7 @@ if ($hotelId > 0) {
                                     data-hotel-id="<?php echo (int) $hotelId; ?>"
                                     data-hotel-slug="<?php echo esc_attr((string) get_post_field('post_name', $postId)); ?>"
                                     data-hotel-name="<?php echo esc_attr(get_the_title($postId)); ?>"
+                                    data-hotel-breakfast-type="<?php echo esc_attr($hotel['breakfast_type'] ?? 'buffet'); ?>"
                                 >
                                     <script type="application/json"><?php
                                         echo wp_json_encode($roomsData, JSON_UNESCAPED_UNICODE);

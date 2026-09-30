@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import Button from 'primevue/button';
-import { search, selection, getQuote, appliedCoupon } from '@/composables/useBookingState';
+import { search, selection, hotel, getQuote, appliedCoupon } from '@/composables/useBookingState';
 import { formatVND, formatDateVN } from '@/composables/useFormat';
 
 const props = defineProps<{ rooms: Array<{ id: number; name: string }> }>();
@@ -102,7 +102,7 @@ function scrollToCheckout() {
         </div>
 
         <ul class="vh-widget-benefits">
-          <li><i class="pi pi-check-circle" /> Buffet sáng</li>
+          <li><i class="pi pi-check-circle" /> {{ hotel.breakfastType === 'breakfast' ? 'Bữa sáng' : 'Buffet sáng' }}</li>
           <li v-if="isCombo && quote.seat_count > 0"><i class="pi pi-check-circle" /> {{ comboSeats }} vé khứ hồi xe limousine<span v-if="comboFreeSeats > 0"> (miễn {{ comboFreeSeats }} bé)</span></li>
         </ul>
 

@@ -8,6 +8,7 @@ final class HotelValidation
     public static function createRules(): array
     {
         return [
+            'breakfast_type'               => 'string|in:buffet,breakfast',
             'post_id'                      => 'nullable|int|unique:vie_hotel,post_id',
             'name'                         => 'required|string|max:255',
             'slug'                         => 'nullable|string|max:255|unique:vie_hotel,slug',
@@ -34,6 +35,7 @@ final class HotelValidation
     public static function updateRules(int $id): array
     {
         return [
+            'breakfast_type'               => 'string|in:buffet,breakfast',
             'post_id'                      => 'nullable|int|unique:vie_hotel,post_id,' . $id,
             'name'                         => 'nullable|string|max:255',
             'slug'                         => 'nullable|string|max:255|unique:vie_hotel,slug,' . $id,

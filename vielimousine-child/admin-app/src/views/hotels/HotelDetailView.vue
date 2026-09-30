@@ -9,6 +9,7 @@ import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
+import Select from 'primevue/select';
 import Textarea from 'primevue/textarea';
 import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
@@ -40,6 +41,10 @@ const loading = ref(true);
 const saving = ref(false);
 
 const id = computed(() => Number(route.params.id));
+const breakfastOptions = [
+  { label: 'Buffet sáng', value: 'buffet' },
+  { label: 'Bữa sáng', value: 'breakfast' },
+];
 
 // Policy texts (free-form)
 const pricingPolicyText = ref('');
@@ -117,7 +122,11 @@ async function load() {
       hotelsApi.get(id.value),
       roomsApi.list({ hotel_id: id.value, per_page: 100 }),
     ]);
-    hotel.value = { ...hResp.data, name: decodeEntities(hResp.data.name) };
+    hotel.value = {
+      ...hResp.data,
+      name: decodeEntities(hResp.data.name),
+      breakfast_type: hResp.data.breakfast_type === 'breakfast' ? 'breakfast' : 'buffet',
+    };
     rooms.value = rResp.data.map((r) => ({ ...r, name: decodeEntities(r.name) }));
     pricingPolicyText.value = hotel.value.pricing_policy?.text ?? '';
     cancellationPolicyText.value = hotel.value.cancellation_policy?.text ?? '';
@@ -151,6 +160,7 @@ async function saveInfo() {
       contact_phone: hotel.value.contact_phone,
       contact_email: hotel.value.contact_email,
       star_rating: hotel.value.star_rating,
+      breakfast_type: hotel.value.breakfast_type,
       // Giá vé / chính sách vé chỉ gửi khi có quyền (backend cũng chặn ghi nếu thiếu quyền).
       ...(canEditPricing.value
         ? {
@@ -226,6 +236,18 @@ async function savePolicy() {
               <div class="field">
                 <label>Hạng sao (1–5)</label>
                 <InputNumber v-model="hotel.star_rating" :min="1" :max="5" show-buttons />
+              </div>
+              <div class="field">
+                <label for="hotel-breakfast-type">Loại bữa sáng</label>
+                <Select
+                  input-id="hotel-breakfast-type"
+                  v-model="hotel.breakfast_type"
+                  :options="breakfastOptions"
+                  option-label="label"
+                  option-value="value"
+                  aria-describedby="hotel-breakfast-hint"
+                />
+                <small id="hotel-breakfast-hint" class="muted">Hiển thị trong tóm tắt đặt phòng và combo. Mặc định: Buffet sáng.</small>
               </div>
               <template v-if="canEditPricing">
                 <div class="field">

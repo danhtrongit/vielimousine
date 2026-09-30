@@ -9,6 +9,7 @@ export interface Hotel {
   contact_phone: string | null;
   contact_email: string | null;
   star_rating: number | null;
+  breakfast_type: 'buffet' | 'breakfast';
   default_checkin: string | null;
   default_checkout: string | null;
   default_ticket_price: number;
