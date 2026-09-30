@@ -540,7 +540,7 @@ async function revokeQuote() {
               <div><span>Số đêm:</span> <strong>{{ pricing.nights }}</strong></div>
               <div><span>Người lớn quy đổi:</span> <strong>{{ pricing.effective_adults }}</strong></div>
               <div><span>Trẻ em quy đổi:</span> <strong>{{ pricing.effective_children }}</strong></div>
-              <div v-if="selection.booking_type === 'combo'"><span>Số vé tính phí / Tổng ghế:</span> <strong>{{ pricing.billable_seats }} / {{ pricing.seat_count }}</strong> (miễn {{ pricing.free_child_seats }})</div>
+              <div v-if="selection.booking_type === 'combo'"><span>Số combo:</span> <strong>{{ pricing.seat_count }}</strong><small v-if="pricing.free_child_seats > 0"> ({{ pricing.billable_seats }} tính phí, miễn {{ pricing.free_child_seats }})</small></div>
               <div><span>Tiền phòng:</span> <strong>{{ formatVND(pricing.room_subtotal) }}</strong></div>
               <div v-if="pricing.extra_adult_subtotal > 0"><span>Giường phụ:</span> <strong>{{ formatVND(pricing.extra_adult_subtotal) }}</strong></div>
               <div v-if="pricing.child_surcharge_total > 0"><span>Phụ thu bé:</span> <strong>{{ formatVND(pricing.child_surcharge_total) }}</strong></div>

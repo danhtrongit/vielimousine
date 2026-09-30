@@ -411,12 +411,13 @@ onBeforeUnmount(() => {
                   <div><dt>Nhận / trả phòng</dt><dd>{{ formatTripDate(item.checkin) }} – {{ formatTripDate(item.checkout) }}</dd></div>
                   <div><dt>Số phòng / số đêm</dt><dd>{{ item.num_rooms }} phòng · {{ item.nights }} đêm</dd></div>
                   <div><dt>Khách lưu trú</dt><dd>{{ item.adults }} người lớn<template v-if="item.child_ages.length"> · {{ item.child_ages.length }} trẻ em ({{ item.child_ages.join(', ') }} tuổi)</template></dd></div>
+                  <div v-if="item.booking_type === 'combo'"><dt>Số combo</dt><dd>{{ item.ticket_count }} combo</dd></div>
                 </dl>
                 <dl class="bq-room-prices">
                   <div><dt>Tiền phòng</dt><dd>{{ formatMoney(item.room_subtotal) }}</dd></div>
                   <div v-if="item.extra_adult_total > 0"><dt>Phụ thu người lớn</dt><dd>{{ formatMoney(item.extra_adult_total) }}</dd></div>
                   <div v-if="item.child_surcharge_total > 0"><dt>Phụ thu trẻ em</dt><dd>{{ formatMoney(item.child_surcharge_total) }}</dd></div>
-                  <div v-if="item.booking_type === 'combo'"><dt>Vé xe khứ hồi · {{ item.ticket_count }} vé</dt><dd>{{ formatMoney(item.ticket_subtotal) }}</dd></div>
+                  <div v-if="item.booking_type === 'combo'"><dt>Vé xe khứ hồi</dt><dd>{{ formatMoney(item.ticket_subtotal) }}</dd></div>
                   <div class="bq-room-total"><dt>Tạm tính</dt><dd>{{ formatMoney(item.line_total) }}</dd></div>
                 </dl>
               </article>
